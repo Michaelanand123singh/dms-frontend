@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function UsersAndRolesPage() {
   const [showModal, setShowModal] = useState(false);
@@ -44,6 +44,8 @@ export default function UsersAndRolesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showUserDetails, setShowUserDetails] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -51,7 +53,56 @@ export default function UsersAndRolesPage() {
     password: "",
     role: "Super Admin",
     status: "Active",
+    serviceCenter: "",
   });
+
+  const [centers, setCenters] = useState([]);
+
+  // Load service centers
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
+      const staticCenters = [
+        { id: 1, name: "Delhi Central Hub" },
+        { id: 2, name: "Mumbai Metroplex" },
+        { id: 3, name: "Bangalore Innovation Center" },
+      ];
+      
+      // Merge static and stored centers
+      const allCenters = [...staticCenters];
+      Object.values(storedCenters).forEach(center => {
+        if (!allCenters.find(c => c.id === center.id)) {
+          allCenters.push({ id: center.id, name: center.name });
+        }
+      });
+      setCenters(allCenters);
+    }
+  }, []);
+
+  // Helper function to get service center name(s) from assigned field
+  const getServiceCenterName = (assigned) => {
+    if (!assigned) return "Not Assigned";
+    
+    // If it's already a name (contains spaces or common words), return as is
+    if (assigned.includes(" ") || assigned.includes("Hub") || assigned.includes("Center") || assigned.includes("Metroplex")) {
+      return assigned;
+    }
+    
+    // If it's an ID format like "SC001" or "SC001,SC002"
+    const centerIds = assigned.split(",").map(id => id.trim());
+    const centerNames = centerIds.map(id => {
+      // Extract number from SC001 format
+      const match = id.match(/SC(\d+)/);
+      if (match) {
+        const centerId = parseInt(match[1]);
+        const center = centers.find(c => c.id === centerId);
+        return center ? center.name : id;
+      }
+      return id;
+    });
+    
+    return centerNames.join(", ");
+  };
 
   // Handle Filters
   const handleSearch = (value) => {
@@ -112,12 +163,16 @@ export default function UsersAndRolesPage() {
       .join("")
       .toUpperCase();
 
+    // Get service center name
+    const selectedCenter = centers.find(c => c.id === parseInt(formData.serviceCenter));
+    const assignedSC = selectedCenter ? selectedCenter.name : "Not Assigned";
+
     const newUser = {
       initials,
       name: formData.fullName,
       email: formData.email,
       role: formData.role,
-      assigned: "SC001",
+      assigned: assignedSC,
       status: formData.status,
     };
 
@@ -132,6 +187,7 @@ export default function UsersAndRolesPage() {
       password: "",
       role: "Super Admin",
       status: "Active",
+      serviceCenter: "",
     });
   };
 
@@ -195,7 +251,11 @@ export default function UsersAndRolesPage() {
           filteredUsers.map((user, index) => (
             <div
               key={index}
-              className="rounded-xl border bg-white shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition"
+              onClick={() => {
+                setSelectedUser(user);
+                setShowUserDetails(true);
+              }}
+              className="rounded-xl border bg-white shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition cursor-pointer"
             >
               <div className="flex items-center gap-4">
                 <div className="bg-gradient-to-r from-pink-500 to-purple-500 text-white font-semibold rounded-full w-14 h-14 flex items-center justify-center text-lg">
@@ -215,8 +275,8 @@ export default function UsersAndRolesPage() {
                   </span>
                 </p>
                 <p className="text-sm text-gray-600 mt-1">
-                  <span className="font-semibold">Assigned SC:</span>{" "}
-                  {user.assigned}
+                  <span className="font-semibold">Service Center:</span>{" "}
+                  <span className="text-gray-800">{getServiceCenterName(user.assigned)}</span>
                 </p>
                 <p className="text-sm mt-2">
                   <span className="font-semibold">Status:</span>{" "}
@@ -292,6 +352,24 @@ export default function UsersAndRolesPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium mb-1">Service Center</label>
+                <select
+                  name="serviceCenter"
+                  value={formData.serviceCenter}
+                  onChange={handleChange}
+                  className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                  required
+                >
+                  <option value="">Select Service Center</option>
+                  {centers.map((center) => (
+                    <option key={center.id} value={center.id}>
+                      {center.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium mb-1">Role</label>
                 <select
                   name="role"
@@ -335,6 +413,87 @@ export default function UsersAndRolesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {showUserDetails && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-semibold text-gray-800">User Details</h2>
+              <button
+                onClick={() => {
+                  setShowUserDetails(false);
+                  setSelectedUser(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 pb-4 border-b">
+                <div className="bg-gradient-to-r from-pink-500 to-purple-500 text-white font-semibold rounded-full w-16 h-16 flex items-center justify-center text-xl">
+                  {selectedUser.initials}
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-800">{selectedUser.name}</h3>
+                  <p className="text-gray-500">{selectedUser.email}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b">
+                  <span className="text-sm font-medium text-gray-600">Full Name:</span>
+                  <span className="text-sm text-gray-800">{selectedUser.name}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b">
+                  <span className="text-sm font-medium text-gray-600">Email Address:</span>
+                  <span className="text-sm text-gray-800">{selectedUser.email}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b">
+                  <span className="text-sm font-medium text-gray-600">Role:</span>
+                  <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-md text-sm font-medium">
+                    {selectedUser.role}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b">
+                  <span className="text-sm font-medium text-gray-600">Service Center:</span>
+                  <span className="text-sm text-gray-800">{getServiceCenterName(selectedUser.assigned)}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b">
+                  <span className="text-sm font-medium text-gray-600">Status:</span>
+                  <span
+                    className={`text-sm font-semibold ${
+                      selectedUser.status === "Active"
+                        ? "text-green-600"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {selectedUser.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <button
+                  onClick={() => {
+                    setShowUserDetails(false);
+                    setSelectedUser(null);
+                  }}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

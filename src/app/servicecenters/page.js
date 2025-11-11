@@ -138,13 +138,13 @@ export default function ServiceCentersPage() {
         {centers.map((center) => (
           <div
             key={center.id}
-            className="bg-white border rounded-xl shadow-sm hover:shadow-md transition p-4 sm:p-5 flex flex-col justify-between"
+            onClick={() => router.push(`/servicecenters/${center.id}`)}
+            className="bg-white border rounded-xl shadow-sm hover:shadow-md transition p-4 sm:p-5 flex flex-col justify-between cursor-pointer"
           >
             <div>
               <div className="flex items-start justify-between mb-2">
                 <h2 
-                  onClick={() => router.push(`/servicecenters/${center.id}`)}
-                  className="text-base sm:text-lg font-semibold text-gray-800 break-words cursor-pointer hover:text-blue-600 flex-1"
+                  className="text-base sm:text-lg font-semibold text-gray-800 break-words hover:text-blue-600 flex-1"
                 >
                   {center.name}
                 </h2>

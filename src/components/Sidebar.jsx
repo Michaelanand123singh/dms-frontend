@@ -20,11 +20,11 @@ const menu = [
   { name: "Service Centers", icon: Building, href: "/servicecenters" },
   { name: "Users & Roles", icon: Users, href: "/user&roles" },
   { name: "Inventory", icon: Package, href: "/inventory" },
-  { name: "Approvals", icon: CheckCircle, href: "#" },
-  { name: "Finance", icon: DollarSign, href: "#" },
-  { name: "Reports", icon: FileText, href: "#" },
-  { name: "Complaints", icon: AlertCircle, href: "#" },
-  { name: "Audit Logs", icon: ClipboardList, href: "#" },
+  { name: "Approvals", icon: CheckCircle, href: "/approvals" },
+  { name: "Finance", icon: DollarSign, href: "/finance" },
+  { name: "Reports", icon: FileText, href: "/reports" },
+  { name: "Complaints", icon: AlertCircle, href: "/complaints" },
+  { name: "Audit Logs", icon: ClipboardList, href: "/audit-logs" },
 ];
 
 export default function Sidebar({ open, setOpen }) {
