@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { Trash } from "lucide-react";
 
 export default function UsersAndRolesPage() {
   const [showModal, setShowModal] = useState(false);
@@ -46,6 +47,8 @@ export default function UsersAndRolesPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -191,6 +194,59 @@ export default function UsersAndRolesPage() {
     });
   };
 
+  // Handle Delete User
+  const handleDeleteClick = (user, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setUserToDelete(user);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (userToDelete) {
+      const updatedUsers = users.filter(
+        (u) => !(u.email === userToDelete.email && u.name === userToDelete.name)
+      );
+      setUsers(updatedUsers);
+      
+      // Apply filters to the updated users list
+      let filtered = [...updatedUsers];
+
+      if (searchTerm.trim() !== "") {
+        filtered = filtered.filter(
+          (u) =>
+            u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.email.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+
+      if (roleFilter !== "All") {
+        filtered = filtered.filter((u) => u.role === roleFilter);
+      }
+
+      if (statusFilter !== "All") {
+        filtered = filtered.filter((u) => u.status === statusFilter);
+      }
+
+      setFilteredUsers(filtered);
+      
+      // Close modals if open
+      if (showUserDetails && selectedUser && selectedUser.email === userToDelete.email) {
+        setShowUserDetails(false);
+        setSelectedUser(null);
+      }
+      
+      setShowDeleteConfirm(false);
+      setUserToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setUserToDelete(null);
+  };
+
   return (
     <div className="min-h-screen bg-white text-gray-900 p-6">
       {/* Header */}
@@ -227,6 +283,7 @@ export default function UsersAndRolesPage() {
           <option>SC Manager</option>
           <option>Finance Manager</option>
           <option>Call Center</option>
+          <option>Technician Engineer</option>
         </select>
         <select
           value={statusFilter}
@@ -255,8 +312,15 @@ export default function UsersAndRolesPage() {
                 setSelectedUser(user);
                 setShowUserDetails(true);
               }}
-              className="rounded-xl border bg-white shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition cursor-pointer"
+              className="rounded-xl border bg-white shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition cursor-pointer relative"
             >
+              <button
+                onClick={(e) => handleDeleteClick(user, e)}
+                className="absolute top-3 right-3 p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                title="Delete User"
+              >
+                <Trash size={18} />
+              </button>
               <div className="flex items-center gap-4">
                 <div className="bg-gradient-to-r from-pink-500 to-purple-500 text-white font-semibold rounded-full w-14 h-14 flex items-center justify-center text-lg">
                   {user.initials}
@@ -381,6 +445,7 @@ export default function UsersAndRolesPage() {
                   <option>SC Manager</option>
                   <option>Finance Manager</option>
                   <option>Call Center</option>
+                  <option>Technician Engineer</option>
                 </select>
               </div>
 
@@ -482,7 +547,17 @@ export default function UsersAndRolesPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-4">
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(selectedUser, e);
+                  }}
+                  className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition flex items-center gap-2"
+                >
+                  <Trash size={16} />
+                  Delete User
+                </button>
                 <button
                   onClick={() => {
                     setShowUserDetails(false);
@@ -493,6 +568,32 @@ export default function UsersAndRolesPage() {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && userToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-md p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Confirm Delete</h2>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete user <span className="font-semibold text-gray-800">{userToDelete.name}</span> ({userToDelete.email})? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={cancelDelete}
+                className="bg-gray-300 px-6 py-2 rounded-md hover:bg-gray-400 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
