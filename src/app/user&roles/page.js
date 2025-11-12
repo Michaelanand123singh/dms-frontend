@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Trash } from "lucide-react";
 
 export default function UsersAndRolesPage() {
@@ -59,10 +59,8 @@ export default function UsersAndRolesPage() {
     serviceCenter: "",
   });
 
-  const [centers, setCenters] = useState([]);
-
-  // Load service centers
-  useEffect(() => {
+  // Load service centers using lazy initializer
+  const [centers, setCenters] = useState(() => {
     if (typeof window !== 'undefined') {
       const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
       const staticCenters = [
@@ -78,9 +76,10 @@ export default function UsersAndRolesPage() {
           allCenters.push({ id: center.id, name: center.name });
         }
       });
-      setCenters(allCenters);
+      return allCenters;
     }
-  }, []);
+    return [];
+  });
 
   // Helper function to get service center name(s) from assigned field
   const getServiceCenterName = (assigned) => {
@@ -366,7 +365,7 @@ export default function UsersAndRolesPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-md p-6">
             <h2 className="text-xl font-semibold mb-4">Create New User</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -484,7 +483,7 @@ export default function UsersAndRolesPage() {
 
       {/* User Details Modal */}
       {showUserDetails && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-lg p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-semibold text-gray-800">User Details</h2>
@@ -575,7 +574,7 @@ export default function UsersAndRolesPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && userToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-md p-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Confirm Delete</h2>
             <p className="text-gray-600 mb-6">

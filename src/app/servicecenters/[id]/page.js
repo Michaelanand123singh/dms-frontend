@@ -408,6 +408,13 @@ export default function ServiceCenterDetailPage() {
   // Initialize with empty data for new centers, or sample data for existing ones
   const [vehicles, setVehicles] = useState(vehiclesData);
   const [serviceRequests, setServiceRequests] = useState(serviceRequestsData);
+
+  // Helper function to normalize phone number for search (remove country code, dashes, spaces)
+  const normalizePhoneNumber = (phone) => {
+    if (!phone) return "";
+    // Remove country code (+91, 91), dashes, spaces, and parentheses
+    return phone.replace(/^\+?91[- ]?/, "").replace(/[- ]/g, "").trim();
+  };
   
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   
@@ -806,7 +813,7 @@ export default function ServiceCenterDetailPage() {
               <div className="mb-6">
                 <input
                   type="text"
-                  placeholder="Search by registration number or VIN..."
+                  placeholder="Search by registration number, VIN, customer name, or mobile number..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900 text-base"
@@ -815,10 +822,16 @@ export default function ServiceCenterDetailPage() {
               <div className="space-y-4">
                 {vehicles
                   .filter(
-                    (vehicle) =>
-                      vehicle.registrationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      vehicle.vin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      vehicle.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+                    (vehicle) => {
+                      const normalizedQuery = normalizePhoneNumber(searchQuery);
+                      const normalizedVehiclePhone = normalizePhoneNumber(vehicle.phone);
+                      return (
+                        vehicle.registrationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        vehicle.vin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        vehicle.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (normalizedVehiclePhone && normalizedVehiclePhone.includes(normalizedQuery))
+                      );
+                    }
                   )
                   .map((vehicle) => (
                     <div
@@ -838,7 +851,7 @@ export default function ServiceCenterDetailPage() {
                               Customer: <span className="font-semibold">{vehicle.customerName}</span>
                             </p>
                             <p>
-                              Phone: <span className="font-semibold break-all">{vehicle.phone}</span>
+                              Phone: <span className="font-semibold break-all">{normalizePhoneNumber(vehicle.phone) || vehicle.phone}</span>
                             </p>
                             <p className="break-all">VIN: {vehicle.vin}</p>
                           </div>
@@ -905,7 +918,7 @@ export default function ServiceCenterDetailPage() {
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-600">Phone</label>
-                            <p className="text-base text-gray-800">{showVehicleDetails.phone}</p>
+                            <p className="text-base text-gray-800">{normalizePhoneNumber(showVehicleDetails.phone) || showVehicleDetails.phone}</p>
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-600">Email</label>
@@ -2598,7 +2611,7 @@ export default function ServiceCenterDetailPage() {
             <div className="mb-4 flex gap-2">
               <input
                 type="text"
-                placeholder="Search vehicles..."
+                placeholder="Search by registration, VIN, name, or mobile number..."
                 value={vehicleSearchQuery}
                 onChange={(e) => setVehicleSearchQuery(e.target.value)}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
@@ -2613,11 +2626,16 @@ export default function ServiceCenterDetailPage() {
             </div>
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {vehicles
-                .filter((v) =>
-                  v.registrationNumber.toLowerCase().includes(vehicleSearchQuery.toLowerCase()) ||
-                  v.customerName.toLowerCase().includes(vehicleSearchQuery.toLowerCase()) ||
-                  v.vin.toLowerCase().includes(vehicleSearchQuery.toLowerCase())
-                )
+                .filter((v) => {
+                  const normalizedQuery = normalizePhoneNumber(vehicleSearchQuery);
+                  const normalizedVehiclePhone = normalizePhoneNumber(v.phone);
+                  return (
+                    v.registrationNumber.toLowerCase().includes(vehicleSearchQuery.toLowerCase()) ||
+                    v.customerName.toLowerCase().includes(vehicleSearchQuery.toLowerCase()) ||
+                    v.vin.toLowerCase().includes(vehicleSearchQuery.toLowerCase()) ||
+                    (normalizedVehiclePhone && normalizedVehiclePhone.includes(normalizedQuery))
+                  );
+                })
                 .map((vehicle) => (
                   <div
                     key={vehicle.id}

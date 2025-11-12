@@ -14,7 +14,7 @@ export default function RootLayout({ children }) {
 
   return (
     <html lang="en">
-      <body className="antialiased bg-[#f9f9fb] flex">
+      <body className="antialiased bg-[#f9f9fb] flex" suppressHydrationWarning>
         {/* ✅ Sidebar only shown if logged in */}
         {isLoggedIn && <Sidebar open={open} setOpen={setOpen} />}
 
