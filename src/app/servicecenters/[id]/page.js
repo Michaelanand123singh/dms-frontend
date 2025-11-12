@@ -425,6 +425,18 @@ export default function ServiceCenterDetailPage() {
   const [showInventoryAddEdit, setShowInventoryAddEdit] = useState(false);
   const [editingInventoryItem, setEditingInventoryItem] = useState(null);
   const [showVehicleDetails, setShowVehicleDetails] = useState(null);
+  const [showJobCardForm, setShowJobCardForm] = useState(false);
+  
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: "" });
+  
+  // Toast function
+  const showToast = (message) => {
+    setToast({ show: true, message });
+    setTimeout(() => {
+      setToast({ show: false, message: "" });
+    }, 3000);
+  };
   
   // Form states
   const [createRequestForm, setCreateRequestForm] = useState({
@@ -567,9 +579,19 @@ export default function ServiceCenterDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[100] animate-fade-in">
+          <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] max-w-md">
+            <CheckCircle2 size={20} className="flex-shrink-0" />
+            <p className="font-medium">{toast.message}</p>
+          </div>
+        </div>
+      )}
+      
       {/* Mobile Menu Overlay */}
       {showMobileMenu && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md z-40 lg:hidden">
           <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Actions</h2>
@@ -835,7 +857,7 @@ export default function ServiceCenterDetailPage() {
               
               {/* Vehicle Details Modal */}
               {showVehicleDetails && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl p-6 relative max-h-[95vh] overflow-y-auto">
                     <button
                       className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"
@@ -983,7 +1005,7 @@ export default function ServiceCenterDetailPage() {
                         </button>
                         <button
                           onClick={() => {
-                            alert("Schedule appointment functionality coming soon!");
+                            showToast("Schedule appointment functionality coming soon!");
                           }}
                           className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-700 transition"
                         >
@@ -1121,7 +1143,10 @@ export default function ServiceCenterDetailPage() {
                                   req.id === request.id ? { ...req, status: "Approved" } : req
                                 )
                               );
-                              alert("Request approved!");
+                              showToast("Request approved!");
+                              // Navigate to Create Job Card tab
+                              setActiveTab("Create Job Card");
+                              setShowJobCardForm(false);
                             }}
                             className="bg-green-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition whitespace-nowrap flex-1"
                           >
@@ -1134,7 +1159,7 @@ export default function ServiceCenterDetailPage() {
                                   req.id === request.id ? { ...req, status: "Rejected" } : req
                                 )
                               );
-                              alert("Request rejected!");
+                              showToast("Request rejected!");
                             }}
                             className="bg-red-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-red-700 transition whitespace-nowrap flex-1"
                           >
@@ -1168,7 +1193,7 @@ export default function ServiceCenterDetailPage() {
                       status: "Pending",
                     };
                     setServiceRequests([...serviceRequests, newRequest]);
-                    alert("Service request created successfully!");
+                    showToast("Service request created successfully!");
                     setCreateRequestForm({ vehicle: "", serviceType: "", description: "", estimatedCost: "" });
                   }}
                   className="space-y-4 sm:space-y-6"
@@ -1268,26 +1293,121 @@ export default function ServiceCenterDetailPage() {
                   <ClipboardList size={24} className="text-orange-600" />
                   <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Create Job Card</h2>
                 </div>
-                <button
-                  onClick={() => {
-                    setJobCardForm({
-                      approvedRequest: "",
-                      vehicle: "",
-                      customerName: "",
-                      serviceType: "",
-                      technician: "",
-                      completionDate: "",
-                      laborCost: "",
-                      partsCost: "",
-                    });
-                  }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center gap-2"
-                >
-                  <Plus size={16} />
-                  Create New Job Card
-                </button>
+                {!showJobCardForm && (
+                  <button
+                    onClick={() => {
+                      setShowJobCardForm(true);
+                      setJobCardForm({
+                        approvedRequest: "",
+                        vehicle: "",
+                        customerName: "",
+                        serviceType: "",
+                        technician: "",
+                        completionDate: "",
+                        laborCost: "",
+                        partsCost: "",
+                      });
+                    }}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center gap-2"
+                  >
+                    <Plus size={16} />
+                    Create New Job Card
+                  </button>
+                )}
               </div>
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
+
+              {/* Show Approved Requests List */}
+              {!showJobCardForm && (
+                <div className="space-y-4">
+                  {serviceRequests.filter(sr => sr.status === "Approved").length > 0 ? (
+                    serviceRequests.filter(sr => sr.status === "Approved").map((request) => (
+                      <div
+                        key={request.id}
+                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6"
+                      >
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-lg font-semibold text-gray-800">{request.id}</h3>
+                              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                Approved
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-700 space-y-1">
+                              <p>
+                                <span className="font-semibold">Vehicle:</span> {request.vehicle}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Customer:</span> {request.customerName}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Service Type:</span> {request.serviceType}
+                              </p>
+                              <p className="break-words">
+                                <span className="font-semibold">Description:</span> {request.description}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Estimated Cost:</span> ₹{request.estimatedCost}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Requested:</span> {request.requestedDate}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setShowJobCardForm(true);
+                              const selectedRequest = request;
+                              setJobCardForm({
+                                approvedRequest: selectedRequest.id,
+                                vehicle: selectedRequest.vehicle || "",
+                                customerName: selectedRequest.customerName || "",
+                                serviceType: selectedRequest.serviceType || "",
+                                technician: "",
+                                completionDate: "",
+                                laborCost: "",
+                                partsCost: "",
+                              });
+                            }}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-blue-700 transition whitespace-nowrap"
+                          >
+                            Create Job Card
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center">
+                      <p className="text-gray-500">No approved requests available. Please approve requests first.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Show Job Card Form */}
+              {showJobCardForm && (
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Job Card Form</h3>
+                    <button
+                      onClick={() => {
+                        setShowJobCardForm(false);
+                        setJobCardForm({
+                          approvedRequest: "",
+                          vehicle: "",
+                          customerName: "",
+                          serviceType: "",
+                          technician: "",
+                          completionDate: "",
+                          laborCost: "",
+                          partsCost: "",
+                        });
+                      }}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -1300,7 +1420,8 @@ export default function ServiceCenterDetailPage() {
                       status: "Not Started",
                     };
                     setJobs([...jobs, newJob]);
-                    alert("Job card created successfully!");
+                    showToast("Job card created successfully!");
+                    setShowJobCardForm(false);
                     setJobCardForm({
                       approvedRequest: "",
                       vehicle: "",
@@ -1468,7 +1589,8 @@ export default function ServiceCenterDetailPage() {
                     Create Job Card
                   </button>
                 </form>
-              </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1483,7 +1605,7 @@ export default function ServiceCenterDetailPage() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    alert("Part request submitted successfully!");
+                    showToast("Part request submitted successfully!");
                     setRequestPartsForm({ part: "", quantity: "", reason: "Low Stock", notes: "" });
                   }}
                   className="space-y-4 sm:space-y-6"
@@ -1614,7 +1736,7 @@ export default function ServiceCenterDetailPage() {
                                   req.id === request.id ? { ...req, status: "Issued" } : req
                                 )
                               );
-                              alert("Parts issued successfully!");
+                              showToast("Parts issued successfully!");
                             }}
                             className="bg-green-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition whitespace-nowrap flex-1"
                           >
@@ -1627,7 +1749,7 @@ export default function ServiceCenterDetailPage() {
                                   req.id === request.id ? { ...req, status: "Rejected" } : req
                                 )
                               );
-                              alert("Request rejected!");
+                              showToast("Request rejected!");
                             }}
                             className="bg-red-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-red-700 transition whitespace-nowrap flex-1"
                           >
@@ -1877,7 +1999,7 @@ export default function ServiceCenterDetailPage() {
                               j.id === job.id ? { ...j, status: newStatus } : j
                             )
                           );
-                          alert(`Job status updated to ${newStatus}!`);
+                          showToast(`Job status updated to ${newStatus}!`);
                         }}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
                       >
@@ -1940,7 +2062,7 @@ export default function ServiceCenterDetailPage() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    alert("Invoice generated and sent successfully!");
+                    showToast("Invoice generated and sent successfully!");
                     setGenerateInvoiceForm({
                       jobCard: "",
                       vehicle: "",
@@ -2233,7 +2355,7 @@ export default function ServiceCenterDetailPage() {
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
-                        alert("Payment recorded successfully!");
+                        showToast("Payment recorded successfully!");
                         setRecordPaymentForm({
                           invoice: "",
                           paymentMethod: "Cash",
@@ -2302,7 +2424,7 @@ export default function ServiceCenterDetailPage() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    alert("Order processed and invoice generated successfully!");
+                    showToast("Order processed and invoice generated successfully!");
                     setOtcOrderForm({
                       customerName: "",
                       customerPhone: "",
@@ -2461,7 +2583,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Vehicle Selection Popup */}
       {showVehiclePopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-black hover:text-gray-700"
@@ -2517,7 +2639,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Add New Vehicle Popup */}
       {showAddVehiclePopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2556,7 +2678,7 @@ export default function ServiceCenterDetailPage() {
                   phone: "",
                   vin: "",
                 });
-                alert("Vehicle added successfully!");
+                showToast("Vehicle added successfully!");
               }}
               className="space-y-4"
             >
@@ -2633,7 +2755,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Engineer Search Popup */}
       {showEngineerPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2666,7 +2788,7 @@ export default function ServiceCenterDetailPage() {
                       setJobs(jobs.map(j => j.id === showEngineerPopup ? { ...j, technician: staff.name } : j));
                       setShowEngineerPopup(false);
                       setEngineerSearchQuery("");
-                      alert("Engineer assigned successfully!");
+                      showToast("Engineer assigned successfully!");
                     }}
                     className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
                   >
@@ -2681,7 +2803,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Part Search Popup */}
       {showPartPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2737,7 +2859,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Add Custom Part Popup */}
       {showAddPartPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2771,7 +2893,7 @@ export default function ServiceCenterDetailPage() {
                   quantity: "",
                   price: "",
                 });
-                alert("Custom part added successfully!");
+                showToast("Custom part added successfully!");
               }}
               className="space-y-4"
             >
@@ -2798,7 +2920,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Invoice Search Popup */}
       {showInvoiceSearchPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2846,7 +2968,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Inventory Add/Edit Popup */}
       {showInventoryAddEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2885,7 +3007,7 @@ export default function ServiceCenterDetailPage() {
                         }
                       : item
                   ));
-                  alert("Part updated successfully!");
+                  showToast("Part updated successfully!");
                 } else {
                   const newPart = {
                     id: inventory.length + 1,
@@ -2897,7 +3019,7 @@ export default function ServiceCenterDetailPage() {
                     status: inventoryForm.status,
                   };
                   setInventory([...inventory, newPart]);
-                  alert("Part added successfully!");
+                  showToast("Part added successfully!");
                 }
                 setShowInventoryAddEdit(false);
                 setEditingInventoryItem(null);

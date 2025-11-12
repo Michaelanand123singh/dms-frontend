@@ -21,7 +21,9 @@ export default function RootLayout({ children }) {
         {/* ✅ Main Area */}
         <div
           className={`flex-1 flex flex-col transition-all duration-300 ${
-            open && isLoggedIn ? "md:ml-64" : "ml-0"
+            isLoggedIn 
+              ? (open ? "ml-64 md:ml-64" : "ml-0 md:ml-20") 
+              : "ml-0"
           }`}
         >
           {/* ✅ Navbar only shown if logged in */}
