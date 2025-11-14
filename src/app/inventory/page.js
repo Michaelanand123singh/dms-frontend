@@ -124,6 +124,7 @@ export default function InventoryPage() {
   const [form, setForm] = useState({
     partName: "",
     sku: "",
+    partCode: "",
     category: "",
     quantity: "",
     price: "",
@@ -200,6 +201,7 @@ export default function InventoryPage() {
     setForm({
       partName: "",
       sku: "",
+      partCode: "",
       category: "",
       quantity: "",
       price: "",
@@ -215,6 +217,7 @@ export default function InventoryPage() {
     setForm({
       partName: item.partName,
       sku: item.sku,
+      partCode: item.partCode || "",
       category: item.category,
       quantity: item.quantity.toString(),
       price: item.price,
@@ -615,6 +618,16 @@ export default function InventoryPage() {
                   onChange={(e) => setForm({ ...form, sku: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none text-gray-900 text-sm"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Part Code</label>
+                <input
+                  type="text"
+                  value={form.partCode}
+                  onChange={(e) => setForm({ ...form, partCode: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none text-gray-900 text-sm"
+                  placeholder="Enter part code"
                 />
               </div>
               <div>

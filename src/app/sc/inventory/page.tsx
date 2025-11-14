@@ -94,7 +94,8 @@ export default function SCInventory() {
     const matchesSearch =
       item.partName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase());
+      item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.partCode && item.partCode.toLowerCase().includes(searchQuery.toLowerCase()));
 
     if (filter === "low_stock") {
       return matchesSearch && item.currentQty <= item.minStock && item.currentQty > 0;
@@ -244,6 +245,9 @@ export default function SCInventory() {
                     SKU
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Part Code
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Category
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -284,6 +288,9 @@ export default function SCInventory() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900 font-mono">{item.sku}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-700">{item.partCode || "-"}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-700">{item.category}</span>
@@ -374,6 +381,9 @@ export default function SCInventory() {
                   <p className="text-sm text-gray-600 mb-1">Part Name</p>
                   <p className="font-semibold text-gray-800">{selectedPart.partName}</p>
                   <p className="text-xs text-gray-500 mt-1">SKU: {selectedPart.sku}</p>
+                  {selectedPart.partCode && (
+                    <p className="text-xs text-gray-500 mt-1">Part Code: {selectedPart.partCode}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

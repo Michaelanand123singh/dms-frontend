@@ -16,6 +16,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
+import { useState, useEffect } from "react";
 import { useRole } from "@/shared/hooks";
 import { safeStorage } from "@/shared/lib/localStorage";
 
@@ -40,6 +41,12 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userInfo } = useRole();
+  const [mounted, setMounted] = useState(false);
+
+  // Only access userInfo after component mounts to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = () => {
     safeStorage.removeItem("userRole");
@@ -48,9 +55,10 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
     router.push("/");
   };
 
-  const displayName = userInfo?.name || "Admin";
-  const displayRole = userInfo?.role || "Super Admin";
-  const initials = userInfo?.initials || "A";
+  // Use consistent default during SSR and initial render
+  const displayName = mounted ? (userInfo?.name || "Admin") : "Admin";
+  const displayRole = mounted ? (userInfo?.role || "Super Admin") : "Super Admin";
+  const initials = mounted ? (userInfo?.initials || "A") : "A";
 
   return (
     <aside

@@ -127,9 +127,7 @@ const actionButtons = [
   { name: "Overview", icon: BarChart3 },
   { name: "Vehicle Search", icon: Search },
   { name: "Create Request", icon: Plus },
-  { name: "Approve Request", icon: CheckCircle },
   { name: "Create Job Card", icon: FileText },
-  { name: "Assign Engineer", icon: User },
   { name: "Update Job Status", icon: RefreshCw },
   { name: "Complete Job", icon: CheckCircle2 },
   { name: "View Inventory", icon: Package },
@@ -367,6 +365,7 @@ const jobsData = [
     customerName: "Priya Nair",
     technician: "Technician Raj",
     status: "In Progress",
+    estimatedCost: "₹5500",
   },
   {
     id: "JC002",
@@ -374,6 +373,23 @@ const jobsData = [
     customerName: "Rohit Shah",
     technician: "Technician Priya",
     status: "Not Started",
+    estimatedCost: "₹3500",
+  },
+  {
+    id: "JC003",
+    vehicle: "DL-01-XY-9999",
+    customerName: "Amit Kumar",
+    technician: "Technician Raj",
+    status: "Completed",
+    estimatedCost: "₹4500",
+  },
+  {
+    id: "JC004",
+    vehicle: "DL-01-MN-8888",
+    customerName: "Sneha Patel",
+    technician: "Technician Priya",
+    status: "Completed",
+    estimatedCost: "₹6200",
   },
 ];
 
@@ -467,6 +483,7 @@ export default function ServiceCenterDetailPage() {
   const [partRequests, setPartRequests] = useState(partRequestsData);
   const [inventory, setInventory] = useState(inventoryData);
   const [jobs, setJobs] = useState(jobsData);
+  const [invoices, setInvoices] = useState(invoicesData);
   
   const [requestPartsForm, setRequestPartsForm] = useState({
     part: "",
@@ -515,6 +532,7 @@ export default function ServiceCenterDetailPage() {
   const [inventoryForm, setInventoryForm] = useState({
     partName: "",
     sku: "",
+    partCode: "",
     category: "",
     quantity: "",
     price: "",
@@ -1116,76 +1134,6 @@ export default function ServiceCenterDetailPage() {
             </div>
           )}
 
-          {/* Approve Request */}
-          {activeTab === "Approve Request" && (
-            <div>
-              <div className="flex items-center gap-2 mb-6">
-                <CheckCircle size={24} className="text-green-600" />
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Approve Service Requests</h2>
-              </div>
-              <div className="space-y-4">
-                {serviceRequests
-                  .filter((req) => req.status === "Pending")
-                  .map((request) => (
-                    <div
-                      key={request.id}
-                      className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6"
-                    >
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3">{request.id}</h3>
-                          <div className="text-sm text-gray-700 space-y-2">
-                            <p>
-                              Vehicle: <span className="font-semibold break-words">{request.vehicle} - {request.customerName}</span>
-                            </p>
-                            <p>
-                              Service Type: <span className="font-semibold">{request.serviceType}</span>
-                            </p>
-                            <p className="break-words">Description: {request.description}</p>
-                            <p>
-                              Estimated Cost: <span className="font-semibold">{request.estimatedCost}</span>
-                            </p>
-                            <p>Requested: {request.requestedDate}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:ml-4 w-full lg:w-auto">
-                          <button
-                            onClick={() => {
-                              setServiceRequests(
-                                serviceRequests.map((req) =>
-                                  req.id === request.id ? { ...req, status: "Approved" } : req
-                                )
-                              );
-                              showToast("Request approved!");
-                              // Navigate to Create Job Card tab
-                              setActiveTab("Create Job Card");
-                              setShowJobCardForm(false);
-                            }}
-                            className="bg-green-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition whitespace-nowrap flex-1"
-                          >
-                            ✓ Approve
-                          </button>
-                          <button
-                            onClick={() => {
-                              setServiceRequests(
-                                serviceRequests.map((req) =>
-                                  req.id === request.id ? { ...req, status: "Rejected" } : req
-                                )
-                              );
-                              showToast("Request rejected!");
-                            }}
-                            className="bg-red-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-red-700 transition whitespace-nowrap flex-1"
-                          >
-                            X Reject
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
           {/* Create Request */}
           {activeTab === "Create Request" && (
             <div>
@@ -1206,8 +1154,21 @@ export default function ServiceCenterDetailPage() {
                       status: "Pending",
                     };
                     setServiceRequests([...serviceRequests, newRequest]);
-                    showToast("Service request created successfully!");
+                    showToast("Service request created successfully! Redirecting to Create Job Card...");
                     setCreateRequestForm({ vehicle: "", serviceType: "", description: "", estimatedCost: "" });
+                    // Navigate to Create Job Card and pre-fill the form
+                    setActiveTab("Create Job Card");
+                    setShowJobCardForm(true);
+                    setJobCardForm({
+                      approvedRequest: newRequest.id,
+                      vehicle: newRequest.vehicle || "",
+                      customerName: newRequest.customerName || "",
+                      serviceType: newRequest.serviceType || "",
+                      technician: "",
+                      completionDate: "",
+                      laborCost: "",
+                      partsCost: "",
+                    });
                   }}
                   className="space-y-4 sm:space-y-6"
                 >
@@ -1329,69 +1290,112 @@ export default function ServiceCenterDetailPage() {
                 )}
               </div>
 
-              {/* Show Approved Requests List */}
+              {/* Show Pending Service Requests and Created Job Cards */}
               {!showJobCardForm && (
                 <div className="space-y-4">
-                  {serviceRequests.filter(sr => sr.status === "Approved").length > 0 ? (
-                    serviceRequests.filter(sr => sr.status === "Approved").map((request) => (
-                      <div
-                        key={request.id}
-                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6"
-                      >
-                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="text-lg font-semibold text-gray-800">{request.id}</h3>
-                              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
-                                Approved
-                              </span>
+                  {serviceRequests.filter(sr => sr.status === "Pending" || sr.status === "Converted").length > 0 ? (
+                    serviceRequests.filter(sr => sr.status === "Pending" || sr.status === "Converted").map((request) => {
+                      const createdJobCard = request.jobCardId ? jobs.find(j => j.id === request.jobCardId) : null;
+                      
+                      return (
+                        <div
+                          key={request.id}
+                          className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6"
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="text-lg font-semibold text-gray-800">{request.id}</h3>
+                                {request.status === "Pending" ? (
+                                  <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                    Pending
+                                  </span>
+                                ) : (
+                                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                    Converted
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-700 space-y-1">
+                                <p>
+                                  <span className="font-semibold">Vehicle:</span> {request.vehicle}
+                                </p>
+                                <p>
+                                  <span className="font-semibold">Customer:</span> {request.customerName}
+                                </p>
+                                <p>
+                                  <span className="font-semibold">Service Type:</span> {request.serviceType}
+                                </p>
+                                <p className="break-words">
+                                  <span className="font-semibold">Description:</span> {request.description}
+                                </p>
+                                <p>
+                                  <span className="font-semibold">Estimated Cost:</span> {request.estimatedCost}
+                                </p>
+                                <p>
+                                  <span className="font-semibold">Requested:</span> {request.requestedDate}
+                                </p>
+                              </div>
+                              
+                              {/* Show Created Job Card if exists */}
+                              {createdJobCard && (
+                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <FileText size={18} className="text-blue-600" />
+                                    <h4 className="text-base font-semibold text-gray-800">Created Job Card</h4>
+                                  </div>
+                                  <div className="bg-blue-50 rounded-lg p-3 space-y-1">
+                                    <p className="text-sm">
+                                      <span className="font-semibold">Job Card ID:</span> {createdJobCard.id}
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="font-semibold">Technician:</span> {createdJobCard.technician || "Not Assigned"}
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="font-semibold">Status:</span>{" "}
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                        createdJobCard.status === "Not Started" ? "bg-gray-100 text-gray-700" :
+                                        createdJobCard.status === "In Progress" ? "bg-blue-100 text-blue-700" :
+                                        createdJobCard.status === "Completed" ? "bg-green-100 text-green-700" :
+                                        "bg-yellow-100 text-yellow-700"
+                                      }`}>
+                                        {createdJobCard.status}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <div className="text-sm text-gray-700 space-y-1">
-                              <p>
-                                <span className="font-semibold">Vehicle:</span> {request.vehicle}
-                              </p>
-                              <p>
-                                <span className="font-semibold">Customer:</span> {request.customerName}
-                              </p>
-                              <p>
-                                <span className="font-semibold">Service Type:</span> {request.serviceType}
-                              </p>
-                              <p className="break-words">
-                                <span className="font-semibold">Description:</span> {request.description}
-                              </p>
-                              <p>
-                                <span className="font-semibold">Estimated Cost:</span> ₹{request.estimatedCost}
-                              </p>
-                              <p>
-                                <span className="font-semibold">Requested:</span> {request.requestedDate}
-                              </p>
-                            </div>
+                            
+                            {/* Show Convert button only if not converted yet */}
+                            {!createdJobCard && (
+                              <button
+                                onClick={() => {
+                                  setShowJobCardForm(true);
+                                  const selectedRequest = request;
+                                  setJobCardForm({
+                                    approvedRequest: selectedRequest.id,
+                                    vehicle: selectedRequest.vehicle || "",
+                                    customerName: selectedRequest.customerName || "",
+                                    serviceType: selectedRequest.serviceType || "",
+                                    technician: "",
+                                    completionDate: "",
+                                    laborCost: "",
+                                    partsCost: "",
+                                  });
+                                }}
+                                className="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-blue-700 transition whitespace-nowrap"
+                              >
+                                Convert to Job Card
+                              </button>
+                            )}
                           </div>
-                          <button
-                            onClick={() => {
-                              setShowJobCardForm(true);
-                              const selectedRequest = request;
-                              setJobCardForm({
-                                approvedRequest: selectedRequest.id,
-                                vehicle: selectedRequest.vehicle || "",
-                                customerName: selectedRequest.customerName || "",
-                                serviceType: selectedRequest.serviceType || "",
-                                technician: "",
-                                completionDate: "",
-                                laborCost: "",
-                                partsCost: "",
-                              });
-                            }}
-                            className="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-blue-700 transition whitespace-nowrap"
-                          >
-                            Create Job Card
-                          </button>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center">
-                      <p className="text-gray-500">No approved requests available. Please approve requests first.</p>
+                      <p className="text-gray-500">No service requests available. Create a service request to convert it to a job card.</p>
                     </div>
                   )}
                 </div>
@@ -1433,6 +1437,16 @@ export default function ServiceCenterDetailPage() {
                       status: "Not Started",
                     };
                     setJobs([...jobs, newJob]);
+                    
+                    // Mark the service request as converted and store jobCardId if it was selected
+                    if (jobCardForm.approvedRequest) {
+                      setServiceRequests(
+                        serviceRequests.map((req) =>
+                          req.id === jobCardForm.approvedRequest ? { ...req, status: "Converted", jobCardId: newJob.id } : req
+                        )
+                      );
+                    }
+                    
                     showToast("Job card created successfully!");
                     setShowJobCardForm(false);
                     setJobCardForm({
@@ -1450,7 +1464,7 @@ export default function ServiceCenterDetailPage() {
                 >
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Approved Request (Optional - or fill below for direct creation)
+                      Select Service Request (Optional - or fill below for direct creation)
                     </label>
                     <select
                       value={jobCardForm.approvedRequest}
@@ -1467,13 +1481,13 @@ export default function ServiceCenterDetailPage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
                     >
                       <option value="">-- Select Request (Optional) --</option>
-                      {serviceRequests.filter(sr => sr.status === "Approved").map((request) => (
+                      {serviceRequests.filter(sr => sr.status === "Pending").map((request) => (
                         <option key={request.id} value={request.id}>
                           {request.id} - {request.vehicle} - {request.customerName}
                         </option>
                       ))}
-                      {serviceRequests.filter(sr => sr.status === "Approved").length === 0 && (
-                        <option value="" disabled>No approved requests available</option>
+                      {serviceRequests.filter(sr => sr.status === "Pending").length === 0 && (
+                        <option value="" disabled>No pending service requests available</option>
                       )}
                     </select>
                   </div>
@@ -1791,6 +1805,7 @@ export default function ServiceCenterDetailPage() {
                     setInventoryForm({
                       partName: "",
                       sku: "",
+                      partCode: "",
                       category: "",
                       quantity: "",
                       price: "",
@@ -1814,6 +1829,9 @@ export default function ServiceCenterDetailPage() {
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                           SKU
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                          PART CODE
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider hidden md:table-cell">
                           CATEGORY
@@ -1842,6 +1860,9 @@ export default function ServiceCenterDetailPage() {
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                             {item.sku}
                           </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {item.partCode || "-"}
+                          </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 hidden md:table-cell">
                             {item.category}
                           </td>
@@ -1869,6 +1890,7 @@ export default function ServiceCenterDetailPage() {
                                 setInventoryForm({
                                   partName: item.partName,
                                   sku: item.sku,
+                                  partCode: item.partCode || "",
                                   category: item.category,
                                   quantity: item.quantity.toString(),
                                   price: item.price.replace('₹', ''),
@@ -1885,79 +1907,6 @@ export default function ServiceCenterDetailPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Assign Engineer */}
-          {activeTab === "Assign Engineer" && (
-            <div>
-              <div className="flex items-center gap-2 mb-6">
-                <User size={24} className="text-gray-600" />
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Assign Engineer to Job</h2>
-              </div>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {/* Available Technicians */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-700 mb-4">Available Technicians</h3>
-                  <div className="space-y-3">
-                    {center.staffMembers
-                      .filter((staff) => staff.role === "Technician")
-                      .map((staff) => (
-                        <div
-                          key={staff.id}
-                          className="bg-gray-50 rounded-lg border border-gray-200 p-4"
-                        >
-                          <h4 className="text-base font-semibold text-gray-800">{staff.name}</h4>
-                          <p className="text-sm text-gray-600">{staff.role}</p>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* Pending Jobs */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-700 mb-4">Pending Jobs</h3>
-                  <div className="space-y-4">
-                    {jobs.map((job) => (
-                      <div
-                        key={job.id}
-                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6"
-                      >
-                        <h4 className="text-lg font-bold text-gray-800 mb-3">{job.id}</h4>
-                        <div className="text-sm text-gray-700 space-y-2 mb-4">
-                          <p>
-                            Vehicle: <span className="font-semibold break-words">{job.vehicle} - {job.customerName}</span>
-                          </p>
-                          <p>
-                            Current Assignee: <span className="font-semibold">{job.technician}</span>
-                          </p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Reassign to
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              readOnly
-                              placeholder="Click to search engineer"
-                              onClick={() => setShowEngineerPopup(job.id)}
-                              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900 cursor-pointer"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowEngineerPopup(job.id)}
-                              className="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition"
-                            >
-                              <Search size={20} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>
@@ -2009,10 +1958,23 @@ export default function ServiceCenterDetailPage() {
                           const newStatus = e.target.value;
                           setJobs(
                             jobs.map((j) =>
-                              j.id === job.id ? { ...j, status: newStatus } : j
+                              j.id === job.id 
+                                ? { 
+                                    ...j, 
+                                    status: newStatus,
+                                    // Ensure estimatedCost exists when marking as completed
+                                    estimatedCost: newStatus === "Completed" && !j.estimatedCost 
+                                      ? "₹5000"
+                                      : j.estimatedCost
+                                  } 
+                                : j
                             )
                           );
-                          showToast(`Job status updated to ${newStatus}!`);
+                          if (newStatus === "Completed") {
+                            showToast(`Job ${job.id} marked as completed! You can now convert it to an invoice in the "Complete Job" tab.`);
+                          } else {
+                            showToast(`Job status updated to ${newStatus}!`);
+                          }
                         }}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
                       >
@@ -2036,25 +1998,88 @@ export default function ServiceCenterDetailPage() {
               </div>
               <div className="space-y-4">
                 {jobs.filter(job => job.status === "Completed").length > 0 ? (
-                  jobs.filter(job => job.status === "Completed").map((job) => (
-                    <div
-                      key={job.id}
-                      className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6"
-                    >
-                      <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3">{job.id}</h3>
-                      <div className="text-sm text-gray-700 space-y-2">
-                        <p>
-                          Vehicle: <span className="font-semibold break-words">{job.vehicle} - {job.customerName}</span>
-                        </p>
-                        <p>
-                          Technician: <span className="font-semibold">{job.technician}</span>
-                        </p>
-                        <span className="inline-block text-xs font-medium px-3 py-1 rounded-full bg-green-100 text-green-700">
-                          Completed
-                        </span>
+                  jobs.filter(job => job.status === "Completed").map((job) => {
+                    const hasInvoice = invoices.some(inv => inv.jobCardId === job.id);
+                    return (
+                      <div
+                        key={job.id}
+                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3">{job.id}</h3>
+                            <div className="text-sm text-gray-700 space-y-2">
+                              <p>
+                                Vehicle: <span className="font-semibold break-words">{job.vehicle} - {job.customerName}</span>
+                              </p>
+                              <p>
+                                Technician: <span className="font-semibold">{job.technician}</span>
+                              </p>
+                              {hasInvoice && (
+                                <p className="text-xs text-blue-600 flex items-center gap-1">
+                                  <Receipt size={14} />
+                                  Invoice already generated
+                                </p>
+                              )}
+                              <span className="inline-block text-xs font-medium px-3 py-1 rounded-full bg-green-100 text-green-700">
+                                Completed
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            {!hasInvoice ? (
+                              <button
+                                onClick={() => {
+                                  // Generate invoice number
+                                  const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(3, '0')}`;
+                                  const today = new Date().toISOString().split('T')[0];
+                                  const dueDate = new Date();
+                                  dueDate.setDate(dueDate.getDate() + 7);
+                                  const dueDateStr = dueDate.toISOString().split('T')[0];
+                                  
+                                  // Calculate estimated amount (you can enhance this with actual job costs)
+                                  const estimatedAmount = job.estimatedCost || "₹5000";
+                                  
+                                  const newInvoice = {
+                                    id: invoiceNumber,
+                                    customerName: job.customerName,
+                                    amount: estimatedAmount,
+                                    date: today,
+                                    dueDate: dueDateStr,
+                                    status: "Pending",
+                                    jobCardId: job.id,
+                                    vehicle: job.vehicle,
+                                  };
+                                  
+                                  setInvoices([...invoices, newInvoice]);
+                                  showToast(`Invoice ${invoiceNumber} created successfully for job ${job.id}!`);
+                                }}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 text-sm font-medium cursor-pointer"
+                                type="button"
+                              >
+                                <Receipt size={16} />
+                                Convert to Invoice
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  const invoice = invoices.find(inv => inv.jobCardId === job.id);
+                                  if (invoice) {
+                                    showToast(`Invoice ${invoice.id} already exists for this job.`);
+                                  }
+                                }}
+                                className="bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
+                                disabled
+                              >
+                                <Receipt size={16} />
+                                Invoice Created
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center">
                     <p className="text-gray-500">No completed jobs</p>
@@ -2323,39 +2348,52 @@ export default function ServiceCenterDetailPage() {
                   {/* Invoice Details */}
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Invoice Details</h3>
-                    {invoicesData.length > 0 ? (
+                    {invoices.length > 0 ? (
                       <div className="space-y-3">
-                        <div>
-                          <p className="text-sm text-gray-600">Invoice Number</p>
-                          <p className="text-lg font-bold text-gray-800">{invoicesData[0].id}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Customer</p>
-                          <p className="text-base font-semibold text-gray-800">{invoicesData[0].customerName}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Amount</p>
-                          <p className="text-lg font-bold text-gray-800">{invoicesData[0].amount}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Date</p>
-                          <p className="text-base text-gray-800">{invoicesData[0].date}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Due Date</p>
-                          <p className="text-base text-gray-800">{invoicesData[0].dueDate}</p>
-                        </div>
-                        <div>
-                          <span
-                            className={`inline-block text-xs font-medium px-3 py-1 rounded-full ${
-                              invoicesData[0].status === "Pending"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-green-100 text-green-700"
-                            }`}
-                          >
-                            {invoicesData[0].status}
-                          </span>
-                        </div>
+                        {invoices.slice(0, 5).map((invoice, index) => (
+                          <div key={invoice.id} className={index > 0 ? "pt-3 border-t border-gray-200" : ""}>
+                            <div>
+                              <p className="text-sm text-gray-600">Invoice Number</p>
+                              <p className="text-lg font-bold text-gray-800">{invoice.id}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Customer</p>
+                              <p className="text-base font-semibold text-gray-800">{invoice.customerName}</p>
+                            </div>
+                            {invoice.jobCardId && (
+                              <div>
+                                <p className="text-sm text-gray-600">Job Card</p>
+                                <p className="text-base text-gray-800">{invoice.jobCardId}</p>
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-sm text-gray-600">Amount</p>
+                              <p className="text-lg font-bold text-gray-800">{invoice.amount}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Date</p>
+                              <p className="text-base text-gray-800">{invoice.date}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Due Date</p>
+                              <p className="text-base text-gray-800">{invoice.dueDate}</p>
+                            </div>
+                            <div>
+                              <span
+                                className={`inline-block text-xs font-medium px-3 py-1 rounded-full ${
+                                  invoice.status === "Pending"
+                                    ? "bg-orange-100 text-orange-700"
+                                    : "bg-green-100 text-green-700"
+                                }`}
+                              >
+                                {invoice.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        {invoices.length > 5 && (
+                          <p className="text-xs text-gray-500 pt-2">+ {invoices.length - 5} more invoices</p>
+                        )}
                       </div>
                     ) : (
                       <p className="text-gray-500">No pending invoices</p>
@@ -2583,7 +2621,7 @@ export default function ServiceCenterDetailPage() {
           )}
 
           {/* Placeholder for other tabs */}
-          {!["Overview", "Vehicle Search", "Create Request", "Approve Request", "Create Job Card", "Request Parts", "Issue Parts", "View Inventory", "Assign Engineer", "Update Job Status", "Complete Job", "Generate Invoice", "Record Payment", "OTC Order"].includes(activeTab) && (
+          {!["Overview", "Vehicle Search", "Create Request", "Create Job Card", "Request Parts", "Issue Parts", "View Inventory", "Update Job Status", "Complete Job", "Generate Invoice", "Record Payment", "OTC Order"].includes(activeTab) && (
             <div>
               <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-6">{activeTab}</h2>
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center">
@@ -3018,6 +3056,7 @@ export default function ServiceCenterDetailPage() {
                           ...item,
                           partName: inventoryForm.partName,
                           sku: inventoryForm.sku,
+                          partCode: inventoryForm.partCode,
                           category: inventoryForm.category,
                           quantity: parseInt(inventoryForm.quantity),
                           price: `₹${inventoryForm.price}`,
@@ -3031,6 +3070,7 @@ export default function ServiceCenterDetailPage() {
                     id: inventory.length + 1,
                     partName: inventoryForm.partName,
                     sku: inventoryForm.sku,
+                    partCode: inventoryForm.partCode,
                     category: inventoryForm.category,
                     quantity: parseInt(inventoryForm.quantity),
                     price: `₹${inventoryForm.price}`,
@@ -3044,6 +3084,7 @@ export default function ServiceCenterDetailPage() {
                 setInventoryForm({
                   partName: "",
                   sku: "",
+                  partCode: "",
                   category: "",
                   quantity: "",
                   price: "",
@@ -3070,6 +3111,16 @@ export default function ServiceCenterDetailPage() {
                   onChange={(e) => setInventoryForm({ ...inventoryForm, sku: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Part Code</label>
+                <input
+                  type="text"
+                  value={inventoryForm.partCode}
+                  onChange={(e) => setInventoryForm({ ...inventoryForm, partCode: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
+                  placeholder="Enter part code"
                 />
               </div>
               <div>

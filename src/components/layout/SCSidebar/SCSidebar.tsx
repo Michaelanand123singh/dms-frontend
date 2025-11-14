@@ -99,6 +99,7 @@ export function SCSidebar({ open, setOpen, role = "sc_manager" }: SCSidebarProps
   const router = useRouter();
   const { userInfo } = useRole();
   const menu = roleMenus[role] || roleMenus.sc_manager;
+  const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState({
     name: "SC Manager",
     role: "SC Manager",
@@ -106,14 +107,18 @@ export function SCSidebar({ open, setOpen, role = "sc_manager" }: SCSidebarProps
   });
 
   useEffect(() => {
-    if (userInfo) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (userInfo && mounted) {
       setUser({
         name: userInfo.name || "SC Manager",
         role: userInfo.role || "SC Manager",
         initials: userInfo.initials || "SC",
       });
     }
-  }, [userInfo]);
+  }, [userInfo, mounted]);
 
   const handleLogout = () => {
     safeStorage.removeItem("userRole");
@@ -166,13 +171,14 @@ export function SCSidebar({ open, setOpen, role = "sc_manager" }: SCSidebarProps
       <nav className="mt-6 flex flex-col flex-grow overflow-y-auto">
         {menu.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href;
+          // Only check active state after mount to avoid hydration mismatch
+          const active = mounted && pathname === item.href;
           return (
             <Link
               key={item.name}
               href={item.href}
               onClick={() => {
-                if (typeof window !== "undefined" && window.innerWidth < 768) {
+                if (mounted && typeof window !== "undefined" && window.innerWidth < 768) {
                   setOpen(false);
                 }
               }}

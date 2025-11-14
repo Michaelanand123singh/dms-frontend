@@ -44,6 +44,7 @@ export default function ServiceCentersPage() {
   const [form, setForm] = useState({
     name: "",
     location: "",
+    pinCode: "",
     staff: "",
     jobs: "",
     status: "Active",
@@ -64,6 +65,7 @@ export default function ServiceCentersPage() {
               ...center,
               name: form.name,
               location: form.location,
+              pinCode: form.pinCode,
               staff: Number(form.staff) || 0,
               jobs: Number(form.jobs) || 0,
               status: form.status,
@@ -80,6 +82,7 @@ export default function ServiceCentersPage() {
           ...storedCenters[editingCenter.id],
           name: updatedCenter.name,
           location: updatedCenter.location,
+          pinCode: updatedCenter.pinCode,
           staff: updatedCenter.staff,
           jobs: updatedCenter.jobs,
           status: updatedCenter.status,
@@ -106,6 +109,7 @@ export default function ServiceCentersPage() {
         id: newCenter.id,
         name: newCenter.name,
         location: newCenter.location,
+        pinCode: newCenter.pinCode,
         staff: newCenter.staff,
         jobs: newCenter.jobs,
         revenue: newCenter.revenue,
@@ -121,7 +125,7 @@ export default function ServiceCentersPage() {
       alert("Service center created successfully!");
     }
 
-    setForm({ name: "", location: "", staff: "", jobs: "", status: "Active" });
+    setForm({ name: "", location: "", pinCode: "", staff: "", jobs: "", status: "Active" });
     setEditingCenter(null);
     setShowForm(false);
   };
@@ -155,6 +159,7 @@ export default function ServiceCentersPage() {
                     setForm({
                       name: center.name,
                       location: center.location,
+                      pinCode: center.pinCode || "",
                       staff: center.staff.toString(),
                       jobs: center.jobs.toString(),
                       status: center.status,
@@ -168,6 +173,11 @@ export default function ServiceCentersPage() {
                 </button>
               </div>
               <p className="text-gray-500 text-xs sm:text-sm mb-2 sm:mb-3 break-words">{center.location}</p>
+              {center.pinCode && (
+                <p className="text-gray-500 text-xs sm:text-sm mb-2 sm:mb-3">
+                  Pin Code: <span className="font-medium text-gray-700">{center.pinCode}</span>
+                </p>
+              )}
 
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 <p className="flex justify-between">
@@ -228,7 +238,7 @@ export default function ServiceCentersPage() {
               onClick={() => {
                 setShowForm(false);
                 setEditingCenter(null);
-                setForm({ name: "", location: "", staff: "", jobs: "", status: "Active" });
+                setForm({ name: "", location: "", pinCode: "", staff: "", jobs: "", status: "Active" });
               }}
             >
               <X size={18} />
@@ -258,6 +268,18 @@ export default function ServiceCentersPage() {
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
                   className="w-full border text-black border-gray-300 rounded-lg px-3 py-2 mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-600">Pin Code</label>
+                <input
+                  type="text"
+                  value={form.pinCode}
+                  onChange={(e) => setForm({ ...form, pinCode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                  placeholder="Enter 6-digit pin code"
+                  maxLength={6}
+                  className="w-full border text-black border-gray-300 rounded-lg px-3 py-2 mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
 

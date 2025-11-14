@@ -29,6 +29,7 @@ export default function JobCards() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
   const [showDetails, setShowDetails] = useState<boolean>(false);
+  const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
 
   // Mock job cards data
   const [jobCards, setJobCards] = useState<JobCard[]>([
@@ -149,18 +150,18 @@ export default function JobCards() {
 
   return (
     <div className="bg-[#f9f9fb] min-h-screen">
-      <div className="pt-6 pb-10">
+      <div className="pt-4 pb-6 md:pt-6 md:pb-10 px-4 sm:px-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-blue-600 mb-2">Job Cards</h1>
-            <p className="text-gray-500">Manage and track service job cards</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 md:mb-8 gap-4">
+          <div className="text-center md:text-left">
+            <h1 className="text-2xl sm:text-3xl font-bold text-blue-600 mb-1 md:mb-2">Job Cards</h1>
+            <p className="text-gray-500 text-sm md:text-base">Manage and track service job cards</p>
           </div>
-          <div className="flex gap-3">
-            <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-300">
+          <div className="flex flex-col xs:flex-row gap-3 justify-center md:justify-start">
+            <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-300 self-center">
               <button
                 onClick={() => setView("kanban")}
-                className={`px-4 py-2 rounded text-sm font-medium transition ${
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded text-xs sm:text-sm font-medium transition ${
                   view === "kanban"
                     ? "bg-blue-600 text-white"
                     : "text-gray-700 hover:bg-gray-100"
@@ -170,7 +171,7 @@ export default function JobCards() {
               </button>
               <button
                 onClick={() => setView("list")}
-                className={`px-4 py-2 rounded text-sm font-medium transition ${
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded text-xs sm:text-sm font-medium transition ${
                   view === "list"
                     ? "bg-blue-600 text-white"
                     : "text-gray-700 hover:bg-gray-100"
@@ -181,31 +182,42 @@ export default function JobCards() {
             </div>
             <Link
               href="/sc/job-cards?action=create"
-              className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
+              className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2 justify-center text-sm sm:text-base"
             >
-              <PlusCircle size={20} />
-              Create Job Card
+              <PlusCircle size={18} />
+              <span>Create Job Card</span>
             </Link>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+        <div className="bg-white rounded-xl md:rounded-2xl shadow-md p-4 md:p-6 mb-4 md:mb-6">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+            <div className="flex-1 w-full relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
                 placeholder="Search by job card ID, customer name, vehicle..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm md:text-base"
               />
             </div>
-            <div className="flex gap-2">
+            
+            {/* Mobile Filter Toggle */}
+            <button 
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className="md:hidden bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition inline-flex items-center gap-2 w-full justify-center"
+            >
+              <Filter size={16} />
+              Filters
+            </button>
+            
+            {/* Desktop Filters */}
+            <div className="hidden md:flex flex-wrap gap-2">
               {(["all", "created", "assigned", "in_progress", "completed"] as FilterType[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  className={`px-3 py-1 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium transition ${
                     filter === f
                       ? "bg-blue-600 text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -216,63 +228,85 @@ export default function JobCards() {
               ))}
             </div>
           </div>
+          
+          {/* Mobile Filters Dropdown */}
+          {showMobileFilters && (
+            <div className="mt-4 md:hidden grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(["all", "created", "assigned", "in_progress", "completed"] as FilterType[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => {
+                    setFilter(f);
+                    setShowMobileFilters(false);
+                  }}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
+                    filter === f
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {f.charAt(0).toUpperCase() + f.slice(1).replace("_", " ")}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Kanban View */}
+        {/* Kanban View - 3 cards per row */}
         {view === "kanban" && (
-          <div className="overflow-x-auto pb-6">
-            <div className="flex gap-4 min-w-max">
+          <div className="overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-6">
               {kanbanColumns.map((column) => {
                 const columnJobs = getJobsByStatus(column.status);
                 return (
                   <div
                     key={column.id}
-                    className="flex-shrink-0 w-80 bg-white rounded-xl shadow-md p-4"
+                    className="bg-white rounded-xl shadow-md p-4"
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-700">
+                      <h3 className="font-semibold text-gray-700 text-sm md:text-base">
                         {column.title}
                       </h3>
                       <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
                         {columnJobs.length}
                       </span>
                     </div>
-                    <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+                    <div className="space-y-3 max-h-[400px] md:max-h-[500px] overflow-y-auto">
                       {columnJobs.map((job) => (
                         <div
                           key={job.id}
-                          className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition cursor-pointer"
+                          className="bg-gray-50 rounded-lg p-3 md:p-4 border border-gray-200 hover:shadow-md transition cursor-pointer"
                           onClick={() => {
                             setSelectedJob(job);
                             setShowDetails(true);
                           }}
                         >
                           <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <p className="font-semibold text-gray-800 text-sm">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-800 text-sm truncate">
                                 {job.id}
                               </p>
-                              <p className="text-xs text-gray-600 mt-1">
+                              <p className="text-xs text-gray-600 mt-1 truncate">
                                 {job.customerName}
                               </p>
                             </div>
                             <span
-                              className={`w-2 h-2 rounded-full ${getPriorityColor(
+                              className={`w-2 h-2 rounded-full flex-shrink-0 ml-2 ${getPriorityColor(
                                 job.priority
                               )}`}
                               title={job.priority}
                             ></span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
-                            <Car size={14} />
-                            <span>{job.vehicle}</span>
+                            <Car size={12} />
+                            <span className="truncate">{job.vehicle}</span>
                           </div>
-                          <p className="text-xs text-gray-700 mb-2 line-clamp-2">
+                          <p className="text-xs text-gray-700 mb-2 line-clamp-2 break-words">
                             {job.description}
                           </p>
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600">
-                              <Clock size={12} className="inline mr-1" />
+                            <span className="text-gray-600 flex items-center">
+                              <Clock size={10} className="inline mr-1" />
                               {job.estimatedTime}
                             </span>
                             <span className="font-medium text-gray-800">
@@ -281,14 +315,14 @@ export default function JobCards() {
                           </div>
                           {job.assignedEngineer && (
                             <div className="mt-2 pt-2 border-t border-gray-200 flex items-center gap-2 text-xs text-gray-600">
-                              <User size={12} />
-                              <span>{job.assignedEngineer}</span>
+                              <User size={10} />
+                              <span className="truncate">{job.assignedEngineer}</span>
                             </div>
                           )}
                         </div>
                       ))}
                       {columnJobs.length === 0 && (
-                        <div className="text-center py-8 text-gray-400 text-sm">
+                        <div className="text-center py-6 md:py-8 text-gray-400 text-xs md:text-sm">
                           No jobs
                         </div>
                       )}
@@ -302,58 +336,58 @@ export default function JobCards() {
 
         {/* List View */}
         {view === "list" && (
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {filteredJobs.map((job) => (
               <div
                 key={job.id}
-                className="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition"
+                className="bg-white rounded-xl md:rounded-2xl shadow-md p-4 md:p-6 hover:shadow-lg transition"
               >
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3">
+                      <span className="bg-blue-100 text-blue-700 px-2 py-1 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-semibold">
                         {job.id}
                       </span>
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                        className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-xs font-medium border ${getStatusColor(
                           job.status
                         )}`}
                       >
                         {job.status}
                       </span>
                       <span
-                        className={`w-3 h-3 rounded-full ${getPriorityColor(
+                        className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${getPriorityColor(
                           job.priority
                         )}`}
                         title={job.priority}
                       ></span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 gap-3 md:gap-4 mb-3">
                       <div className="flex items-center gap-2 text-gray-700">
-                        <User size={18} className="text-gray-400" />
-                        <span className="font-medium">{job.customerName}</span>
+                        <User size={16} className="text-gray-400 flex-shrink-0" />
+                        <span className="font-medium text-sm md:text-base truncate">{job.customerName}</span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-700">
-                        <Car size={18} className="text-gray-400" />
-                        <span>{job.vehicle}</span>
-                        <span className="text-gray-500">• {job.registration}</span>
+                        <Car size={16} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-sm md:text-base truncate">{job.vehicle}</span>
+                        <span className="text-gray-500 text-xs md:text-sm hidden sm:inline">• {job.registration}</span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-700">
-                        <Wrench size={18} className="text-gray-400" />
-                        <span>{job.serviceType}</span>
+                        <Wrench size={16} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-sm md:text-base truncate">{job.serviceType}</span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-700">
-                        <Calendar size={18} className="text-gray-400" />
-                        <span>{job.createdAt}</span>
+                        <Calendar size={16} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-sm md:text-base truncate">{job.createdAt}</span>
                       </div>
                     </div>
 
-                    <p className="text-gray-600 text-sm mb-2">{job.description}</p>
+                    <p className="text-gray-600 text-xs md:text-sm mb-2 line-clamp-2 break-words">{job.description}</p>
 
-                    <div className="flex items-center gap-4 text-sm">
+                    <div className="flex flex-col xs:flex-row xs:items-center gap-2 md:gap-4 text-xs md:text-sm">
                       {job.assignedEngineer && (
-                        <span className="text-gray-500">
+                        <span className="text-gray-500 truncate">
                           Engineer: <span className="font-medium text-gray-700">{job.assignedEngineer}</span>
                         </span>
                       )}
@@ -373,20 +407,20 @@ export default function JobCards() {
                           setSelectedJob(job);
                           setShowDetails(true);
                         }}
-                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition inline-flex items-center gap-2"
+                        className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:bg-gray-200 transition inline-flex items-center gap-1 md:gap-2 justify-center"
                       >
-                        <Eye size={16} />
+                        <Eye size={14} />
                         View
                       </button>
-                      <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition inline-flex items-center gap-2">
-                        <Edit size={16} />
+                      <button className="flex-1 bg-blue-100 text-blue-700 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:bg-blue-200 transition inline-flex items-center gap-1 md:gap-2 justify-center">
+                        <Edit size={14} />
                         Edit
                       </button>
                     </div>
                     {job.status === "Created" && (
                       <button
                         onClick={() => handleStatusChange(job.id, "Assigned")}
-                        className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition"
+                        className="bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:opacity-90 transition w-full"
                       >
                         Assign Engineer
                       </button>
@@ -399,43 +433,43 @@ export default function JobCards() {
         )}
 
         {filteredJobs.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-md p-12 text-center">
-            <FileText className="mx-auto text-gray-400 mb-4" size={64} />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Job Cards Found</h3>
-            <p className="text-gray-500">No job cards match the current filter criteria.</p>
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-md p-6 md:p-12 text-center">
+            <FileText className="mx-auto text-gray-400 mb-3 md:mb-4" size={48} />
+            <h3 className="text-lg md:text-xl font-semibold text-gray-700 mb-1 md:mb-2">No Job Cards Found</h3>
+            <p className="text-gray-500 text-sm md:text-base">No job cards match the current filter criteria.</p>
           </div>
         )}
       </div>
 
       {/* Job Card Details Modal */}
       {showDetails && selectedJob && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Job Card Details</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-xl w-full max-w-2xl mx-2 max-h-[90vh] overflow-y-auto p-4 md:p-6">
+            <div className="flex items-center justify-between mb-4 md:mb-6">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800">Job Card Details</h2>
               <button
                 onClick={() => setShowDetails(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
               {/* Status and Priority */}
-              <div className="flex items-center gap-3">
-                <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-semibold">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="bg-blue-100 text-blue-700 px-3 py-1 md:px-4 md:py-2 rounded-lg font-semibold text-sm md:text-base">
                   {selectedJob.id}
                 </span>
                 <span
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border ${getStatusColor(
+                  className={`px-3 py-1 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium border ${getStatusColor(
                     selectedJob.status
                   )}`}
                 >
                   {selectedJob.status}
                 </span>
                 <span
-                  className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${getPriorityColor(
+                  className={`px-3 py-1 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium text-white ${getPriorityColor(
                     selectedJob.priority
                   )}`}
                 >
@@ -444,60 +478,60 @@ export default function JobCards() {
               </div>
 
               {/* Customer & Vehicle Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-4 rounded-xl">
-                  <h3 className="font-semibold text-blue-800 mb-2">Customer Information</h3>
-                  <p className="text-sm text-gray-700">{selectedJob.customerName}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <div className="bg-blue-50 p-3 md:p-4 rounded-xl">
+                  <h3 className="font-semibold text-blue-800 mb-1 md:mb-2 text-sm md:text-base">Customer Information</h3>
+                  <p className="text-xs md:text-sm text-gray-700 break-words">{selectedJob.customerName}</p>
                 </div>
-                <div className="bg-green-50 p-4 rounded-xl">
-                  <h3 className="font-semibold text-green-800 mb-2">Vehicle Information</h3>
-                  <p className="text-sm text-gray-700">{selectedJob.vehicle}</p>
-                  <p className="text-xs text-gray-600 mt-1">{selectedJob.registration}</p>
+                <div className="bg-green-50 p-3 md:p-4 rounded-xl">
+                  <h3 className="font-semibold text-green-800 mb-1 md:mb-2 text-sm md:text-base">Vehicle Information</h3>
+                  <p className="text-xs md:text-sm text-gray-700 break-words">{selectedJob.vehicle}</p>
+                  <p className="text-xs text-gray-600 mt-1 break-words">{selectedJob.registration}</p>
                 </div>
               </div>
 
               {/* Service Details */}
               <div>
-                <h3 className="font-semibold text-gray-800 mb-2">Service Details</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-700 mb-2">
+                <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Service Details</h3>
+                <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                  <p className="text-xs md:text-sm text-gray-700 mb-1 md:mb-2 break-words">
                     <strong>Type:</strong> {selectedJob.serviceType}
                   </p>
-                  <p className="text-sm text-gray-700">
+                  <p className="text-xs md:text-sm text-gray-700 break-words">
                     <strong>Description:</strong> {selectedJob.description}
                   </p>
                 </div>
               </div>
 
               {/* Parts & Estimates */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                 <div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Required Parts</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Required Parts</h3>
+                  <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
                     {selectedJob.parts.length > 0 ? (
                       <ul className="space-y-1">
                         {selectedJob.parts.map((part, idx) => (
-                          <li key={idx} className="text-sm text-gray-700 flex items-center gap-2">
-                            <Package size={14} className="text-gray-400" />
+                          <li key={idx} className="text-xs md:text-sm text-gray-700 flex items-center gap-1 md:gap-2 break-words">
+                            <Package size={12} className="text-gray-400 flex-shrink-0" />
                             {part}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-gray-500">No parts required</p>
+                      <p className="text-xs md:text-sm text-gray-500">No parts required</p>
                     )}
                   </div>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Estimates</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                    <p className="text-sm text-gray-700">
+                  <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Estimates</h3>
+                  <div className="bg-gray-50 p-3 md:p-4 rounded-lg space-y-1 md:space-y-2">
+                    <p className="text-xs md:text-sm text-gray-700 break-words">
                       <strong>Cost:</strong> {selectedJob.estimatedCost}
                     </p>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-xs md:text-sm text-gray-700 break-words">
                       <strong>Time:</strong> {selectedJob.estimatedTime}
                     </p>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-xs md:text-sm text-gray-700 break-words">
                       <strong>Location:</strong> {selectedJob.location}
                     </p>
                   </div>
@@ -507,10 +541,10 @@ export default function JobCards() {
               {/* Engineer Assignment */}
               {selectedJob.assignedEngineer && (
                 <div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Assigned Engineer</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-700 flex items-center gap-2">
-                      <User size={16} className="text-gray-400" />
+                  <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Assigned Engineer</h3>
+                  <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                    <p className="text-xs md:text-sm text-gray-700 flex items-center gap-1 md:gap-2 break-words">
+                      <User size={14} className="text-gray-400 flex-shrink-0" />
                       {selectedJob.assignedEngineer}
                     </p>
                   </div>
@@ -518,20 +552,20 @@ export default function JobCards() {
               )}
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row gap-2 md:gap-3 pt-3 md:pt-4 border-t">
                 <button
                   onClick={() => setShowDetails(false)}
-                  className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition"
+                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:bg-gray-200 transition text-sm md:text-base"
                 >
                   Close
                 </button>
                 {selectedJob.status === "Created" && (
-                  <button className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition">
+                  <button className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:opacity-90 transition text-sm md:text-base">
                     Assign Engineer
                   </button>
                 )}
                 {selectedJob.status === "In Progress" && (
-                  <button className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition">
+                  <button className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:opacity-90 transition text-sm md:text-base">
                     Mark as Completed
                   </button>
                 )}
@@ -543,4 +577,3 @@ export default function JobCards() {
     </div>
   );
 }
-

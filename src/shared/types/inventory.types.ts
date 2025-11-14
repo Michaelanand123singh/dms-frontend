@@ -9,6 +9,7 @@ export interface InventoryItem {
   id: number;
   partName: string;
   sku: string;
+  partCode?: string;
   category: string;
   currentQty: number;
   minStock: number;
