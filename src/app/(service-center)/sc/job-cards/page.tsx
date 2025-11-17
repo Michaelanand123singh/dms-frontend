@@ -1,10 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   PlusCircle,
   Search,
   Filter,
-  MoreVertical,
   Clock,
   User,
   Wrench,
@@ -17,21 +16,82 @@ import {
   X,
   Car,
   Calendar,
+  MapPin,
+  Loader2,
+  UserCheck,
+  ArrowRight,
+  Calculator,
+  Send,
 } from "lucide-react";
-import Link from "next/link";
-import type { JobCard, JobCardStatus, Priority, KanbanColumn } from "@/shared/types";
+import type { JobCard, JobCardStatus, Priority, KanbanColumn, ServiceLocation } from "@/shared/types";
+import { API_CONFIG, API_ENDPOINTS } from "@/config/api.config";
 
 type ViewType = "kanban" | "list";
 type FilterType = "all" | "created" | "assigned" | "in_progress" | "completed";
 
+interface CreateJobCardForm {
+  vehicleId: string;
+  customerId: string;
+  customerName: string;
+  vehicleRegistration: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  serviceType: string;
+  description: string;
+  location: ServiceLocation;
+  homeAddress?: string;
+  estimatedCost: string;
+  estimatedTime: string;
+  priority: Priority;
+  selectedParts: string[];
+  assignedEngineerId: string;
+}
+
+interface Engineer {
+  id: string;
+  name: string;
+  status: "Available" | "Busy" | "On Leave";
+  currentJobs: number;
+  skills: string[];
+}
+
+interface Part {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  availableQty: number;
+  unitPrice: string;
+}
+
+const SERVICE_TYPES = [
+  "Routine Maintenance",
+  "Repair",
+  "Inspection",
+  "Warranty",
+  "AC Service",
+  "Battery Replacement",
+  "Tire Service",
+  "Other",
+];
+
 export default function JobCards() {
   const [view, setView] = useState<ViewType>("kanban");
   const [filter, setFilter] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
   const [showDetails, setShowDetails] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [showAssignEngineerModal, setShowAssignEngineerModal] = useState<boolean>(false);
+  const [showStatusUpdateModal, setShowStatusUpdateModal] = useState<boolean>(false);
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [assigningJobId, setAssigningJobId] = useState<string | null>(null);
+  const [updatingStatusJobId, setUpdatingStatusJobId] = useState<string | null>(null);
+  const [newStatus, setNewStatus] = useState<JobCardStatus>("Assigned");
+  const [selectedEngineer, setSelectedEngineer] = useState<string>("");
 
-  // Mock job cards data
+  // Mock data - TODO: Replace with API calls
   const [jobCards, setJobCards] = useState<JobCard[]>([
     {
       id: "JC-2025-001",
@@ -82,24 +142,273 @@ export default function JobCards() {
       parts: [],
       location: "Station",
     },
+  ]);
+
+  const [engineers] = useState<Engineer[]>([
     {
-      id: "JC-2025-004",
-      customerName: "Suresh Kumar",
-      vehicle: "Toyota Innova 2020",
-      registration: "KA03EF3456",
-      serviceType: "Repair",
-      description: "AC repair and gas refill",
-      status: "Completed",
-      priority: "High",
-      assignedEngineer: "Engineer 1",
-      estimatedCost: "₹5,500",
-      estimatedTime: "4 hours",
-      completedAt: "2025-01-15 16:30",
-      createdAt: "2025-01-15 12:00",
-      parts: ["AC Gas", "AC Filter"],
-      location: "Home Service",
+      id: "eng-1",
+      name: "Engineer 1",
+      status: "Available",
+      currentJobs: 1,
+      skills: ["Engine", "AC", "General"],
+    },
+    {
+      id: "eng-2",
+      name: "Engineer 2",
+      status: "Busy",
+      currentJobs: 2,
+      skills: ["Brakes", "Suspension"],
+    },
+    {
+      id: "eng-3",
+      name: "Engineer 3",
+      status: "Available",
+      currentJobs: 0,
+      skills: ["Electrical", "Battery"],
     },
   ]);
+
+  const [availableParts] = useState<Part[]>([
+    { id: "part-1", name: "Engine Oil 5W-30", sku: "EO-001", category: "Lubricants", availableQty: 45, unitPrice: "₹450" },
+    { id: "part-2", name: "Brake Pads - Front", sku: "BP-002", category: "Brakes", availableQty: 8, unitPrice: "₹1,200" },
+    { id: "part-3", name: "Air Filter", sku: "AF-003", category: "Filters", availableQty: 25, unitPrice: "₹350" },
+    { id: "part-4", name: "AC Gas R134a", sku: "AC-004", category: "AC Parts", availableQty: 12, unitPrice: "₹800" },
+    { id: "part-5", name: "Spark Plugs Set", sku: "SP-005", category: "Engine", availableQty: 25, unitPrice: "₹600" },
+  ]);
+
+  const [createForm, setCreateForm] = useState<CreateJobCardForm>({
+    vehicleId: "",
+    customerId: "",
+    customerName: "",
+    vehicleRegistration: "",
+    vehicleMake: "",
+    vehicleModel: "",
+    serviceType: "",
+    description: "",
+    location: "Station",
+    homeAddress: "",
+    estimatedCost: "",
+    estimatedTime: "",
+    priority: "Normal",
+    selectedParts: [],
+    assignedEngineerId: "",
+  });
+
+  // API Functions
+  const fetchJobCards = async () => {
+    try {
+      setLoading(true);
+      // const response = await fetch(`${API_CONFIG.BASE_URL}/service-center/job-cards`, {
+      //   headers: { Authorization: `Bearer ${token}` },
+      // });
+      // const data = await response.json();
+      // setJobCards(data);
+    } catch (error) {
+      console.error("Error fetching job cards:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createJobCard = async (formData: CreateJobCardForm) => {
+    try {
+      setLoading(true);
+      // const response = await fetch(`${API_CONFIG.BASE_URL}/service-center/job-cards`, {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //     Authorization: `Bearer ${token}`,
+      //   },
+      //   body: JSON.stringify({
+      //     vehicleId: formData.vehicleId,
+      //     customerId: formData.customerId,
+      //     serviceType: formData.serviceType,
+      //     description: formData.description,
+      //     estimatedCost: parseFloat(formData.estimatedCost.replace(/[₹,]/g, "")),
+      //     priority: formData.priority.toLowerCase(),
+      //   }),
+      // });
+      // const newJobCard = await response.json();
+      
+      // For now, add to local state
+      const newJobCard: JobCard = {
+        id: `JC-2025-${String(jobCards.length + 1).padStart(3, "0")}`,
+        customerName: formData.customerName,
+        vehicle: `${formData.vehicleMake} ${formData.vehicleModel}`,
+        registration: formData.vehicleRegistration,
+        serviceType: formData.serviceType,
+        description: formData.description,
+        status: "Created",
+        priority: formData.priority,
+        assignedEngineer: null,
+        estimatedCost: `₹${parseFloat(formData.estimatedCost || "0").toLocaleString("en-IN")}`,
+        estimatedTime: formData.estimatedTime,
+        createdAt: new Date().toLocaleString(),
+        parts: formData.selectedParts,
+        location: formData.location,
+      };
+      
+      // Also save to localStorage for persistence
+      const existingJobCards = JSON.parse(localStorage.getItem("jobCards") || "[]");
+      existingJobCards.push(newJobCard);
+      localStorage.setItem("jobCards", JSON.stringify(existingJobCards));
+      
+      setJobCards([newJobCard, ...jobCards]);
+      setShowCreateModal(false);
+      resetCreateForm();
+    } catch (error) {
+      console.error("Error creating job card:", error);
+      alert("Failed to create job card. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const assignEngineer = async (jobId: string, engineerId: string) => {
+    try {
+      setLoading(true);
+      // const response = await fetch(
+      //   `${API_CONFIG.BASE_URL}/service-center/job-cards/${jobId}/assign-engineer`,
+      //   {
+      //     method: "PATCH",
+      //     headers: {
+      //       "Content-Type": "application/json",
+      //       Authorization: `Bearer ${token}`,
+      //     },
+      //     body: JSON.stringify({ engineerId }),
+      //   }
+      // );
+      
+      const engineer = engineers.find((e) => e.id === engineerId);
+      setJobCards(
+        jobCards.map((job) =>
+          job.id === jobId
+            ? { ...job, status: "Assigned" as JobCardStatus, assignedEngineer: engineer?.name || null }
+            : job
+        )
+      );
+      setShowAssignEngineerModal(false);
+      setAssigningJobId(null);
+      setSelectedEngineer("");
+    } catch (error) {
+      console.error("Error assigning engineer:", error);
+      alert("Failed to assign engineer. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStatus = async (jobId: string, status: JobCardStatus) => {
+    try {
+      setLoading(true);
+      // const response = await fetch(
+      //   `${API_CONFIG.BASE_URL}/service-center/job-cards/${jobId}/status`,
+      //   {
+      //     method: "PATCH",
+      //     headers: {
+      //       "Content-Type": "application/json",
+      //       Authorization: `Bearer ${token}`,
+      //     },
+      //     body: JSON.stringify({ status }),
+      //   }
+      // );
+      
+      setJobCards(
+        jobCards.map((job) =>
+          job.id === jobId
+            ? {
+                ...job,
+                status,
+                startTime: status === "In Progress" ? new Date().toLocaleString() : job.startTime,
+                completedAt: status === "Completed" ? new Date().toLocaleString() : job.completedAt,
+              }
+            : job
+        )
+      );
+      setShowStatusUpdateModal(false);
+      setUpdatingStatusJobId(null);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("Failed to update status. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetCreateForm = () => {
+    setCreateForm({
+      vehicleId: "",
+      customerId: "",
+      customerName: "",
+      vehicleRegistration: "",
+      vehicleMake: "",
+      vehicleModel: "",
+      serviceType: "",
+      description: "",
+      location: "Station",
+      homeAddress: "",
+      estimatedCost: "",
+      estimatedTime: "",
+      priority: "Normal",
+      selectedParts: [],
+      assignedEngineerId: "",
+    });
+  };
+
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.customerName || !createForm.serviceType || !createForm.description) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+    createJobCard(createForm);
+  };
+
+  const handleAssignEngineer = () => {
+    if (!assigningJobId || !selectedEngineer) {
+      alert("Please select an engineer.");
+      return;
+    }
+    assignEngineer(assigningJobId, selectedEngineer);
+  };
+
+  const handleStatusUpdate = () => {
+    if (!updatingStatusJobId || !newStatus) {
+      return;
+    }
+    updateStatus(updatingStatusJobId, newStatus);
+  };
+
+  const togglePartSelection = (partName: string) => {
+    setCreateForm({
+      ...createForm,
+      selectedParts: createForm.selectedParts.includes(partName)
+        ? createForm.selectedParts.filter((p) => p !== partName)
+        : [...createForm.selectedParts, partName],
+    });
+  };
+
+  useEffect(() => {
+    fetchJobCards();
+    
+    // Load job cards from localStorage (created from service requests)
+    const storedJobCards = localStorage.getItem("jobCards");
+    if (storedJobCards) {
+      try {
+        const parsed = JSON.parse(storedJobCards);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge with existing job cards, avoiding duplicates
+          setJobCards((prev) => {
+            const existingIds = new Set(prev.map((j) => j.id));
+            const newCards = parsed.filter((j: JobCard) => !existingIds.has(j.id));
+            return [...newCards, ...prev];
+          });
+        }
+      } catch (error) {
+        console.error("Error loading job cards from localStorage:", error);
+      }
+    }
+  }, []);
 
   const getStatusColor = (status: JobCardStatus): string => {
     const colors: Record<JobCardStatus, string> = {
@@ -124,8 +433,25 @@ export default function JobCards() {
   };
 
   const filteredJobs = jobCards.filter((job) => {
-    if (filter === "all") return true;
-    return job.status.toLowerCase().replace(" ", "_") === filter;
+    // Status filter
+    if (filter === "created" && job.status !== "Created") return false;
+    if (filter === "assigned" && job.status !== "Assigned") return false;
+    if (filter === "in_progress" && job.status !== "In Progress") return false;
+    if (filter === "completed" && job.status !== "Completed") return false;
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        job.id.toLowerCase().includes(query) ||
+        job.customerName.toLowerCase().includes(query) ||
+        job.registration.toLowerCase().includes(query) ||
+        job.vehicle.toLowerCase().includes(query) ||
+        job.serviceType.toLowerCase().includes(query)
+      );
+    }
+
+    return true;
   });
 
   const kanbanColumns: KanbanColumn[] = [
@@ -140,12 +466,16 @@ export default function JobCards() {
     return filteredJobs.filter((job) => job.status === status);
   };
 
-  const handleStatusChange = (jobId: string, newStatus: JobCardStatus): void => {
-    setJobCards(
-      jobCards.map((job) =>
-        job.id === jobId ? { ...job, status: newStatus } : job
-      )
-    );
+  const getNextStatus = (currentStatus: JobCardStatus): JobCardStatus[] => {
+    const workflow: Record<JobCardStatus, JobCardStatus[]> = {
+      Created: ["Assigned"],
+      Assigned: ["In Progress"],
+      "In Progress": ["Parts Pending", "Completed"],
+      "Parts Pending": ["In Progress", "Completed"],
+      Completed: ["Invoiced"],
+      Invoiced: [],
+    };
+    return workflow[currentStatus] || [];
   };
 
   return (
@@ -180,13 +510,13 @@ export default function JobCards() {
                 List
               </button>
             </div>
-            <Link
-              href="/sc/job-cards?action=create"
+            <button
+              onClick={() => setShowCreateModal(true)}
               className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2 justify-center text-sm sm:text-base"
             >
               <PlusCircle size={18} />
               <span>Create Job Card</span>
-            </Link>
+            </button>
           </div>
         </div>
 
@@ -198,6 +528,8 @@ export default function JobCards() {
               <input
                 type="text"
                 placeholder="Search by job card ID, customer name, vehicle..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm md:text-base"
               />
             </div>
@@ -252,7 +584,7 @@ export default function JobCards() {
           )}
         </div>
 
-        {/* Kanban View - 3 cards per row */}
+        {/* Kanban View */}
         {view === "kanban" && (
           <div className="overflow-hidden">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-6">
@@ -412,17 +744,28 @@ export default function JobCards() {
                         <Eye size={14} />
                         View
                       </button>
-                      <button className="flex-1 bg-blue-100 text-blue-700 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:bg-blue-200 transition inline-flex items-center gap-1 md:gap-2 justify-center">
-                        <Edit size={14} />
-                        Edit
-                      </button>
                     </div>
                     {job.status === "Created" && (
                       <button
-                        onClick={() => handleStatusChange(job.id, "Assigned")}
+                        onClick={() => {
+                          setAssigningJobId(job.id);
+                          setShowAssignEngineerModal(true);
+                        }}
                         className="bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:opacity-90 transition w-full"
                       >
                         Assign Engineer
+                      </button>
+                    )}
+                    {getNextStatus(job.status).length > 0 && (
+                      <button
+                        onClick={() => {
+                          setUpdatingStatusJobId(job.id);
+                          setNewStatus(getNextStatus(job.status)[0]);
+                          setShowStatusUpdateModal(true);
+                        }}
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:opacity-90 transition w-full"
+                      >
+                        Update Status
                       </button>
                     )}
                   </div>
@@ -500,6 +843,9 @@ export default function JobCards() {
                   <p className="text-xs md:text-sm text-gray-700 break-words">
                     <strong>Description:</strong> {selectedJob.description}
                   </p>
+                  <p className="text-xs md:text-sm text-gray-700 mt-2 break-words">
+                    <strong>Location:</strong> {selectedJob.location}
+                  </p>
                 </div>
               </div>
 
@@ -531,9 +877,6 @@ export default function JobCards() {
                     <p className="text-xs md:text-sm text-gray-700 break-words">
                       <strong>Time:</strong> {selectedJob.estimatedTime}
                     </p>
-                    <p className="text-xs md:text-sm text-gray-700 break-words">
-                      <strong>Location:</strong> {selectedJob.location}
-                    </p>
                   </div>
                 </div>
               </div>
@@ -559,17 +902,466 @@ export default function JobCards() {
                 >
                   Close
                 </button>
-                {selectedJob.status === "Created" && (
-                  <button className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:opacity-90 transition text-sm md:text-base">
+                {selectedJob.status === "Created" && !selectedJob.assignedEngineer && (
+                  <button
+                    onClick={() => {
+                      setShowDetails(false);
+                      setAssigningJobId(selectedJob.id);
+                      setShowAssignEngineerModal(true);
+                    }}
+                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:opacity-90 transition text-sm md:text-base"
+                  >
                     Assign Engineer
                   </button>
                 )}
-                {selectedJob.status === "In Progress" && (
-                  <button className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:opacity-90 transition text-sm md:text-base">
-                    Mark as Completed
+                {getNextStatus(selectedJob.status).length > 0 && (
+                  <button
+                    onClick={() => {
+                      setShowDetails(false);
+                      setUpdatingStatusJobId(selectedJob.id);
+                      setNewStatus(getNextStatus(selectedJob.status)[0]);
+                      setShowStatusUpdateModal(true);
+                    }}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:opacity-90 transition text-sm md:text-base"
+                  >
+                    Update Status
+                  </button>
+                )}
+                {selectedJob.status === "Completed" && (
+                  <button className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:opacity-90 transition text-sm md:text-base">
+                    Generate Invoice
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Job Card Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Create Job Card</h2>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  resetCreateForm();
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Customer Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.customerName}
+                    onChange={(e) => setCreateForm({ ...createForm, customerName: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    required
+                    placeholder="Search vehicle to auto-fill"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vehicle Registration
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.vehicleRegistration}
+                    onChange={(e) => setCreateForm({ ...createForm, vehicleRegistration: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="PB10AB1234"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vehicle Make
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.vehicleMake}
+                    onChange={(e) => setCreateForm({ ...createForm, vehicleMake: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="Honda"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vehicle Model
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.vehicleModel}
+                    onChange={(e) => setCreateForm({ ...createForm, vehicleModel: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="City"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Service Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={createForm.serviceType}
+                    onChange={(e) => setCreateForm({ ...createForm, serviceType: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    required
+                  >
+                    <option value="">Select Service Type</option>
+                    {SERVICE_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Service Location <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={createForm.location}
+                    onChange={(e) => setCreateForm({ ...createForm, location: e.target.value as ServiceLocation })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    required
+                  >
+                    <option value="Station">Station</option>
+                    <option value="Home Service">Home Service</option>
+                  </select>
+                </div>
+                {createForm.location === "Home Service" && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Home Address
+                    </label>
+                    <textarea
+                      value={createForm.homeAddress}
+                      onChange={(e) => setCreateForm({ ...createForm, homeAddress: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      rows={2}
+                      placeholder="Enter complete address"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estimated Cost (₹)
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.estimatedCost}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, "");
+                      setCreateForm({ ...createForm, estimatedCost: value });
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="3500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estimated Time
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.estimatedTime}
+                    onChange={(e) => setCreateForm({ ...createForm, estimatedTime: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="2 hours"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={createForm.priority}
+                    onChange={(e) => setCreateForm({ ...createForm, priority: e.target.value as Priority })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Normal">Normal</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  rows={4}
+                  placeholder="Describe the service required..."
+                  required
+                />
+              </div>
+              
+              {/* Parts Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Required Parts
+                </label>
+                <div className="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
+                  {availableParts.length === 0 ? (
+                    <p className="text-sm text-gray-500">No parts available</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableParts.map((part) => (
+                        <label
+                          key={part.id}
+                          className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={createForm.selectedParts.includes(part.name)}
+                            onChange={() => togglePartSelection(part.name)}
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-700">{part.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {part.sku} • Qty: {part.availableQty} • {part.unitPrice}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {createForm.selectedParts.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {createForm.selectedParts.map((part) => (
+                      <span
+                        key={part}
+                        className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1"
+                      >
+                        {part}
+                        <button
+                          type="button"
+                          onClick={() => togglePartSelection(part)}
+                          className="hover:text-blue-900"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    resetCreateForm();
+                  }}
+                  className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-2 rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle size={16} />
+                      Create Job Card
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Engineer Modal */}
+      {showAssignEngineerModal && assigningJobId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Assign Engineer</h2>
+              <button
+                onClick={() => {
+                  setShowAssignEngineerModal(false);
+                  setAssigningJobId(null);
+                  setSelectedEngineer("");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Engineer <span className="text-red-500">*</span>
+                </label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {engineers.map((engineer) => (
+                    <label
+                      key={engineer.id}
+                      className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition ${
+                        selectedEngineer === engineer.id
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="engineer"
+                        value={engineer.id}
+                        checked={selectedEngineer === engineer.id}
+                        onChange={(e) => setSelectedEngineer(e.target.value)}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-gray-700">{engineer.name}</p>
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              engineer.status === "Available"
+                                ? "bg-green-100 text-green-700"
+                                : engineer.status === "Busy"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {engineer.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Current Jobs: {engineer.currentJobs} • Skills: {engineer.skills.join(", ")}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={() => {
+                  setShowAssignEngineerModal(false);
+                  setAssigningJobId(null);
+                  setSelectedEngineer("");
+                }}
+                className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignEngineer}
+                disabled={loading || !selectedEngineer}
+                className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-2 rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <UserCheck size={16} />
+                    Assign Engineer
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Status Modal */}
+      {showStatusUpdateModal && updatingStatusJobId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Update Status</h2>
+              <button
+                onClick={() => {
+                  setShowStatusUpdateModal(false);
+                  setUpdatingStatusJobId(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Status <span className="text-red-500">*</span>
+                </label>
+                {updatingStatusJobId && (
+                  <select
+                    value={newStatus}
+                    onChange={(e) => setNewStatus(e.target.value as JobCardStatus)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    {getNextStatus(
+                      jobCards.find((j) => j.id === updatingStatusJobId)?.status || "Created"
+                    ).map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={() => {
+                  setShowStatusUpdateModal(false);
+                  setUpdatingStatusJobId(null);
+                }}
+                className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStatusUpdate}
+                disabled={loading}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2 rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={16} />
+                    Update Status
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
