@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import {
-  PlusCircle,
+  Plus,
   Search,
   Filter,
   MoreVertical,
@@ -18,8 +18,7 @@ import {
   Car,
   Calendar,
 } from "lucide-react";
-import Link from "next/link";
-import type { JobCard, JobCardStatus, Priority, KanbanColumn } from "@/shared/types";
+import type { JobCard, JobCardStatus, Priority, KanbanColumn, ServiceLocation } from "@/shared/types";
 
 type ViewType = "kanban" | "list";
 type FilterType = "all" | "created" | "assigned" | "in_progress" | "completed";
@@ -30,6 +29,21 @@ export default function JobCards() {
   const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [newJobCard, setNewJobCard] = useState<Partial<JobCard>>({
+    customerName: "",
+    vehicle: "",
+    registration: "",
+    serviceType: "",
+    description: "",
+    status: "Created",
+    priority: "Normal",
+    assignedEngineer: null,
+    estimatedCost: "",
+    estimatedTime: "",
+    parts: [],
+    location: "Station",
+  });
 
   // Mock job cards data
   const [jobCards, setJobCards] = useState<JobCard[]>([
@@ -148,6 +162,61 @@ export default function JobCards() {
     );
   };
 
+  const generateJobCardId = (): string => {
+    const year = new Date().getFullYear();
+    const count = jobCards.length + 1;
+    return `JC-${year}-${String(count).padStart(3, "0")}`;
+  };
+
+  const handleCreateJobCard = (): void => {
+    if (
+      !newJobCard.customerName ||
+      !newJobCard.vehicle ||
+      !newJobCard.registration ||
+      !newJobCard.serviceType ||
+      !newJobCard.description ||
+      !newJobCard.estimatedCost ||
+      !newJobCard.estimatedTime
+    ) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    const jobCard: JobCard = {
+      id: generateJobCardId(),
+      customerName: newJobCard.customerName!,
+      vehicle: newJobCard.vehicle!,
+      registration: newJobCard.registration!,
+      serviceType: newJobCard.serviceType!,
+      description: newJobCard.description!,
+      status: newJobCard.status || "Created",
+      priority: newJobCard.priority || "Normal",
+      assignedEngineer: newJobCard.assignedEngineer || null,
+      estimatedCost: newJobCard.estimatedCost!,
+      estimatedTime: newJobCard.estimatedTime!,
+      createdAt: new Date().toISOString().split("T")[0] + " " + new Date().toTimeString().split(" ")[0].slice(0, 5),
+      parts: newJobCard.parts || [],
+      location: newJobCard.location || "Station",
+    };
+
+    setJobCards([...jobCards, jobCard]);
+    setShowCreateModal(false);
+    setNewJobCard({
+      customerName: "",
+      vehicle: "",
+      registration: "",
+      serviceType: "",
+      description: "",
+      status: "Created",
+      priority: "Normal",
+      assignedEngineer: null,
+      estimatedCost: "",
+      estimatedTime: "",
+      parts: [],
+      location: "Station",
+    });
+  };
+
   return (
     <div className="bg-[#f9f9fb] min-h-screen">
       <div className="pt-4 pb-6 md:pt-6 md:pb-10 px-4 sm:px-6">
@@ -180,13 +249,13 @@ export default function JobCards() {
                 List
               </button>
             </div>
-            <Link
-              href="/sc/job-cards?action=create"
+            <button
+              onClick={() => setShowCreateModal(true)}
               className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2 justify-center text-sm sm:text-base"
             >
-              <PlusCircle size={18} />
+              <Plus size={18} />
               <span>Create Job Card</span>
-            </Link>
+            </button>
           </div>
         </div>
 
@@ -441,10 +510,184 @@ export default function JobCards() {
         )}
       </div>
 
+      {/* Create Job Card Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-[100] p-2 sm:p-4">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-2xl mx-2 max-h-[90vh] overflow-y-auto p-4 md:p-6 z-[101]">
+            <div className="flex items-center justify-between mb-4 md:mb-6">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800">Create New Job Card</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4 md:space-y-6">
+              {/* Customer & Vehicle Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Customer Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newJobCard.customerName}
+                    onChange={(e) => setNewJobCard({ ...newJobCard, customerName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                    placeholder="Enter customer name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vehicle <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newJobCard.vehicle}
+                    onChange={(e) => setNewJobCard({ ...newJobCard, vehicle: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                    placeholder="e.g., Honda City 2020"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Registration Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newJobCard.registration}
+                    onChange={(e) => setNewJobCard({ ...newJobCard, registration: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                    placeholder="e.g., PB10AB1234"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Service Type <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newJobCard.serviceType}
+                    onChange={(e) => setNewJobCard({ ...newJobCard, serviceType: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                    placeholder="e.g., Routine Maintenance"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={newJobCard.description}
+                  onChange={(e) => setNewJobCard({ ...newJobCard, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                  placeholder="Enter service description"
+                />
+              </div>
+
+              {/* Priority, Location, Estimates */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={newJobCard.priority}
+                    onChange={(e) => setNewJobCard({ ...newJobCard, priority: e.target.value as Priority })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Normal">Normal</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Location
+                  </label>
+                  <select
+                    value={newJobCard.location}
+                    onChange={(e) => setNewJobCard({ ...newJobCard, location: e.target.value as ServiceLocation })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                  >
+                    <option value="Station">Station</option>
+                    <option value="Home Service">Home Service</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estimated Cost <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newJobCard.estimatedCost}
+                    onChange={(e) => setNewJobCard({ ...newJobCard, estimatedCost: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                    placeholder="e.g., ₹3,500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estimated Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newJobCard.estimatedTime}
+                    onChange={(e) => setNewJobCard({ ...newJobCard, estimatedTime: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                    placeholder="e.g., 2 hours"
+                  />
+                </div>
+              </div>
+
+              {/* Parts */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Required Parts (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={newJobCard.parts?.join(", ") || ""}
+                  onChange={(e) => {
+                    const parts = e.target.value.split(",").map((p) => p.trim()).filter((p) => p);
+                    setNewJobCard({ ...newJobCard, parts });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm md:text-base"
+                  placeholder="e.g., Engine Oil, Air Filter"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row gap-2 md:gap-3 pt-3 md:pt-4 border-t">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:bg-gray-200 transition text-sm md:text-base"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateJobCard}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:opacity-90 transition text-sm md:text-base"
+                >
+                  Create Job Card
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Job Card Details Modal */}
       {showDetails && selectedJob && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-xl md:rounded-2xl shadow-xl w-full max-w-2xl mx-2 max-h-[90vh] overflow-y-auto p-4 md:p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-[100] p-2 sm:p-4">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-2xl mx-2 max-h-[90vh] overflow-y-auto p-4 md:p-6 z-[101]">
             <div className="flex items-center justify-between mb-4 md:mb-6">
               <h2 className="text-xl md:text-2xl font-bold text-gray-800">Job Card Details</h2>
               <button

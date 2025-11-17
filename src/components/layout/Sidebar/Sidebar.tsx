@@ -9,14 +9,13 @@ import {
   FileText,
   AlertCircle,
   ClipboardList,
-  X,
+  ChevronLeft,
   LogOut,
-  Menu,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRole } from "@/shared/hooks";
 import { safeStorage } from "@/shared/lib/localStorage";
 
@@ -41,12 +40,8 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userInfo } = useRole();
-  const [mounted, setMounted] = useState(false);
-
-  // Only access userInfo after component mounts to avoid hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Use lazy initializer to check if we're on the client side
+  const [isMounted] = useState(() => typeof window !== "undefined");
 
   const handleLogout = () => {
     safeStorage.removeItem("userRole");
@@ -56,22 +51,22 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
   };
 
   // Use consistent default during SSR and initial render
-  const displayName = mounted ? (userInfo?.name || "Admin") : "Admin";
-  const displayRole = mounted ? (userInfo?.role || "Super Admin") : "Super Admin";
-  const initials = mounted ? (userInfo?.initials || "A") : "A";
+  const displayName = isMounted ? (userInfo?.name || "Admin") : "Admin";
+  const displayRole = isMounted ? (userInfo?.role || "Super Admin") : "Super Admin";
+  const initials = isMounted ? (userInfo?.initials || "A") : "A";
 
   return (
     <aside
       className={clsx(
-        "fixed top-0 left-0 h-screen bg-[#0d1224] text-white flex flex-col justify-between shadow-2xl z-50 transition-all duration-300 ease-in-out",
-        "w-64",
+        "fixed left-0 bg-white text-gray-900 flex flex-col justify-between shadow-2xl z-40 transition-all duration-300 ease-in-out",
+        "w-64 top-16 h-[calc(100vh-4rem)]",
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         open ? "md:w-64" : "md:w-20"
       )}
     >
       <div
         className={clsx(
-          "flex items-center border-b border-gray-800 transition-all duration-300 relative",
+          "flex items-center border-b border-gray-200 bg-white transition-all duration-300 relative",
           open ? "justify-between px-6 py-5" : "justify-center px-0 py-5"
         )}
       >
@@ -79,25 +74,24 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
           <>
             <div className="flex items-center gap-3">
               <div className="bg-gradient-to-tr from-[#6f42c1] to-[#9b6dff] p-2 rounded-xl shadow-md">
-                <Building size={26} />
+                <Building size={26} className="text-white" />
               </div>
-              <h1 className="text-lg font-semibold whitespace-nowrap">Admin Panel</h1>
+              <h1 className="text-lg font-semibold whitespace-nowrap text-gray-900">Admin Panel</h1>
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="text-gray-400 hover:text-white"
+              className="text-gray-900 hover:text-black transition p-2 rounded-lg hover:bg-gray-100"
+              aria-label="Close sidebar"
             >
-              <X size={22} />
+              <ChevronLeft size={22} />
             </button>
           </>
         ) : (
-          <button
-            onClick={() => setOpen(true)}
-            className="flex items-center justify-center text-gray-400 hover:text-white p-2"
-            title="Open sidebar"
-          >
-            <Menu size={22} />
-          </button>
+          <div className="flex items-center justify-center">
+            <div className="bg-gradient-to-tr from-[#6f42c1] to-[#9b6dff] p-2 rounded-xl shadow-md">
+              <Building size={26} className="text-white" />
+            </div>
+          </div>
         )}
       </div>
 
@@ -119,7 +113,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                 open ? "gap-3 px-6 py-3" : "justify-center px-0 py-3 md:px-0",
                 active
                   ? "bg-gradient-to-r from-[#6f42c1] to-[#a374ff] text-white font-medium"
-                  : "text-gray-300 hover:bg-[#1a2036]"
+                  : "text-gray-700 hover:bg-gray-100"
               )}
               title={!open ? item.name : ""}
             >
@@ -127,7 +121,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                 size={18} 
                 className={clsx(
                   "flex-shrink-0",
-                  active ? "text-white" : "text-gray-300"
+                  active ? "text-white" : "text-gray-700"
                 )}
                 strokeWidth={2}
               />
@@ -139,7 +133,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
 
       <div
         className={clsx(
-          "border-t border-gray-700 transition-all duration-300",
+          "border-t border-gray-200 transition-all duration-300",
           open ? "p-6" : "p-4 md:p-4"
         )}
       >
@@ -150,13 +144,13 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                 {initials}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">{displayName}</p>
-                <p className="text-xs text-gray-400">{displayRole}</p>
+                <p className="text-sm font-medium text-gray-900">{displayName}</p>
+                <p className="text-xs text-gray-500">{displayRole}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-red-600 hover:text-white rounded-lg transition"
+              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition"
             >
               <LogOut size={18} />
               Logout
@@ -169,7 +163,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center justify-center p-2 text-gray-300 hover:bg-red-600 hover:text-white rounded-lg transition"
+              className="flex items-center justify-center p-2 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition"
               title="Logout"
             >
               <LogOut size={18} />

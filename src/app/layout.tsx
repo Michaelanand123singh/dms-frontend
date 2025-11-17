@@ -40,7 +40,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
               : "ml-0"
           }`}
         >
-          {isLoggedIn && <Navbar setOpen={setOpen} isLoggedIn={isLoggedIn} />}
+          {isLoggedIn && <Navbar open={open} setOpen={setOpen} isLoggedIn={isLoggedIn} />}
 
           <main className={isLoggedIn ? "pt-16 px-6 md:px-8" : "px-0"}>
             {children}
