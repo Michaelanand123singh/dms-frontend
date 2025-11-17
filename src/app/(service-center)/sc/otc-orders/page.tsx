@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   ShoppingCart,
   PlusCircle,
@@ -78,14 +78,17 @@ export default function OTCOrders() {
   const tax = ((subtotal - discountAmount) * 18) / 100; // 18% GST
   const total = subtotal - discountAmount + tax;
 
-  const handleGenerateInvoice = (): void => {
+  const handleGenerateInvoice = useCallback((): void => {
     if (cart.length === 0) {
       alert("Cart is empty!");
       return;
     }
+    // Generate invoice data only when handler is called (not during render)
+    const now = Date.now();
+    const currentDate = new Date();
     const invoice: InvoiceData = {
-      invoiceNumber: `OTC-${Date.now()}`,
-      date: new Date().toLocaleDateString("en-IN"),
+      invoiceNumber: `OTC-${now}`,
+      date: currentDate.toLocaleDateString("en-IN"),
       customer: customerInfo,
       items: cart,
       subtotal,
@@ -96,7 +99,7 @@ export default function OTCOrders() {
     };
     setInvoiceData(invoice);
     setShowInvoice(true);
-  };
+  }, [cart, customerInfo, subtotal, discount, discountAmount, tax, total]);
 
   const handleCompleteSale = (): void => {
     alert("Payment recorded! Invoice generated successfully.");

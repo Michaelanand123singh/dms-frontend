@@ -340,7 +340,7 @@ export default function FinancePage() {
           <div className="bg-white rounded-lg shadow-sm border border-blue-200 p-6">
             <div className="mb-2">
               <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                TODAY'S REVENUE
+                TODAYS REVENUE
               </p>
             </div>
             <div className="mb-2">

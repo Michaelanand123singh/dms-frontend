@@ -1,5 +1,4 @@
 "use client";
-import { useState, useEffect } from "react";
 import {
   DollarSign,
   ClipboardList,
@@ -41,13 +40,7 @@ interface DashboardData {
 
 export default function SCDashboard() {
   const { userRole, userInfo } = useRole();
-  const [serviceCenter, setServiceCenter] = useState("Pune Phase 1");
-
-  useEffect(() => {
-    if (userInfo?.serviceCenter) {
-      setServiceCenter(userInfo.serviceCenter);
-    }
-  }, [userInfo]);
+  const serviceCenter = userInfo?.serviceCenter || "Pune Phase 1";
 
   const getDashboardData = (): DashboardData => {
     const baseData: Record<UserRole, DashboardData> = {

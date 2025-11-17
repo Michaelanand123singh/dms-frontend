@@ -16,27 +16,23 @@ interface SearchResult {
 }
 
 export interface NavbarProps {
+  open: boolean;
   setOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   isLoggedIn?: boolean;
 }
 
-export function Navbar({ setOpen, isLoggedIn = true }: NavbarProps) {
+export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
   const router = useRouter();
   const { userRole } = useRole();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const [dashboardTitle, setDashboardTitle] = useState("Dashboard");
   const searchRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (userRole === "admin" || userRole === "super_admin") {
-      setDashboardTitle("Admin Dashboard");
-    } else {
-      setDashboardTitle("Service Center Dashboard");
-    }
-  }, [userRole]);
+  const dashboardTitle = userRole === "admin" || userRole === "super_admin" 
+    ? "Admin Dashboard" 
+    : "Service Center Dashboard";
 
   const handleLogout = () => {
     safeStorage.removeItem("userRole");
@@ -176,13 +172,14 @@ export function Navbar({ setOpen, isLoggedIn = true }: NavbarProps) {
   }, {} as Record<string, SearchResult[]>);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-30 bg-white shadow-sm border-b border-gray-200">
+    <nav className="fixed top-0 left-0 right-0 z-[60] bg-white shadow-sm border-b border-gray-200">
       <div className="flex items-center px-4 py-3 gap-4 relative">
         <button
-          className="text-gray-700 hover:text-black flex-shrink-0"
+          className="text-gray-700 hover:text-[#6f42c1] flex-shrink-0 p-2 rounded-lg hover:bg-gray-100 transition-colors"
           onClick={() => setOpen((prev) => !prev)}
+          aria-label={open ? "Close sidebar" : "Open sidebar"}
         >
-          <Menu size={24} />
+          {open ? <X size={24} /> : <Menu size={24} />}
         </button>
 
         <h1 className="absolute left-1/2 transform -translate-x-1/2 text-lg md:text-xl font-semibold text-[#6f42c1] hidden md:block">
@@ -267,7 +264,7 @@ export function Navbar({ setOpen, isLoggedIn = true }: NavbarProps) {
                 ref={resultsRef}
                 className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-8 text-center z-50"
               >
-                <p className="text-gray-500 text-sm">No results found for "{searchQuery}"</p>
+                <p className="text-gray-500 text-sm">No results found for &quot;{searchQuery}&quot;</p>
               </div>
             )}
           </div>

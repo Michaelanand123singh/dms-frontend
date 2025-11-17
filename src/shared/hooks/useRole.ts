@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocalStorage } from "./useLocalStorage";
 import type { UserRole, UserInfo } from "../types/auth.types";
 
@@ -9,13 +9,7 @@ import type { UserRole, UserInfo } from "../types/auth.types";
 export function useRole() {
   const [userRole, setUserRole] = useLocalStorage<UserRole>("userRole", "admin");
   const [userInfo, setUserInfo] = useLocalStorage<UserInfo | null>("userInfo", null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setIsLoading(false);
-    }
-  }, []);
+  const [isLoading] = useState(() => typeof window === "undefined");
 
   const updateRole = (role: UserRole, user: UserInfo) => {
     setUserRole(role);

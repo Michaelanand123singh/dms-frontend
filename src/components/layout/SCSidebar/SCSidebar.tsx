@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Home,
   Search,
@@ -13,9 +13,8 @@ import {
   Users,
   MessageSquare,
   Settings,
-  X,
+  ChevronLeft,
   LogOut,
-  Menu,
   Building,
   Truck,
   BarChart3,
@@ -98,33 +97,25 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userInfo, userRole, isLoading } = useRole();
-  const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState({
-    name: "SC Manager",
-    role: "SC Manager",
-    initials: "SC",
-  });
+  // Use lazy initializer to check if we're on the client side
+  const [isMounted] = useState(() => typeof window !== "undefined");
 
   // Use role from hook (most reliable) - it reads directly from localStorage
-  // Once mounted, always prefer hook value over prop to avoid stale data
-  const effectiveRole = mounted && userRole && userRole !== "admin" && userRole !== "super_admin"
+  // Use consistent role during SSR to avoid hydration mismatch
+  // Default to sc_manager during SSR, then use actual role after mount
+  const effectiveRole = (isMounted && userRole && userRole !== "admin" && userRole !== "super_admin")
     ? userRole
     : (roleProp || "sc_manager");
+  // Always use the same menu structure - roleProp should be provided from parent
   const menu = roleMenus[effectiveRole] || roleMenus.sc_manager;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (userInfo && mounted) {
-      setUser({
-        name: userInfo.name || "SC Manager",
-        role: userInfo.role || "SC Manager",
-        initials: userInfo.initials || "SC",
-      });
-    }
-  }, [userInfo, mounted]);
+  // Compute user info with consistent defaults for SSR and client
+  // Use consistent defaults during SSR to avoid hydration mismatch
+  const user = {
+    name: (isMounted && userInfo?.name) ? userInfo.name : "SC Manager",
+    role: (isMounted && userInfo?.role) ? userInfo.role : "SC Manager",
+    initials: (isMounted && userInfo?.initials) ? userInfo.initials : "SC",
+  };
 
   const handleLogout = () => {
     safeStorage.removeItem("userRole");
@@ -136,15 +127,15 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
   return (
     <aside
       className={clsx(
-        "fixed top-0 left-0 h-screen bg-[#0d1224] text-white flex flex-col justify-between shadow-2xl z-50 transition-all duration-300 ease-in-out",
-        "w-64",
+        "fixed left-0 bg-white text-gray-900 flex flex-col justify-between shadow-2xl z-40 transition-all duration-300 ease-in-out",
+        "w-64 top-16 h-[calc(100vh-4rem)]",
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         open ? "md:w-64" : "md:w-20"
       )}
     >
       <div
         className={clsx(
-          "flex items-center border-b border-gray-800 transition-all duration-300 relative",
+          "flex items-center border-b border-gray-200 bg-white transition-all duration-300 relative",
           open ? "justify-between px-6 py-5" : "justify-center px-0 py-5"
         )}
       >
@@ -154,37 +145,36 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
               <div className="bg-gradient-to-tr from-[#6f42c1] to-[#9b6dff] p-2 rounded-xl shadow-md">
                 <Building size={26} className="text-white" strokeWidth={2} />
               </div>
-              <h1 className="text-lg font-semibold whitespace-nowrap">Service Center</h1>
+              <h1 className="text-lg font-semibold whitespace-nowrap text-gray-900">Service Center</h1>
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="text-gray-400 hover:text-white transition"
+              className="text-gray-900 hover:text-black transition p-2 rounded-lg hover:bg-gray-100"
+              aria-label="Close sidebar"
             >
-              <X size={22} className="text-gray-400 hover:text-white" strokeWidth={2} />
+              <ChevronLeft size={22} className="text-gray-900 hover:text-black" strokeWidth={2} />
             </button>
           </>
         ) : (
-          <button
-            onClick={() => setOpen(true)}
-            className="flex items-center justify-center text-gray-400 hover:text-white p-2 transition"
-            title="Open sidebar"
-          >
-            <Menu size={22} className="text-gray-400 hover:text-white" strokeWidth={2} />
-          </button>
+          <div className="flex items-center justify-center">
+            <div className="bg-gradient-to-tr from-[#6f42c1] to-[#9b6dff] p-2 rounded-xl shadow-md">
+              <Building size={26} className="text-white" strokeWidth={2} />
+            </div>
+          </div>
         )}
       </div>
 
       <nav className="mt-6 flex flex-col flex-grow overflow-y-auto">
-        {mounted && menu.length > 0 && menu.map((item) => {
+        {menu.length > 0 && menu.map((item) => {
           const Icon = item.icon;
-          // Only check active state after mount to avoid hydration mismatch
-          const active = mounted && pathname === item.href;
+          // Check active state - pathname is available on both server and client
+          const active = pathname === item.href;
           return (
             <Link
               key={item.name}
               href={item.href}
               onClick={() => {
-                if (mounted && typeof window !== "undefined" && window.innerWidth < 768) {
+                if (typeof window !== "undefined" && window.innerWidth < 768) {
                   setOpen(false);
                 }
               }}
@@ -193,7 +183,7 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
                 open ? "gap-3 px-6 py-3" : "justify-center px-0 py-3 md:px-0",
                 active
                   ? "bg-gradient-to-r from-[#6f42c1] to-[#a374ff] text-white font-medium"
-                  : "text-gray-300 hover:bg-[#1a2036]"
+                  : "text-gray-700 hover:bg-gray-100"
               )}
               title={!open ? item.name : ""}
             >
@@ -201,7 +191,7 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
                 size={18} 
                 className={clsx(
                   "flex-shrink-0",
-                  active ? "text-white" : "text-gray-300"
+                  active ? "text-white" : "text-gray-700"
                 )}
                 strokeWidth={2}
               />
@@ -213,7 +203,7 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
 
       <div
         className={clsx(
-          "border-t border-gray-700 transition-all duration-300",
+          "border-t border-gray-200 transition-all duration-300",
           open ? "p-6" : "p-4 md:p-4"
         )}
       >
@@ -224,15 +214,15 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
                 {user.initials}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">{user.name}</p>
-                <p className="text-xs text-gray-400">{user.role}</p>
+                <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                <p className="text-xs text-gray-500">{user.role}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-red-600 hover:text-white rounded-lg transition group"
+              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition group"
             >
-              <LogOut size={18} className="text-gray-300 group-hover:text-white transition" strokeWidth={2} />
+              <LogOut size={18} className="text-gray-700 group-hover:text-red-600 transition" strokeWidth={2} />
               Logout
             </button>
           </>
@@ -243,10 +233,10 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center justify-center p-2 text-gray-300 hover:bg-red-600 hover:text-white rounded-lg transition"
+              className="flex items-center justify-center p-2 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition"
               title="Logout"
             >
-              <LogOut size={18} className="text-gray-300 hover:text-white" strokeWidth={2} />
+              <LogOut size={18} className="text-gray-700 hover:text-red-600" strokeWidth={2} />
             </button>
           </div>
         )}

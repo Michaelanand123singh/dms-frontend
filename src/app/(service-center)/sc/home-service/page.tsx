@@ -14,6 +14,7 @@ import {
   Wrench,
   FileText,
   PlusCircle,
+  X,
 } from "lucide-react";
 import type { HomeService, HomeServiceStatus, HomeServiceStats, HomeServiceFilterType } from "@/shared/types";
 
@@ -21,6 +22,19 @@ export default function HomeService() {
   const [filter, setFilter] = useState<HomeServiceFilterType>("all");
   const [selectedService, setSelectedService] = useState<HomeService | null>(null);
   const [showDetails, setShowDetails] = useState<boolean>(false);
+  const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    customerName: "",
+    phone: "",
+    vehicle: "",
+    registration: "",
+    address: "",
+    serviceType: "",
+    scheduledDate: "",
+    scheduledTime: "",
+    engineer: "",
+    estimatedCost: "",
+  });
 
   // Mock home service data
   const [homeServices, setHomeServices] = useState<HomeService[]>([
@@ -95,6 +109,76 @@ export default function HomeService() {
     total: homeServices.length,
   };
 
+  const handleScheduleSubmit = () => {
+    // Validate form
+    if (
+      !scheduleForm.customerName ||
+      !scheduleForm.phone ||
+      !scheduleForm.vehicle ||
+      !scheduleForm.registration ||
+      !scheduleForm.address ||
+      !scheduleForm.serviceType ||
+      !scheduleForm.scheduledDate ||
+      !scheduleForm.scheduledTime ||
+      !scheduleForm.engineer ||
+      !scheduleForm.estimatedCost
+    ) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+
+    // Validate phone number (10 digits)
+    if (!/^\d{10}$/.test(scheduleForm.phone)) {
+      alert("Please enter a valid 10-digit phone number.");
+      return;
+    }
+
+    // Generate new service ID
+    const newId = `HS-2025-${String(homeServices.length + 1).padStart(3, "0")}`;
+
+    // Create new home service
+    const newService: HomeService = {
+      id: newId,
+      customerName: scheduleForm.customerName,
+      phone: scheduleForm.phone,
+      vehicle: scheduleForm.vehicle,
+      registration: scheduleForm.registration,
+      address: scheduleForm.address,
+      serviceType: scheduleForm.serviceType,
+      scheduledDate: scheduleForm.scheduledDate,
+      scheduledTime: scheduleForm.scheduledTime,
+      engineer: scheduleForm.engineer,
+      status: "Scheduled",
+      estimatedCost: scheduleForm.estimatedCost,
+      createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+    };
+
+    // Add to services list
+    setHomeServices([...homeServices, newService]);
+
+    // Store in localStorage (simulating API call)
+    const storedServices = JSON.parse(localStorage.getItem("homeServices") || "[]");
+    storedServices.push(newService);
+    localStorage.setItem("homeServices", JSON.stringify(storedServices));
+
+    // Reset form and close modal
+    setScheduleForm({
+      customerName: "",
+      phone: "",
+      vehicle: "",
+      registration: "",
+      address: "",
+      serviceType: "",
+      scheduledDate: "",
+      scheduledTime: "",
+      engineer: "",
+      estimatedCost: "",
+    });
+    setShowScheduleModal(false);
+
+    alert(`Home service scheduled successfully! Service ID: ${newId}`);
+  };
+
   return (
     <div className="bg-[#f9f9fb] min-h-screen">
       <div className="pt-6 pb-10">
@@ -104,7 +188,24 @@ export default function HomeService() {
             <h1 className="text-3xl font-bold text-blue-600 mb-2">Home Service</h1>
             <p className="text-gray-500">Manage mobile service appointments and track engineers</p>
           </div>
-          <button className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2">
+          <button
+            onClick={() => {
+              setShowScheduleModal(true);
+              setScheduleForm({
+                customerName: "",
+                phone: "",
+                vehicle: "",
+                registration: "",
+                address: "",
+                serviceType: "",
+                scheduledDate: "",
+                scheduledTime: "",
+                engineer: "",
+                estimatedCost: "",
+              });
+            }}
+            className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
+          >
             <PlusCircle size={20} />
             Schedule Home Service
           </button>
@@ -371,6 +472,240 @@ export default function HomeService() {
                     Track Engineer
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Home Service Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-3xl mx-2 max-h-[90vh] overflow-y-auto p-4 md:p-6 z-[101]">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Schedule Home Service</h2>
+              <button
+                onClick={() => {
+                  setShowScheduleModal(false);
+                  setScheduleForm({
+                    customerName: "",
+                    phone: "",
+                    vehicle: "",
+                    registration: "",
+                    address: "",
+                    serviceType: "",
+                    scheduledDate: "",
+                    scheduledTime: "",
+                    engineer: "",
+                    estimatedCost: "",
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600 transition p-2 rounded-lg hover:bg-gray-100"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Customer Information */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Customer Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={scheduleForm.customerName}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, customerName: e.target.value })}
+                      placeholder="Enter customer name"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={scheduleForm.phone}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, phone: e.target.value })}
+                      placeholder="9876543210"
+                      maxLength={10}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Vehicle Information */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Vehicle Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vehicle <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={scheduleForm.vehicle}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, vehicle: e.target.value })}
+                      placeholder="e.g., Honda City 2020"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Registration Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={scheduleForm.registration}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, registration: e.target.value.toUpperCase() })}
+                      placeholder="PB10AB1234"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Service Details */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Service Details</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Service Address <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={scheduleForm.address}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, address: e.target.value })}
+                      placeholder="Enter complete service address"
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Service Type <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={scheduleForm.serviceType}
+                        onChange={(e) => setScheduleForm({ ...scheduleForm, serviceType: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        required
+                      >
+                        <option value="">Select service type</option>
+                        <option value="Routine Maintenance">Routine Maintenance</option>
+                        <option value="AC Repair">AC Repair</option>
+                        <option value="Oil Change">Oil Change</option>
+                        <option value="Battery Replacement">Battery Replacement</option>
+                        <option value="Tire Service">Tire Service</option>
+                        <option value="Brake Service">Brake Service</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Estimated Cost <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={scheduleForm.estimatedCost}
+                        onChange={(e) => setScheduleForm({ ...scheduleForm, estimatedCost: e.target.value })}
+                        placeholder="₹3,500"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Schedule Information */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Schedule Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Scheduled Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={scheduleForm.scheduledDate}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, scheduledDate: e.target.value })}
+                      min={new Date().toISOString().split("T")[0]}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Scheduled Time <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={scheduleForm.scheduledTime}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, scheduledTime: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Assign Engineer <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={scheduleForm.engineer}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, engineer: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    >
+                      <option value="">Select engineer</option>
+                      <option value="Engineer 1">Engineer 1</option>
+                      <option value="Engineer 2">Engineer 2</option>
+                      <option value="Engineer 3">Engineer 3</option>
+                      <option value="Engineer 4">Engineer 4</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowScheduleModal(false);
+                    setScheduleForm({
+                      customerName: "",
+                      phone: "",
+                      vehicle: "",
+                      registration: "",
+                      address: "",
+                      serviceType: "",
+                      scheduledDate: "",
+                      scheduledTime: "",
+                      engineer: "",
+                      estimatedCost: "",
+                    });
+                  }}
+                  className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleScheduleSubmit}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+                >
+                  Schedule Service
+                </button>
               </div>
             </div>
           </div>

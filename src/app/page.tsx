@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { UserInfo, UserRole } from "@/shared/types";
 import { getRedirectPath } from "@/shared/constants/routes";
 import { safeStorage } from "@/shared/lib/localStorage";
+import { PageLoader } from "@/components/ui/PageLoader";
 
 interface MockUser {
   email: string;
@@ -75,6 +76,7 @@ export default function LoginPage() {
   const [showRoleSelector, setShowRoleSelector] = useState(false);
   const [selectedRole, setSelectedRole] = useState<MockUser | null>(null);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const roleSelectorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function LoginPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -105,6 +107,8 @@ export default function LoginPage() {
     );
 
     if (user) {
+      setIsLoading(true);
+      
       const userInfo: UserInfo = {
         email: user.email,
         name: user.name,
@@ -116,6 +120,9 @@ export default function LoginPage() {
       safeStorage.setItem("userRole", user.role);
       safeStorage.setItem("userInfo", userInfo);
       safeStorage.setItem("isLoggedIn", "true");
+
+      // Simulate a brief loading period for better UX
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       const redirectPath = getRedirectPath(user.role);
       router.push(redirectPath);
@@ -133,6 +140,10 @@ export default function LoginPage() {
       setShowRoleSelector(false);
     }
   };
+
+  if (isLoading) {
+    return <PageLoader message="Signing you in..." fullScreen={true} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E5E9F2] via-[#C7D2FE] to-[#EEF2FF] text-gray-900 relative overflow-hidden">
