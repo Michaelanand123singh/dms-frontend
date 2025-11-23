@@ -3,11 +3,27 @@
  */
 
 export type SearchType = "phone" | "registration" | "vin";
+export type CustomerSearchType = "phone" | "name" | "customerNumber" | "email";
 
 export type VehicleStatus = "Available" | "Active Job Card";
 
+export interface Customer {
+  id: number | string;
+  customerNumber: string; // Unique customer number
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  createdAt: string;
+  totalVehicles?: number;
+  totalSpent?: string;
+  lastServiceDate?: string;
+}
+
 export interface Vehicle {
   id: number | string;
+  customerId: number | string; // Link to customer
+  customerNumber?: string; // Customer number for quick reference
   phone: string;
   registration: string;
   vin: string;
@@ -51,5 +67,16 @@ export interface NewVehicleForm {
   vehicleColor: string;
   registration: string;
   vin: string;
+}
+
+export interface NewCustomerForm {
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+}
+
+export interface CustomerWithVehicles extends Customer {
+  vehicles: Vehicle[];
 }
 

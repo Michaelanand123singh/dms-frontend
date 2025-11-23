@@ -1410,28 +1410,29 @@ export default function ServiceCenterDetailPage() {
 
               {/* Show Job Card Form */}
               {showJobCardForm && (
-                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Job Card Form</h3>
-                    <button
-                      onClick={() => {
-                        setShowJobCardForm(false);
-                        setJobCardForm({
-                          approvedRequest: "",
-                          vehicle: "",
-                          customerName: "",
-                          serviceType: "",
-                          technician: "",
-                          completionDate: "",
-                          laborCost: "",
-                          partsCost: "",
-                        });
-                      }}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
+                <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-xl p-4 sm:p-6 lg:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-800">Job Card Form</h3>
+                      <button
+                        onClick={() => {
+                          setShowJobCardForm(false);
+                          setJobCardForm({
+                            approvedRequest: "",
+                            vehicle: "",
+                            customerName: "",
+                            serviceType: "",
+                            technician: "",
+                            completionDate: "",
+                            laborCost: "",
+                            partsCost: "",
+                          });
+                        }}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -1624,6 +1625,7 @@ export default function ServiceCenterDetailPage() {
                     Create Job Card
                   </button>
                 </form>
+                  </div>
                 </div>
               )}
             </div>

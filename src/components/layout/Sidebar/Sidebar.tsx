@@ -15,7 +15,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRole } from "@/shared/hooks";
 import { safeStorage } from "@/shared/lib/localStorage";
 
@@ -40,8 +40,12 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userInfo } = useRole();
-  // Use lazy initializer to check if we're on the client side
-  const [isMounted] = useState(() => typeof window !== "undefined");
+  // Track if component has mounted to avoid hydration mismatch
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleLogout = () => {
     safeStorage.removeItem("userRole");
@@ -50,10 +54,11 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
     router.push("/");
   };
 
-  // Use consistent default during SSR and initial render
-  const displayName = isMounted ? (userInfo?.name || "Admin") : "Admin";
-  const displayRole = isMounted ? (userInfo?.role || "Super Admin") : "Super Admin";
-  const initials = isMounted ? (userInfo?.initials || "A") : "A";
+  // Use consistent defaults during SSR and initial render to prevent hydration mismatch
+  // Only use actual userInfo after component has mounted on client
+  const displayName = isMounted && userInfo?.name ? userInfo.name : "Admin";
+  const displayRole = isMounted && userInfo?.role ? userInfo.role : "Super Admin";
+  const initials = isMounted && userInfo?.initials ? userInfo.initials : "A";
 
   return (
     <aside

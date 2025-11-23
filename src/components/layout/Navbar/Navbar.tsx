@@ -23,12 +23,14 @@ export interface NavbarProps {
 
 export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
   const router = useRouter();
-  const { userRole } = useRole();
+  const { userRole, userInfo } = useRole();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
 
   const dashboardTitle = userRole === "admin" || userRole === "super_admin" 
     ? "Admin Dashboard" 
@@ -151,6 +153,12 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
       ) {
         setShowResults(false);
       }
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowUserDropdown(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -269,16 +277,39 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
             )}
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-            title="Logout"
-          >
-            <LogOut size={18} />
-            <span className="hidden sm:inline">Logout</span>
-          </button>
-          <div className="w-9 h-9 rounded-full bg-[#6f42c1] text-white flex items-center justify-center font-bold">
-            {userRole === "admin" || userRole === "super_admin" ? "R" : "SC"}
+          <div className="relative" ref={userDropdownRef}>
+            <button
+              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              className="w-9 h-9 rounded-full bg-[#6f42c1] text-white flex items-center justify-center font-bold hover:bg-[#5a32a3] transition cursor-pointer"
+              title="User menu"
+            >
+              {userRole === "admin" || userRole === "super_admin" ? "R" : "SC"}
+            </button>
+            
+            {showUserDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-4 border-b border-gray-200">
+                  <p className="text-sm font-medium text-gray-900">
+                    {userInfo?.name || (userRole === "admin" || userRole === "super_admin" ? "Admin User" : "Service Center User")}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {userInfo?.email || ""}
+                  </p>
+                </div>
+                <div className="p-2">
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setShowUserDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                  >
+                    <LogOut size={18} />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

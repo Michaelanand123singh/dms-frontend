@@ -332,14 +332,6 @@ export default function SCDashboard() {
       call_center: {
         cards: [
           {
-            title: "Service Requests",
-            value: "15",
-            change: "+3",
-            icon: FileText,
-            color: "from-blue-400/20 to-blue-100",
-            text: "text-blue-600",
-          },
-          {
             title: "Pending Appointments",
             value: "8",
             change: "Today",
@@ -358,12 +350,6 @@ export default function SCDashboard() {
         ],
         alerts: [],
         quickActions: [
-          {
-            label: "Create Service Request",
-            icon: PlusCircle,
-            bg: "bg-gradient-to-r from-green-500 to-green-700",
-            link: "/sc/service-requests?action=create",
-          },
           {
             label: "Schedule Appointment",
             icon: Clock,
