@@ -47,6 +47,8 @@ export default function VehicleSearch() {
   const mockVehicles: Vehicle[] = [
     {
       id: 1,
+      customerId: 1,
+      customerNumber: "CUST-2025-001",
       phone: "9876543210",
       registration: "PB10AB1234",
       vin: "MH12AB3456CD7890",
@@ -66,6 +68,8 @@ export default function VehicleSearch() {
     },
     {
       id: 2,
+      customerId: 2,
+      customerNumber: "CUST-2025-002",
       phone: "9876543211",
       registration: "MH01XY5678",
       vin: "MH12AB3456CD7891",
