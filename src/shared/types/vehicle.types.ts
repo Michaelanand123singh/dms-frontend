@@ -3,7 +3,8 @@
  */
 
 export type SearchType = "phone" | "registration" | "vin";
-export type CustomerSearchType = "phone" | "name" | "customerNumber" | "email";
+export type CustomerSearchType = "phone" | "name" | "customerNumber" | "email" | "vin" | "vehicleNumber" | "auto";
+export type ServiceType = "walk-in" | "home-service";
 
 export type VehicleStatus = "Available" | "Active Job Card";
 
@@ -74,6 +75,7 @@ export interface NewCustomerForm {
   phone: string;
   email?: string;
   address?: string;
+  serviceType?: ServiceType;
 }
 
 export interface CustomerWithVehicles extends Customer {

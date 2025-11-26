@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { UserInfo, UserRole } from "@/shared/types";
 import { getRedirectPath } from "@/shared/constants/routes";
 import { safeStorage } from "@/shared/lib/localStorage";
-import { PageLoader } from "@/components/ui/PageLoader";
+import { TopLoadingBar } from "@/components/ui/TopLoadingBar";
 
 interface MockUser {
   email: string;
@@ -141,11 +141,9 @@ export default function LoginPage() {
     }
   };
 
-  if (isLoading) {
-    return <PageLoader message="Signing you in..." fullScreen={true} />;
-  }
-
   return (
+    <>
+      <TopLoadingBar isLoading={isLoading} />
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E5E9F2] via-[#C7D2FE] to-[#EEF2FF] text-gray-900 relative overflow-hidden">
       <div className="absolute top-1/4 left-1/3 w-72 h-72 bg-[#3B82F6]/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-[#2563EB]/20 rounded-full blur-3xl animate-pulse"></div>
@@ -313,6 +311,7 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

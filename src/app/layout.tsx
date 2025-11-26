@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar, SCSidebar, Navbar } from "@/components/layout";
 import { useRole } from "@/shared/hooks";
 import type { UserRole } from "@/shared/types";
-import { PageLoader } from "@/components/ui/PageLoader";
+import { TopLoadingBar } from "@/components/ui/TopLoadingBar";
 import "./globals.css";
 
 interface RootLayoutProps {
@@ -49,6 +49,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
             <Sidebar open={open} setOpen={setOpen} />
           ))}
 
+        <TopLoadingBar isLoading={isNavigating} />
         <div
           className={`flex-1 flex flex-col transition-all duration-300 relative ${
             isLoggedIn
@@ -61,7 +62,6 @@ export default function RootLayout({ children }: RootLayoutProps) {
           {isLoggedIn && <Navbar open={open} setOpen={setOpen} isLoggedIn={isLoggedIn} />}
 
           <main className={`relative min-h-[calc(100vh-4rem)] ${isLoggedIn ? "pt-16 px-6 md:px-8" : "px-0"}`}>
-            {isNavigating && <PageLoader message="Loading page..." />}
             {children}
           </main>
         </div>

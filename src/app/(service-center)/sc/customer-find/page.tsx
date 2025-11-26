@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Search,
   User,
@@ -12,30 +12,46 @@ import {
   CheckCircle,
   Hash,
   Calendar,
-  DollarSign,
-  FileText,
   AlertCircle,
+  Clock,
+  Home,
+  Building2,
 } from "lucide-react";
 import Link from "next/link";
+import { useRole } from "@/shared/hooks";
+import { safeStorage } from "@/shared/lib/localStorage";
 import type {
   Customer,
   CustomerSearchType,
   CustomerWithVehicles,
   NewCustomerForm,
   Vehicle,
+  ServiceType,
 } from "@/shared/types";
 
+interface RecentCustomer extends CustomerWithVehicles {
+  lastAccessed: string;
+}
+
 export default function CustomerFind() {
-  const [searchType, setSearchType] = useState<CustomerSearchType>("phone");
+  const { userRole } = useRole();
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [searchResults, setSearchResults] = useState<CustomerWithVehicles | null>(null);
+  const [searchResults, setSearchResults] = useState<CustomerWithVehicles[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
   const [showCreateCustomer, setShowCreateCustomer] = useState<boolean>(false);
   const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
+  const [showServiceTypeSelection, setShowServiceTypeSelection] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [suggestions, setSuggestions] = useState<CustomerWithVehicles[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
-  const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
+  // Initialize recent customers from localStorage
+  const [recentCustomers, setRecentCustomers] = useState<RecentCustomer[]>(() => {
+    if (typeof window === "undefined") return [];
+    const stored = safeStorage.getItem<RecentCustomer[]>("recentCustomers", []);
+    return stored
+      .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
+      .slice(0, 10);
+  });
+  const [detectedSearchType, setDetectedSearchType] = useState<CustomerSearchType | null>(null);
 
   // Form state for creating new customer
   const [newCustomerForm, setNewCustomerForm] = useState<NewCustomerForm>({
@@ -403,165 +419,184 @@ export default function CustomerFind() {
     },
   ];
 
-  // Filter suggestions based on search query
-  const getSuggestions = (query: string): CustomerWithVehicles[] => {
+
+  // Auto-detect search type based on input
+  const detectSearchType = (query: string): CustomerSearchType => {
+    const trimmed = query.trim();
+
+    // Check for customer number pattern (CUST-YYYY-XXXX)
+    if (/^CUST-\d{4}-\d{4}$/i.test(trimmed)) {
+      return "customerNumber";
+    }
+
+    // Check for VIN (typically 17 alphanumeric characters)
+    if (/^[A-HJ-NPR-Z0-9]{17}$/i.test(trimmed)) {
+      return "vin";
+    }
+
+    // Check for vehicle registration (typically 2 letters, 2 digits, 2 letters, 4 digits)
+    if (/^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/i.test(trimmed)) {
+      return "vehicleNumber";
+    }
+
+    // Check for email
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return "email";
+    }
+
+    // Check for phone (10 digits, with or without country code)
+    const cleanedPhone = trimmed.replace(/[\s-+]/g, "").replace(/^91/, "");
+    if (/^\d{10}$/.test(cleanedPhone)) {
+      return "phone";
+    }
+
+    // Default to name search
+    return "name";
+  };
+
+  // Global search function
+  const performGlobalSearch = (query: string): CustomerWithVehicles[] => {
     if (!query.trim() || query.length < 2) {
       return [];
     }
 
-    let searchValue = query.trim();
-    
-    // Normalize search value based on type
+    const searchType = detectSearchType(query);
+    setDetectedSearchType(searchType);
+    const results: CustomerWithVehicles[] = [];
+    const lowerQuery = query.toLowerCase().trim();
+
+    // Search based on detected type
     if (searchType === "phone") {
-      searchValue = searchValue.replace(/[\s-+]/g, "").replace(/^91/, "");
+      const cleaned = query.replace(/[\s-+]/g, "").replace(/^91/, "");
+      mockCustomers.forEach((customer) => {
+        if (customer.phone.includes(cleaned)) {
+          results.push(customer);
+        }
+      });
+    } else if (searchType === "email") {
+      mockCustomers.forEach((customer) => {
+        if (customer.email?.toLowerCase().includes(lowerQuery)) {
+          results.push(customer);
+        }
+      });
     } else if (searchType === "customerNumber") {
-      searchValue = searchValue.toUpperCase().replace(/\s+/g, "");
+      const upperQuery = query.toUpperCase().replace(/\s+/g, "");
+      mockCustomers.forEach((customer) => {
+        if (customer.customerNumber.toUpperCase().includes(upperQuery)) {
+          results.push(customer);
+        }
+      });
+    } else if (searchType === "vin") {
+      const upperQuery = query.toUpperCase();
+      mockCustomers.forEach((customer) => {
+        customer.vehicles.forEach((vehicle) => {
+          if (vehicle.vin.toUpperCase().includes(upperQuery) && !results.find((r) => r.id === customer.id)) {
+            results.push(customer);
+          }
+        });
+      });
+    } else if (searchType === "vehicleNumber") {
+      const upperQuery = query.toUpperCase().replace(/\s+/g, "");
+      mockCustomers.forEach((customer) => {
+        customer.vehicles.forEach((vehicle) => {
+          if (vehicle.registration.toUpperCase().includes(upperQuery) && !results.find((r) => r.id === customer.id)) {
+            results.push(customer);
+          }
+        });
+      });
+    } else {
+      // Name search
+      mockCustomers.forEach((customer) => {
+        if (customer.name.toLowerCase().includes(lowerQuery)) {
+          results.push(customer);
+        }
+      });
     }
 
-    const filtered = mockCustomers.filter((customer) => {
-      if (searchType === "phone") {
-        return customer.phone.includes(searchValue);
-      } else if (searchType === "name") {
-        return customer.name.toLowerCase().includes(searchValue.toLowerCase());
-      } else if (searchType === "customerNumber") {
-        return customer.customerNumber.toUpperCase().includes(searchValue);
-      } else if (searchType === "email") {
-        return customer.email?.toLowerCase().includes(searchValue.toLowerCase());
-      }
-      return false;
-    });
-
-    return filtered.slice(0, 5); // Limit to 5 suggestions
+    return results;
   };
 
-  // Handle input change with autocomplete
-  const handleInputChange = (value: string): void => {
+  // Handle search input change
+  const handleSearchInputChange = (value: string): void => {
     setSearchQuery(value);
     setValidationError("");
-    
+    setSelectedCustomer(null);
+    setShowCreateCustomer(false);
+
     if (value.trim().length >= 2) {
-      const filtered = getSuggestions(value);
-      setSuggestions(filtered);
-      setShowSuggestions(filtered.length > 0 && isInputFocused);
+      const results = performGlobalSearch(value);
+      setSearchResults(results);
     } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
+      setSearchResults([]);
+      setDetectedSearchType(null);
     }
   };
 
-  // Handle suggestion selection
-  const handleSuggestionSelect = (customer: CustomerWithVehicles): void => {
-    setSearchQuery(
-      searchType === "phone"
-        ? customer.phone
-        : searchType === "name"
-        ? customer.name
-        : searchType === "customerNumber"
-        ? customer.customerNumber
-        : customer.email || ""
-    );
-    setSearchResults(customer);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    setShowCreateCustomer(false);
-  };
-
-  const validateSearchInput = (): boolean => {
-    setValidationError("");
-
+  // Handle search execution
+  const handleSearch = (): void => {
     if (!searchQuery.trim()) {
       setValidationError("Please enter a search query");
-      return false;
-    }
-
-    if (searchType === "phone") {
-      const cleaned = searchQuery.replace(/[\s-+]/g, "").replace(/^91/, "");
-      if (cleaned.length !== 10 || !/^\d{10}$/.test(cleaned)) {
-        setValidationError("Please enter a valid 10-digit phone number");
-        return false;
-      }
-    } else if (searchType === "email") {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(searchQuery)) {
-        setValidationError("Please enter a valid email address");
-        return false;
-      }
-    }
-
-    return true;
-  };
-
-  const handleSearch = (): void => {
-    if (!validateSearchInput()) {
       return;
     }
 
     setLoading(true);
-    setSearchResults(null);
-    setShowCreateCustomer(false);
-    setShowSuggestions(false);
+    setValidationError("");
 
-    // Normalize search value
-    let searchValue = searchQuery.trim();
-    if (searchType === "phone") {
-      searchValue = searchValue.replace(/[\s-+]/g, "").replace(/^91/, "");
-    } else if (searchType === "customerNumber") {
-      // Normalize customer number search - convert to uppercase and remove extra spaces
-      searchValue = searchValue.toUpperCase().replace(/\s+/g, "");
-    }
-
-    // Mock search logic - replace with API call
+    // Simulate API call
     setTimeout(() => {
-      let found: CustomerWithVehicles | undefined = undefined;
+      const results = performGlobalSearch(searchQuery);
+      setSearchResults(results);
 
-      if (searchType === "phone") {
-        found = mockCustomers.find((c) => c.phone.includes(searchValue));
-      } else if (searchType === "name") {
-        found = mockCustomers.find((c) =>
-          c.name.toLowerCase().includes(searchValue.toLowerCase())
-        );
-      } else if (searchType === "customerNumber") {
-        found = mockCustomers.find((c) =>
-          c.customerNumber.toUpperCase().includes(searchValue.toUpperCase())
-        );
-      } else if (searchType === "email") {
-        found = mockCustomers.find((c) =>
-          c.email?.toLowerCase().includes(searchValue.toLowerCase())
-        );
-      }
-
-      if (found) {
-        setSearchResults(found);
-        setShowCreateCustomer(false);
-      } else {
-        setSearchResults(null);
+      if (results.length === 0) {
         setShowCreateCustomer(true);
+      } else if (results.length === 1) {
+        handleCustomerSelect(results[0]);
       }
+
       setLoading(false);
-    }, 500);
+    }, 300);
   };
 
-  const handleCreateCustomer = (): void => {
+  // Handle customer selection
+  const handleCustomerSelect = (customer: CustomerWithVehicles): void => {
+    setSelectedCustomer(customer);
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowCreateCustomer(false);
+
+    // Add to recent customers
+    const recent: RecentCustomer = {
+      ...customer,
+      lastAccessed: new Date().toISOString(),
+    };
+
+    const stored = safeStorage.getItem<RecentCustomer[]>("recentCustomers", []);
+    const filtered = stored.filter((c) => c.id !== customer.id);
+    const updated = [recent, ...filtered].slice(0, 10);
+    safeStorage.setItem("recentCustomers", updated);
+    setRecentCustomers(updated);
+  };
+
+  // Handle direct create customer button
+  const handleDirectCreateCustomer = (): void => {
+    setShowServiceTypeSelection(true);
+    setShowCreateForm(false);
+    setNewCustomerForm({
+      name: "",
+      phone: "",
+      email: "",
+      address: "",
+    });
+  };
+
+  // Handle service type selection
+  const handleServiceTypeSelect = (serviceType: ServiceType): void => {
+    setNewCustomerForm((prev) => ({ ...prev, serviceType }));
+    setShowServiceTypeSelection(false);
     setShowCreateForm(true);
-    // Pre-fill form with search query if applicable
-    if (searchType === "phone") {
-      setNewCustomerForm((prev) => ({
-        ...prev,
-        phone: searchQuery.replace(/[\s-+]/g, "").replace(/^91/, ""),
-      }));
-    } else if (searchType === "email") {
-      setNewCustomerForm((prev) => ({
-        ...prev,
-        email: searchQuery.trim(),
-      }));
-    } else if (searchType === "name") {
-      setNewCustomerForm((prev) => ({
-        ...prev,
-        name: searchQuery.trim(),
-      }));
-    }
   };
 
+  // Generate customer number
   const generateCustomerNumber = (): string => {
     const year = new Date().getFullYear();
     const random = Math.floor(Math.random() * 10000)
@@ -570,6 +605,7 @@ export default function CustomerFind() {
     return `CUST-${year}-${random}`;
   };
 
+  // Save new customer
   const handleSaveNewCustomer = (): void => {
     // Validate form
     if (!newCustomerForm.name || !newCustomerForm.phone) {
@@ -611,8 +647,17 @@ export default function CustomerFind() {
         vehicles: [],
       };
 
-      // In real app, save to backend and then update state
-      setSearchResults(newCustomer);
+      // Add to recent customers
+      const recent: RecentCustomer = {
+        ...newCustomer,
+        lastAccessed: new Date().toISOString(),
+      };
+      const stored = safeStorage.getItem<RecentCustomer[]>("recentCustomers", []);
+      const updated = [recent, ...stored].slice(0, 10);
+      safeStorage.setItem("recentCustomers", updated);
+      setRecentCustomers(updated);
+
+      setSelectedCustomer(newCustomer);
       setShowCreateForm(false);
       setShowCreateCustomer(false);
       setLoading(false);
@@ -625,8 +670,23 @@ export default function CustomerFind() {
         address: "",
       });
 
-      alert(`Customer created successfully! Customer Number: ${newCustomer.customerNumber}`);
+      alert(`Customer created successfully! Customer Number: ${newCustomer.customerNumber}\nService Type: ${newCustomerForm.serviceType === "walk-in" ? "Walk-in" : "Home Service"}`);
     }, 500);
+  };
+
+  // Get search type label
+  const getSearchTypeLabel = (type: CustomerSearchType | null): string => {
+    if (!type) return "";
+    const labels: Record<CustomerSearchType, string> = {
+      phone: "Phone Number",
+      email: "Email ID",
+      customerNumber: "Customer ID",
+      vin: "VIN Number",
+      vehicleNumber: "Vehicle Number",
+      name: "Name",
+      auto: "Auto-detect",
+    };
+    return labels[type];
   };
 
   return (
@@ -634,136 +694,51 @@ export default function CustomerFind() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-800 mb-2">
-            Customer Find
-          </h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-2xl sm:text-3xl font-semibold text-gray-800">
+              Customer Search
+            </h1>
+            <button
+              onClick={handleDirectCreateCustomer}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2"
+            >
+              <PlusCircle size={20} />
+              Create New Customer
+            </button>
+          </div>
           <p className="text-gray-600 text-sm sm:text-base">
-            Search for existing customers or create a new customer ID
+            Search by phone, email, customer ID, VIN, or vehicle number. Auto-detection enabled.
           </p>
         </div>
 
-        {/* Search Section */}
+        {/* Global Search Section */}
         <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
-            <div className="flex flex-wrap gap-2 sm:gap-3">
-              {(["phone", "name", "customerNumber", "email"] as CustomerSearchType[]).map(
-                (type) => (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      setSearchType(type);
-                      setSearchQuery("");
-                      setSuggestions([]);
-                      setShowSuggestions(false);
-                      setSearchResults(null);
-                    }}
-                    className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      searchType === type
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {type === "phone" && "Phone"}
-                    {type === "name" && "Name"}
-                    {type === "customerNumber" && "Customer #"}
-                    {type === "email" && "Email"}
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10" size={20} />
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => handleInputChange(e.target.value)}
-                onFocus={() => {
-                  setIsInputFocused(true);
-                  if (suggestions.length > 0) {
-                    setShowSuggestions(true);
-                  }
-                }}
-                onBlur={() => {
-                  // Delay to allow click on suggestion
-                  setTimeout(() => {
-                    setIsInputFocused(false);
-                    setShowSuggestions(false);
-                  }, 200);
-                }}
+                onChange={(e) => handleSearchInputChange(e.target.value)}
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
-                    if (suggestions.length === 1) {
-                      handleSuggestionSelect(suggestions[0]);
-                    } else {
-                      handleSearch();
-                    }
+                    handleSearch();
                   }
                 }}
-                placeholder={
-                  searchType === "phone"
-                    ? "Enter 10-digit phone number"
-                    : searchType === "name"
-                    ? "Enter customer name"
-                    : searchType === "customerNumber"
-                    ? "Enter customer number (e.g., CUST-2025-001)"
-                    : "Enter email address"
-                }
+                placeholder="Search by phone, email, customer ID, VIN, or vehicle number..."
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-gray-900"
               />
-              
-              {/* Suggestions Dropdown */}
-              {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                  {suggestions.map((customer) => (
-                    <div
-                      key={customer.id}
-                      onClick={() => handleSuggestionSelect(customer)}
-                      className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <User className="text-indigo-600 flex-shrink-0" size={16} />
-                            <h4 className="font-semibold text-gray-800 truncate">{customer.name}</h4>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 ml-6">
-                            <div className="flex items-center gap-1">
-                              <Hash size={12} />
-                              <span className="font-mono">{customer.customerNumber}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Phone size={12} />
-                              <span>{customer.phone}</span>
-                            </div>
-                            {customer.email && (
-                              <div className="flex items-center gap-1">
-                                <Mail size={12} />
-                                <span className="truncate max-w-[150px]">{customer.email}</span>
-                              </div>
-                            )}
-                          </div>
-                          {customer.totalVehicles && customer.totalVehicles > 0 && (
-                            <div className="flex items-center gap-1 ml-6 mt-1">
-                              <Car size={12} className="text-gray-400" />
-                              <span className="text-xs text-gray-500">
-                                {customer.totalVehicles} {customer.totalVehicles === 1 ? "vehicle" : "vehicles"}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <CheckCircle className="text-indigo-600 flex-shrink-0" size={18} />
-                      </div>
-                    </div>
-                  ))}
+              {detectedSearchType && searchQuery.length >= 2 && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
+                    {getSearchTypeLabel(detectedSearchType)}
+                  </span>
                 </div>
               )}
             </div>
             <button
               onClick={handleSearch}
-              disabled={loading}
+              disabled={loading || !searchQuery.trim()}
               className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
@@ -786,20 +761,108 @@ export default function CustomerFind() {
               {validationError}
             </div>
           )}
+
+          {/* Search Results Dropdown */}
+          {searchResults.length > 0 && searchQuery.trim().length >= 2 && (
+            <div className="mt-3 border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+              {searchResults.map((customer) => (
+                <div
+                  key={customer.id}
+                  onClick={() => handleCustomerSelect(customer)}
+                  className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <User className="text-indigo-600 shrink-0" size={16} />
+                        <h4 className="font-semibold text-gray-800 truncate">{customer.name}</h4>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 ml-6">
+                        <div className="flex items-center gap-1">
+                          <Hash size={12} />
+                          <span className="font-mono">{customer.customerNumber}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Phone size={12} />
+                          <span>{customer.phone}</span>
+                        </div>
+                        {customer.email && (
+                          <div className="flex items-center gap-1">
+                            <Mail size={12} />
+                            <span className="truncate max-w-[150px]">{customer.email}</span>
+                          </div>
+                        )}
+                      </div>
+                      {customer.totalVehicles && customer.totalVehicles > 0 && (
+                        <div className="flex items-center gap-1 ml-6 mt-1">
+                          <Car size={12} className="text-gray-400" />
+                          <span className="text-xs text-gray-500">
+                            {customer.totalVehicles} {customer.totalVehicles === 1 ? "vehicle" : "vehicles"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <CheckCircle className="text-indigo-600 shrink-0" size={18} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
+        {/* Recent Customers Section */}
+        {!selectedCustomer && !showCreateForm && !showServiceTypeSelection && recentCustomers.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="text-indigo-600" size={20} />
+              <h2 className="text-lg font-semibold text-gray-800">Recent Customers</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recentCustomers.map((customer) => (
+                <div
+                  key={customer.id}
+                  onClick={() => handleCustomerSelect(customer)}
+                  className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-md transition cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <User className="text-indigo-600" size={18} />
+                      <h3 className="font-semibold text-gray-800 truncate">{customer.name}</h3>
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <Hash size={12} />
+                      <span className="font-mono text-xs">{customer.customerNumber}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Phone size={12} />
+                      <span>{customer.phone}</span>
+                    </div>
+                    {customer.totalVehicles && customer.totalVehicles > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Car size={12} />
+                        <span>{customer.totalVehicles} vehicle{customer.totalVehicles > 1 ? "s" : ""}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Customer Not Found - Create New */}
-        {showCreateCustomer && !showCreateForm && (
+        {showCreateCustomer && !showCreateForm && !showServiceTypeSelection && (
           <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
             <div className="text-center py-8">
               <AlertCircle className="mx-auto text-gray-400 mb-4" size={48} />
               <h3 className="text-xl font-semibold text-gray-800 mb-2">Customer Not Found</h3>
               <p className="text-gray-600 mb-6">
-                No customer found with the provided {searchType}. Would you like to create a new
-                customer?
+                No customer found with the provided search. Would you like to create a new customer?
               </p>
               <button
-                onClick={handleCreateCustomer}
+                onClick={handleDirectCreateCustomer}
                 className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2 mx-auto"
               >
                 <PlusCircle size={20} />
@@ -809,14 +872,58 @@ export default function CustomerFind() {
           </div>
         )}
 
+        {/* Service Type Selection */}
+        {showServiceTypeSelection && (
+          <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Select Service Type</h2>
+              <button
+                onClick={() => {
+                  setShowServiceTypeSelection(false);
+                  setShowCreateCustomer(false);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => handleServiceTypeSelect("walk-in")}
+                className="p-6 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition flex flex-col items-center gap-3"
+              >
+                <Building2 className="text-indigo-600" size={48} />
+                <h3 className="text-lg font-semibold text-gray-800">Walk-in</h3>
+                <p className="text-sm text-gray-600 text-center">Customer will visit the service center</p>
+              </button>
+              <button
+                onClick={() => handleServiceTypeSelect("home-service")}
+                className="p-6 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition flex flex-col items-center gap-3"
+              >
+                <Home className="text-indigo-600" size={48} />
+                <h3 className="text-lg font-semibold text-gray-800">Home Service</h3>
+                <p className="text-sm text-gray-600 text-center">Service will be provided at customer location</p>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Create Customer Form */}
         {showCreateForm && (
           <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6 mb-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Create New Customer</h2>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800">Create New Customer</h2>
+                {newCustomerForm.serviceType && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Service Type: <span className="font-medium">{newCustomerForm.serviceType === "walk-in" ? "Walk-in" : "Home Service"}</span>
+                  </p>
+                )}
+              </div>
               <button
                 onClick={() => {
                   setShowCreateForm(false);
+                  setShowServiceTypeSelection(false);
                   setValidationError("");
                   setNewCustomerForm({
                     name: "",
@@ -892,6 +999,7 @@ export default function CustomerFind() {
                 <button
                   onClick={() => {
                     setShowCreateForm(false);
+                    setShowServiceTypeSelection(false);
                     setValidationError("");
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
@@ -910,8 +1018,8 @@ export default function CustomerFind() {
           </div>
         )}
 
-        {/* Customer Results */}
-        {searchResults && (
+        {/* Selected Customer Details */}
+        {selectedCustomer && (
           <div className="space-y-6">
             {/* Customer Info Card */}
             <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6">
@@ -921,12 +1029,12 @@ export default function CustomerFind() {
                     <User className="text-indigo-600" size={24} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-800">{searchResults.name}</h2>
-                    <p className="text-sm text-gray-600">Customer #{searchResults.customerNumber}</p>
+                    <h2 className="text-xl font-semibold text-gray-800">{selectedCustomer.name}</h2>
+                    <p className="text-sm text-gray-600">Customer #{selectedCustomer.customerNumber}</p>
                   </div>
                 </div>
                 <Link
-                  href={`/sc/vehicle-search?customerId=${searchResults.id}`}
+                  href={`/sc/vehicle-search?customerId=${selectedCustomer.id}`}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center gap-2"
                 >
                   <PlusCircle size={18} />
@@ -939,25 +1047,25 @@ export default function CustomerFind() {
                   <Phone className="text-gray-600" size={20} />
                   <div>
                     <p className="text-xs text-gray-500">Phone</p>
-                    <p className="text-sm font-medium text-gray-800">{searchResults.phone}</p>
+                    <p className="text-sm font-medium text-gray-800">{selectedCustomer.phone}</p>
                   </div>
                 </div>
-                {searchResults.email && (
+                {selectedCustomer.email && (
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <Mail className="text-gray-600" size={20} />
                     <div>
                       <p className="text-xs text-gray-500">Email</p>
-                      <p className="text-sm font-medium text-gray-800">{searchResults.email}</p>
+                      <p className="text-sm font-medium text-gray-800">{selectedCustomer.email}</p>
                     </div>
                   </div>
                 )}
-                {searchResults.address && (
+                {selectedCustomer.address && (
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <MapPin className="text-gray-600" size={20} />
                     <div>
                       <p className="text-xs text-gray-500">Address</p>
                       <p className="text-sm font-medium text-gray-800 line-clamp-1">
-                        {searchResults.address}
+                        {selectedCustomer.address}
                       </p>
                     </div>
                   </div>
@@ -967,7 +1075,7 @@ export default function CustomerFind() {
                   <div>
                     <p className="text-xs text-gray-500">Member Since</p>
                     <p className="text-sm font-medium text-gray-800">
-                      {new Date(searchResults.createdAt).toLocaleDateString()}
+                      {new Date(selectedCustomer.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
@@ -975,17 +1083,17 @@ export default function CustomerFind() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">{searchResults.totalVehicles || 0}</p>
+                  <p className="text-2xl font-bold text-blue-600">{selectedCustomer.totalVehicles || 0}</p>
                   <p className="text-sm text-gray-600 mt-1">Total Vehicles</p>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{searchResults.totalSpent || "₹0"}</p>
+                  <p className="text-2xl font-bold text-green-600">{selectedCustomer.totalSpent || "₹0"}</p>
                   <p className="text-sm text-gray-600 mt-1">Total Spent</p>
                 </div>
-                {searchResults.lastServiceDate && (
+                {selectedCustomer.lastServiceDate && (
                   <div className="text-center p-4 bg-purple-50 rounded-lg">
                     <p className="text-sm font-bold text-purple-600">
-                      {new Date(searchResults.lastServiceDate).toLocaleDateString()}
+                      {new Date(selectedCustomer.lastServiceDate).toLocaleDateString()}
                     </p>
                     <p className="text-sm text-gray-600 mt-1">Last Service</p>
                   </div>
@@ -994,14 +1102,14 @@ export default function CustomerFind() {
             </div>
 
             {/* Vehicles List */}
-            {searchResults.vehicles && searchResults.vehicles.length > 0 && (
+            {selectedCustomer.vehicles && selectedCustomer.vehicles.length > 0 && (
               <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <Car className="text-indigo-600" size={20} />
-                  Linked Vehicles ({searchResults.vehicles.length})
+                  Linked Vehicles ({selectedCustomer.vehicles.length})
                 </h3>
                 <div className="space-y-3">
-                  {searchResults.vehicles.map((vehicle) => (
+                  {selectedCustomer.vehicles.map((vehicle) => (
                     <div
                       key={vehicle.id}
                       className="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow-sm transition"
@@ -1060,15 +1168,15 @@ export default function CustomerFind() {
               </div>
             )}
 
-            {(!searchResults.vehicles || searchResults.vehicles.length === 0) && (
+            {(!selectedCustomer.vehicles || selectedCustomer.vehicles.length === 0) && (
               <div className="bg-white rounded-2xl shadow-md p-6 text-center">
                 <Car className="mx-auto text-gray-400 mb-4" size={48} />
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">No Vehicles Linked</h3>
                 <p className="text-gray-600 mb-4">
-                  This customer doesn't have any vehicles linked yet.
+                  This customer doesn&apos;t have any vehicles linked yet.
                 </p>
                 <Link
-                  href={`/sc/vehicle-search?customerId=${searchResults.id}`}
+                  href={`/sc/vehicle-search?customerId=${selectedCustomer.id}`}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition"
                 >
                   <PlusCircle size={20} />
@@ -1082,4 +1190,3 @@ export default function CustomerFind() {
     </div>
   );
 }
-
