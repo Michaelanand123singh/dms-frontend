@@ -37,9 +37,13 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const dashboardTitle = useMemo(() => {
-    return userRole === "admin" || userRole === "super_admin" 
-      ? "Admin Dashboard" 
-      : "Service Center Dashboard";
+    if (userRole === "admin" || userRole === "super_admin") {
+      return "Admin Dashboard";
+    } else if (userRole === "call_center") {
+      return "Call Center Panel";
+    } else {
+      return "Service Center Dashboard";
+    }
   }, [userRole]);
 
   const handleLogout = useCallback(() => {
@@ -175,10 +179,18 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
 
   useEffect(() => {
     if (debouncedSearchQuery) {
-      performSearch(debouncedSearchQuery);
+      // Use requestAnimationFrame to avoid synchronous setState in effect
+      const rafId = requestAnimationFrame(() => {
+        performSearch(debouncedSearchQuery);
+      });
+      return () => cancelAnimationFrame(rafId);
     } else {
-      setSearchResults([]);
-      setShowResults(false);
+      // Use requestAnimationFrame for else branch as well
+      const rafId = requestAnimationFrame(() => {
+        setSearchResults([]);
+        setShowResults(false);
+      });
+      return () => cancelAnimationFrame(rafId);
     }
   }, [debouncedSearchQuery, performSearch]);
 
