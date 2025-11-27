@@ -19,6 +19,7 @@ import {
   History,
   Wrench,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { useRole } from "@/shared/hooks";
@@ -35,7 +36,48 @@ import type {
   ServiceType,
   Vehicle,
   ServiceHistoryItem,
+  CustomerType,
+  NewVehicleForm,
 } from "@/shared/types";
+
+// Initial form states (constants for reuse)
+const initialCustomerForm: NewCustomerForm = {
+  name: "",
+  phone: "",
+  alternateMobile: "",
+  email: "",
+  address: "",
+  cityState: "",
+  pincode: "",
+  customerType: undefined,
+  serviceType: undefined,
+};
+
+const initialVehicleForm: Partial<NewVehicleForm> = {
+  vehicleBrand: "",
+  vehicleModel: "",
+  registrationNumber: "",
+  vin: "",
+  variant: "",
+  motorNumber: "",
+  chargerSerialNumber: "",
+  purchaseDate: "",
+  vehicleAge: "",
+  warrantyStatus: "",
+  insuranceStartDate: "",
+  insuranceEndDate: "",
+  insuranceCompanyName: "",
+};
+
+const initialAppointmentForm = {
+  customerName: "",
+  phone: "",
+  vehicle: "",
+  serviceType: "",
+  date: new Date().toISOString().split("T")[0],
+  time: "",
+  duration: "2",
+};
 
 export default function CustomerFind() {
   const { userRole } = useRole();
@@ -43,14 +85,21 @@ export default function CustomerFind() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
   const [showCreateCustomer, setShowCreateCustomer] = useState<boolean>(false);
   const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
-  const [showServiceTypeSelection, setShowServiceTypeSelection] = useState<boolean>(false);
   const [showAddVehiclePopup, setShowAddVehiclePopup] = useState<boolean>(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showVehicleDetails, setShowVehicleDetails] = useState<boolean>(false);
   const [showScheduleAppointment, setShowScheduleAppointment] = useState<boolean>(false);
+  const [showComplaints, setShowComplaints] = useState<boolean>(false);
   const [serviceHistory, setServiceHistory] = useState<ServiceHistoryItem[]>([]);
   const [validationError, setValidationError] = useState<string>("");
   const [detectedSearchType, setDetectedSearchType] = useState<CustomerSearchType | null>(null);
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{ show: boolean; message: string; type?: "success" | "error" }>({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
   // Hooks for data fetching
   const { results: searchResults, loading: searchLoading, search: performSearch, clear: clearSearch } = useCustomerSearch();
@@ -58,40 +107,16 @@ export default function CustomerFind() {
   const { customers: recentCustomers, loading: recentLoading } = useRecentCustomers(10);
 
   // Form state for creating new customer
-  const [newCustomerForm, setNewCustomerForm] = useState<NewCustomerForm>({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-  });
+  const [newCustomerForm, setNewCustomerForm] = useState<NewCustomerForm>(initialCustomerForm);
 
   // Form state for adding new vehicle
-  const [newVehicleForm, setNewVehicleForm] = useState<{
-    vin: string;
-    modelName: string;
-  }>({
-    vin: "",
-    modelName: "",
-  });
+  const [newVehicleForm, setNewVehicleForm] = useState<Partial<NewVehicleForm>>(initialVehicleForm);
 
   // Form state for scheduling appointment
-  const [appointmentForm, setAppointmentForm] = useState<{
-    customerName: string;
-    phone: string;
-    vehicle: string;
-    serviceType: string;
-    date: string;
-    time: string;
-    duration: string;
-  }>({
-    customerName: "",
-    phone: "",
-    vehicle: "",
-    serviceType: "",
+  const [appointmentForm, setAppointmentForm] = useState(() => ({
+    ...initialAppointmentForm,
     date: new Date().toISOString().split("T")[0],
-    time: "",
-    duration: "2",
-  });
+  }));
 
   // Auto-detect search type based on input
   const detectSearchType = (query: string): CustomerSearchType => {
@@ -166,38 +191,95 @@ export default function CustomerFind() {
     // The repository tracks this automatically when a customer is accessed
   }, [clearSearch]);
 
-  // Handle direct create customer button
-  const handleDirectCreateCustomer = useCallback((): void => {
-    setShowServiceTypeSelection(true);
-    setShowCreateForm(false);
-    setNewCustomerForm({
-      name: "",
-      phone: "",
-      email: "",
-      address: "",
+  // Form reset functions
+  const resetCustomerForm = useCallback(() => {
+    setNewCustomerForm({ ...initialCustomerForm });
+  }, []);
+
+  const resetVehicleForm = useCallback(() => {
+    setNewVehicleForm({ ...initialVehicleForm });
+  }, []);
+
+  const resetAppointmentForm = useCallback(() => {
+    setAppointmentForm({ ...initialAppointmentForm, date: new Date().toISOString().split("T")[0] });
+  }, []);
+
+  // Helper to initialize appointment form with customer and vehicle data
+  const initializeAppointmentForm = useCallback((customer: CustomerWithVehicles, vehicle: Vehicle) => {
+    setAppointmentForm({
+      customerName: customer.name,
+      phone: customer.phone,
+      vehicle: `${vehicle.vehicleMake} ${vehicle.vehicleModel} (${vehicle.vehicleYear})`,
+      serviceType: "",
+      date: new Date().toISOString().split("T")[0],
+      time: "",
+      duration: "2",
     });
   }, []);
 
-  // Handle service type selection
+  // Modal close handlers
+  const closeCustomerForm = useCallback(() => {
+    setShowCreateForm(false);
+    setValidationError("");
+    resetCustomerForm();
+  }, [resetCustomerForm]);
+
+  const closeVehicleForm = useCallback(() => {
+    setShowAddVehiclePopup(false);
+    setValidationError("");
+    resetVehicleForm();
+  }, [resetVehicleForm]);
+
+  const closeAppointmentForm = useCallback(() => {
+    setShowScheduleAppointment(false);
+    resetAppointmentForm();
+  }, [resetAppointmentForm]);
+
+  // Handle direct create customer button
+  const handleDirectCreateCustomer = useCallback((): void => {
+    setShowCreateForm(true);
+    resetCustomerForm();
+  }, [resetCustomerForm]);
+
+  // Handle service type selection (now integrated in form)
   const handleServiceTypeSelect = useCallback((serviceType: ServiceType): void => {
     setNewCustomerForm((prev) => ({ ...prev, serviceType }));
-    setShowServiceTypeSelection(false);
-    setShowCreateForm(true);
+  }, []);
+
+  // Toast function
+  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: "", type: "success" });
+    }, 3000);
   }, []);
 
   // Save new customer
   const handleSaveNewCustomer = useCallback(async (): Promise<void> => {
     // Validate form
     if (!newCustomerForm.name || !newCustomerForm.phone) {
-      setValidationError("Name and Phone are required fields");
+      setValidationError("Full Name and Mobile Number (Primary) are required fields");
       return;
     }
 
-    // Validate phone
+    // Validate primary phone
     const cleanedPhone = newCustomerForm.phone.replace(/[\s-+]/g, "").replace(/^91/, "");
     if (cleanedPhone.length !== 10 || !/^\d{10}$/.test(cleanedPhone)) {
-      setValidationError("Please enter a valid 10-digit phone number");
+      setValidationError("Please enter a valid 10-digit primary mobile number");
       return;
+    }
+
+    // Validate alternate mobile if provided
+    if (newCustomerForm.alternateMobile) {
+      const cleanedAlternate = newCustomerForm.alternateMobile.replace(/[\s-+]/g, "").replace(/^91/, "");
+      if (cleanedAlternate.length !== 10 || !/^\d{10}$/.test(cleanedAlternate)) {
+        setValidationError("Please enter a valid 10-digit alternate mobile number");
+        return;
+      }
+      if (cleanedAlternate === cleanedPhone) {
+        setValidationError("Alternate mobile number must be different from primary mobile number");
+        return;
+      }
     }
 
     // Validate email if provided
@@ -209,32 +291,43 @@ export default function CustomerFind() {
       }
     }
 
+    // Validate pincode if provided
+    if (newCustomerForm.pincode) {
+      if (!/^\d{6}$/.test(newCustomerForm.pincode)) {
+        setValidationError("Pincode must be exactly 6 digits");
+        return;
+      }
+    }
+
+    // Validate service type
+    if (!newCustomerForm.serviceType) {
+      setValidationError("Please select a service type (Walk-in or Home Service)");
+      return;
+    }
+
     setValidationError("");
 
     const customer = await createCustomer({
       ...newCustomerForm,
       phone: cleanedPhone,
+      alternateMobile: newCustomerForm.alternateMobile 
+        ? newCustomerForm.alternateMobile.replace(/[\s-+]/g, "").replace(/^91/, "")
+        : undefined,
     });
 
     if (customer) {
       setSelectedCustomer(customer);
       setShowCreateForm(false);
       setShowCreateCustomer(false);
-      setShowServiceTypeSelection(false);
 
       // Reset form
-      setNewCustomerForm({
-        name: "",
-        phone: "",
-        email: "",
-        address: "",
-      });
+      resetCustomerForm();
 
-      alert(`Customer created successfully! Customer Number: ${customer.customerNumber}\nService Type: ${newCustomerForm.serviceType === "walk-in" ? "Walk-in" : "Home Service"}`);
+      showToast(`Customer created successfully! Customer Number: ${customer.customerNumber} | Service Type: ${newCustomerForm.serviceType === "walk-in" ? "Walk-in" : "Home Service"}`, "success");
     } else if (createError) {
       setValidationError(createError);
     }
-  }, [newCustomerForm, createCustomer, createError]);
+  }, [newCustomerForm, createCustomer, createError, showToast, resetCustomerForm]);
 
   // Get search type label
   const getSearchTypeLabel = (type: CustomerSearchType | null): string => {
@@ -256,6 +349,26 @@ export default function CustomerFind() {
 
   return (
     <div className="bg-gray-50 min-h-screen pt-20 px-4 sm:px-6 lg:px-8 pb-10">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div 
+          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[10000] transition-all duration-300"
+          style={{
+            animation: 'fadeInDown 0.3s ease-out',
+          }}
+        >
+          <div className={`${
+            toast.type === "success" ? "bg-green-600" : "bg-red-600"
+          } text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] max-w-md`}>
+            {toast.type === "success" ? (
+              <CheckCircle size={20} className="flex-shrink-0" />
+            ) : (
+              <AlertCircle size={20} className="flex-shrink-0" />
+            )}
+            <p className="font-medium">{toast.message}</p>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -380,7 +493,7 @@ export default function CustomerFind() {
         </div>
 
         {/* Recent Customers Section */}
-        {!selectedCustomer && !showCreateForm && !showServiceTypeSelection && recentCustomers.length > 0 && (
+        {!selectedCustomer && !showCreateForm && recentCustomers.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 sm:p-6 mb-6">
             <div className="flex items-center gap-2.5 mb-5">
               <div className="p-1.5 rounded-lg bg-indigo-100">
@@ -430,7 +543,7 @@ export default function CustomerFind() {
         )}
 
         {/* Customer Not Found - Create New */}
-        {shouldShowCreateCustomer && !showCreateForm && !showServiceTypeSelection && (
+        {shouldShowCreateCustomer && !showCreateForm && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-6 sm:p-8 mb-6">
             <div className="text-center py-6">
               <div className="mx-auto w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
@@ -451,70 +564,13 @@ export default function CustomerFind() {
           </div>
         )}
 
-        {/* Service Type Selection */}
-        {showServiceTypeSelection && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-6 mb-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Select Service Type</h2>
-              <button
-                onClick={() => {
-                  setShowServiceTypeSelection(false);
-                  setShowCreateCustomer(false);
-                }}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
-              >
-                <X size={20} strokeWidth={2} />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                onClick={() => handleServiceTypeSelect("walk-in")}
-                className="p-6 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50/50 transition-all duration-200 flex flex-col items-center gap-3 group active:scale-[0.98]"
-              >
-                <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors">
-                  <Building2 className="text-indigo-600" size={40} strokeWidth={2} />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors">Walk-in</h3>
-                <p className="text-sm text-gray-600 text-center">Customer will visit the service center</p>
-              </button>
-              <button
-                onClick={() => handleServiceTypeSelect("home-service")}
-                className="p-6 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50/50 transition-all duration-200 flex flex-col items-center gap-3 group active:scale-[0.98]"
-              >
-                <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors">
-                  <Home className="text-indigo-600" size={40} strokeWidth={2} />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors">Home Service</h3>
-                <p className="text-sm text-gray-600 text-center">Service will be provided at customer location</p>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Create Customer Form */}
         {showCreateForm && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 sm:p-6 mb-6">
             <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Create New Customer</h2>
-                {newCustomerForm.serviceType && (
-                  <p className="text-sm text-gray-600 mt-1.5">
-                    Service Type: <span className="font-semibold text-indigo-600">{newCustomerForm.serviceType === "walk-in" ? "Walk-in" : "Home Service"}</span>
-                  </p>
-                )}
-              </div>
+              <h2 className="text-xl font-bold text-gray-900">Create New Customer</h2>
               <button
-                onClick={() => {
-                  setShowCreateForm(false);
-                  setShowServiceTypeSelection(false);
-                  setValidationError("");
-                  setNewCustomerForm({
-                    name: "",
-                    phone: "",
-                    email: "",
-                    address: "",
-                  });
-                }}
+                onClick={closeCustomerForm}
                 className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
               >
                 <X size={20} strokeWidth={2} />
@@ -524,7 +580,7 @@ export default function CustomerFind() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Customer Name <span className="text-red-500">*</span>
+                  Full Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -532,58 +588,177 @@ export default function CustomerFind() {
                   onChange={(e) =>
                     setNewCustomerForm({ ...newCustomerForm, name: e.target.value })
                   }
+                  placeholder="Enter full name"
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
                   required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Mobile Number (Primary) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={newCustomerForm.phone}
+                    onChange={(e) =>
+                      setNewCustomerForm({ ...newCustomerForm, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })
+                    }
+                    placeholder="10-digit mobile number"
+                    maxLength={10}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Alternate Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={newCustomerForm.alternateMobile || ""}
+                    onChange={(e) =>
+                      setNewCustomerForm({ ...newCustomerForm, alternateMobile: e.target.value.replace(/\D/g, "").slice(0, 10) })
+                    }
+                    placeholder="10-digit mobile number (optional)"
+                    maxLength={10}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Email ID
+                </label>
+                <input
+                  type="email"
+                  value={newCustomerForm.email || ""}
+                  onChange={(e) =>
+                    setNewCustomerForm({ ...newCustomerForm, email: e.target.value })
+                  }
+                  placeholder="Enter email address"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
+                  Full Address
                 </label>
-                <input
-                  type="tel"
-                  value={newCustomerForm.phone}
-                  onChange={(e) =>
-                    setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })
-                  }
-                  placeholder="10-digit phone number"
-                  maxLength={10}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={newCustomerForm.email}
-                  onChange={(e) =>
-                    setNewCustomerForm({ ...newCustomerForm, email: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Address</label>
                 <textarea
-                  value={newCustomerForm.address}
+                  value={newCustomerForm.address || ""}
                   onChange={(e) =>
                     setNewCustomerForm({ ...newCustomerForm, address: e.target.value })
                   }
                   rows={3}
+                  placeholder="Enter complete address"
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 resize-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    City / State
+                  </label>
+                  <input
+                    type="text"
+                    value={newCustomerForm.cityState || ""}
+                    onChange={(e) =>
+                      setNewCustomerForm({ ...newCustomerForm, cityState: e.target.value })
+                    }
+                    placeholder="Enter city and state"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Pincode
+                  </label>
+                  <input
+                    type="text"
+                    value={newCustomerForm.pincode || ""}
+                    onChange={(e) =>
+                      setNewCustomerForm({ ...newCustomerForm, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) })
+                    }
+                    placeholder="6-digit pincode"
+                    maxLength={6}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Customer Type
+                  </label>
+                  <select
+                    value={newCustomerForm.customerType || ""}
+                    onChange={(e) =>
+                      setNewCustomerForm({ ...newCustomerForm, customerType: e.target.value as CustomerType | undefined })
+                    }
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                  >
+                    <option value="">Select Customer Type</option>
+                    <option value="B2C">B2C</option>
+                    <option value="B2B">B2B</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Service Type <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleServiceTypeSelect("walk-in")}
+                      className={`p-4 border-2 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
+                        newCustomerForm.serviceType === "walk-in"
+                          ? "border-indigo-500 bg-indigo-50"
+                          : "border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+                      }`}
+                    >
+                      <Building2 className={`${newCustomerForm.serviceType === "walk-in" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
+                      <span className={`text-sm font-medium ${newCustomerForm.serviceType === "walk-in" ? "text-indigo-700" : "text-gray-600"}`}>Walk-in</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleServiceTypeSelect("home-service")}
+                      className={`p-4 border-2 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
+                        newCustomerForm.serviceType === "home-service"
+                          ? "border-indigo-500 bg-indigo-50"
+                          : "border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+                      }`}
+                    >
+                      <Home className={`${newCustomerForm.serviceType === "home-service" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
+                      <span className={`text-sm font-medium ${newCustomerForm.serviceType === "home-service" ? "text-indigo-700" : "text-gray-600"}`}>Home Service</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={() => {
                     setShowCreateForm(false);
-                    setShowServiceTypeSelection(false);
                     setValidationError("");
+                    setNewCustomerForm({
+                      name: "",
+                      phone: "",
+                      alternateMobile: "",
+                      email: "",
+                      address: "",
+                      cityState: "",
+                      pincode: "",
+                      customerType: undefined,
+                      serviceType: undefined,
+                    });
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
                 >
@@ -623,19 +798,27 @@ export default function CustomerFind() {
                     <p className="text-sm text-gray-600 font-medium mt-0.5">Customer #{selectedCustomer.customerNumber}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowAddVehiclePopup(true);
-                    setNewVehicleForm({
-                      vin: "",
-                      modelName: "",
-                    });
-                  }}
-                  className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg text-sm font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] flex items-center gap-2"
-                >
-                  <PlusCircle size={16} strokeWidth={2} />
-                  Add Vehicle
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setShowComplaints(true);
+                    }}
+                    className="px-4 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-lg text-sm font-semibold hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] flex items-center gap-2"
+                  >
+                    <AlertTriangle size={16} strokeWidth={2} />
+                    Complaints
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddVehiclePopup(true);
+                      resetVehicleForm();
+                    }}
+                    className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg text-sm font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] flex items-center gap-2"
+                  >
+                    <PlusCircle size={16} strokeWidth={2} />
+                    Add Vehicle
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -792,9 +975,22 @@ export default function CustomerFind() {
                                 },
                               ]);
                             }}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center gap-2"
                           >
+                            <FileText size={16} strokeWidth={2} />
                             View Details
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedVehicle(vehicle);
+                              setShowScheduleAppointment(true);
+                              // Auto-fill appointment form with customer and vehicle details
+                              initializeAppointmentForm(selectedCustomer, vehicle);
+                            }}
+                            className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg text-sm font-medium hover:from-green-700 hover:to-green-800 transition flex items-center gap-2"
+                          >
+                            <Calendar size={16} strokeWidth={2} />
+                            Schedule Appointment
                           </button>
                         </div>
                       </div>
@@ -815,8 +1011,19 @@ export default function CustomerFind() {
                   onClick={() => {
                     setShowAddVehiclePopup(true);
                     setNewVehicleForm({
+                      vehicleBrand: "",
+                      vehicleModel: "",
+                      registrationNumber: "",
                       vin: "",
-                      modelName: "",
+                      variant: "",
+                      motorNumber: "",
+                      chargerSerialNumber: "",
+                      purchaseDate: "",
+                      vehicleAge: "",
+                      warrantyStatus: "",
+                      insuranceStartDate: "",
+                      insuranceEndDate: "",
+                      insuranceCompanyName: "",
                     });
                   }}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition"
@@ -836,20 +1043,13 @@ export default function CustomerFind() {
             style={{ animation: 'fadeIn 0.2s ease-out' }}
           >
             <div 
-              className="bg-white rounded-2xl shadow-xl max-w-md w-full"
+              className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
               style={{ animation: 'slideDownFromTop 0.3s ease-out' }}
             >
               <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl">
                 <h2 className="text-2xl font-bold text-gray-800">Add New Vehicle</h2>
                 <button
-                  onClick={() => {
-                    setShowAddVehiclePopup(false);
-                    setValidationError("");
-                    setNewVehicleForm({
-                      vin: "",
-                      modelName: "",
-                    });
-                  }}
+                  onClick={closeVehicleForm}
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
                 >
                   <X size={24} strokeWidth={2} />
@@ -893,38 +1093,218 @@ export default function CustomerFind() {
 
                 {/* Vehicle Form Fields */}
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      VIN Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={newVehicleForm.vin}
-                      onChange={(e) =>
-                        setNewVehicleForm({ ...newVehicleForm, vin: e.target.value.toUpperCase() })
-                      }
-                      placeholder="Enter 17-character VIN number"
-                      maxLength={17}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 font-mono transition-all duration-200"
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1.5">17 alphanumeric characters</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Vehicle Brand <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newVehicleForm.vehicleBrand || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, vehicleBrand: e.target.value })
+                        }
+                        placeholder="e.g., Honda, Toyota, Tesla"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Vehicle Model <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newVehicleForm.vehicleModel || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, vehicleModel: e.target.value })
+                        }
+                        placeholder="e.g., City, Camry, Model 3"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Registration Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newVehicleForm.registrationNumber || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, registrationNumber: e.target.value.toUpperCase() })
+                        }
+                        placeholder="e.g., MH12AB1234"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        VIN / Chassis Number <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newVehicleForm.vin || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, vin: e.target.value.toUpperCase() })
+                        }
+                        placeholder="Enter 17-character VIN number"
+                        maxLength={17}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 font-mono transition-all duration-200"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1.5">17 alphanumeric characters</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Variant / Battery Capacity
+                      </label>
+                      <input
+                        type="text"
+                        value={newVehicleForm.variant || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, variant: e.target.value })
+                        }
+                        placeholder="e.g., VX, 50kWh, Standard Range"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Motor Number
+                      </label>
+                      <input
+                        type="text"
+                        value={newVehicleForm.motorNumber || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, motorNumber: e.target.value })
+                        }
+                        placeholder="Enter motor number"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      />
+                    </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Model Name <span className="text-red-500">*</span>
+                      Charger Serial Number
                     </label>
                     <input
                       type="text"
-                      value={newVehicleForm.modelName}
+                      value={newVehicleForm.chargerSerialNumber || ""}
                       onChange={(e) =>
-                        setNewVehicleForm({ ...newVehicleForm, modelName: e.target.value })
+                        setNewVehicleForm({ ...newVehicleForm, chargerSerialNumber: e.target.value })
                       }
-                      placeholder="e.g., Honda City, Toyota Camry"
+                      placeholder="Enter charger serial number"
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
-                      required
                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Date of Purchase
+                      </label>
+                      <input
+                        type="date"
+                        value={newVehicleForm.purchaseDate || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, purchaseDate: e.target.value })
+                        }
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Vehicle Age
+                      </label>
+                      <input
+                        type="text"
+                        value={newVehicleForm.vehicleAge || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, vehicleAge: e.target.value })
+                        }
+                        placeholder="e.g., 2 years, 6 months"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Warranty Status
+                    </label>
+                    <select
+                      value={newVehicleForm.warrantyStatus || ""}
+                      onChange={(e) =>
+                        setNewVehicleForm({ ...newVehicleForm, warrantyStatus: e.target.value })
+                      }
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                    >
+                      <option value="">Select Warranty Status</option>
+                      <option value="Active">Active</option>
+                      <option value="Expired">Expired</option>
+                      <option value="Not Applicable">Not Applicable</option>
+                    </select>
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-4">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Insurance Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Insurance Start Date
+                        </label>
+                        <input
+                          type="date"
+                          value={newVehicleForm.insuranceStartDate || ""}
+                          onChange={(e) =>
+                            setNewVehicleForm({ ...newVehicleForm, insuranceStartDate: e.target.value })
+                          }
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Insurance End Date
+                        </label>
+                        <input
+                          type="date"
+                          value={newVehicleForm.insuranceEndDate || ""}
+                          onChange={(e) =>
+                            setNewVehicleForm({ ...newVehicleForm, insuranceEndDate: e.target.value })
+                          }
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Insurance Company Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newVehicleForm.insuranceCompanyName || ""}
+                        onChange={(e) =>
+                          setNewVehicleForm({ ...newVehicleForm, insuranceCompanyName: e.target.value })
+                        }
+                        placeholder="Enter insurance company name"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -932,12 +1312,7 @@ export default function CustomerFind() {
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => {
-                      setShowAddVehiclePopup(false);
-                      setValidationError("");
-                      setNewVehicleForm({
-                        vin: "",
-                        modelName: "",
-                      });
+                      closeVehicleForm();
                     }}
                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
                   >
@@ -946,8 +1321,18 @@ export default function CustomerFind() {
                   <button
                     onClick={() => {
                       // Validate form
-                      if (!newVehicleForm.vin || !newVehicleForm.modelName) {
-                        setValidationError("VIN Number and Model Name are required");
+                      if (!newVehicleForm.vehicleBrand || !newVehicleForm.vehicleModel) {
+                        setValidationError("Vehicle Brand and Vehicle Model are required");
+                        return;
+                      }
+
+                      if (!newVehicleForm.registrationNumber) {
+                        setValidationError("Registration Number is required");
+                        return;
+                      }
+
+                      if (!newVehicleForm.vin) {
+                        setValidationError("VIN / Chassis Number is required");
                         return;
                       }
 
@@ -963,18 +1348,24 @@ export default function CustomerFind() {
                         return;
                       }
 
+                      // Validate insurance dates if provided
+                      if (newVehicleForm.insuranceStartDate && newVehicleForm.insuranceEndDate) {
+                        const startDate = new Date(newVehicleForm.insuranceStartDate);
+                        const endDate = new Date(newVehicleForm.insuranceEndDate);
+                        if (endDate <= startDate) {
+                          setValidationError("Insurance end date must be after start date");
+                          return;
+                        }
+                      }
+
                       setValidationError("");
 
                       // TODO: Call API to create vehicle
                       // For now, show success message
-                      alert(`Vehicle added successfully!\n\nVIN: ${newVehicleForm.vin}\nModel: ${newVehicleForm.modelName}\nCustomer: ${selectedCustomer.name}`);
+                      showToast(`Vehicle added successfully! Brand: ${newVehicleForm.vehicleBrand} | Model: ${newVehicleForm.vehicleModel} | Registration: ${newVehicleForm.registrationNumber}`, "success");
 
                       // Close popup and reset form
-                      setShowAddVehiclePopup(false);
-                      setNewVehicleForm({
-                        vin: "",
-                        modelName: "",
-                      });
+                      closeVehicleForm();
 
                       // Optionally refresh customer data to show new vehicle
                       // You might want to refetch the customer data here
@@ -1083,15 +1474,7 @@ export default function CustomerFind() {
                         setShowVehicleDetails(false);
                         setShowScheduleAppointment(true);
                         // Pre-fill appointment form with customer and vehicle details
-                        setAppointmentForm({
-                          customerName: selectedCustomer.name,
-                          phone: selectedCustomer.phone,
-                          vehicle: `${selectedVehicle.vehicleMake} ${selectedVehicle.vehicleModel} (${selectedVehicle.vehicleYear})`,
-                          serviceType: "",
-                          date: new Date().toISOString().split("T")[0],
-                          time: "",
-                          duration: "2",
-                        });
+                        initializeAppointmentForm(selectedCustomer, selectedVehicle);
                       }}
                       className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg text-sm font-medium hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] flex items-center gap-2"
                     >
@@ -1173,18 +1556,7 @@ export default function CustomerFind() {
               <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl z-10">
                 <h2 className="text-2xl font-bold text-gray-800">Schedule Appointment</h2>
                 <button
-                  onClick={() => {
-                    setShowScheduleAppointment(false);
-                    setAppointmentForm({
-                      customerName: "",
-                      phone: "",
-                      vehicle: "",
-                      serviceType: "",
-                      date: new Date().toISOString().split("T")[0],
-                      time: "",
-                      duration: "2",
-                    });
-                  }}
+                  onClick={closeAppointmentForm}
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
                 >
                   <X size={24} strokeWidth={2} />
@@ -1235,8 +1607,8 @@ export default function CustomerFind() {
                     <input
                       type="text"
                       value={appointmentForm.customerName}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, customerName: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      readOnly
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
                       required
                     />
                   </div>
@@ -1248,9 +1620,9 @@ export default function CustomerFind() {
                     <input
                       type="tel"
                       value={appointmentForm.phone}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, phone: e.target.value })}
+                      readOnly
                       maxLength={10}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
                       required
                     />
                   </div>
@@ -1262,8 +1634,8 @@ export default function CustomerFind() {
                     <input
                       type="text"
                       value={appointmentForm.vehicle}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, vehicle: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      readOnly
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
                       required
                     />
                   </div>
@@ -1318,38 +1690,13 @@ export default function CustomerFind() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Duration (hours) <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={appointmentForm.duration}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, duration: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
-                      required
-                    >
-                      <option value="1">1 hour</option>
-                      <option value="2">2 hours</option>
-                      <option value="3">3 hours</option>
-                      <option value="4">4 hours</option>
-                    </select>
-                  </div>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => {
-                      setShowScheduleAppointment(false);
-                      setAppointmentForm({
-                        customerName: "",
-                        phone: "",
-                        vehicle: "",
-                        serviceType: "",
-                        date: new Date().toISOString().split("T")[0],
-                        time: "",
-                        duration: "2",
-                      });
+                    closeAppointmentForm();
                     }}
                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
                   >
@@ -1411,25 +1758,153 @@ export default function CustomerFind() {
                       const updatedAppointments = [...existingAppointments, newAppointment];
                       safeStorage.setItem("appointments", updatedAppointments);
 
-                      alert(`Appointment scheduled successfully!\n\nCustomer: ${appointmentForm.customerName}\nVehicle: ${appointmentForm.vehicle}\nService: ${appointmentForm.serviceType}\nDate: ${appointmentForm.date}\nTime: ${formatTime(appointmentForm.time)}`);
+                      showToast(`Appointment scheduled successfully! Customer: ${appointmentForm.customerName} | Vehicle: ${appointmentForm.vehicle} | Service: ${appointmentForm.serviceType} | Date: ${appointmentForm.date} | Time: ${formatTime(appointmentForm.time)}`, "success");
 
                       // Close modal and reset form
-                      setShowScheduleAppointment(false);
-                      setAppointmentForm({
-                        customerName: "",
-                        phone: "",
-                        vehicle: "",
-                        serviceType: "",
-                        date: new Date().toISOString().split("T")[0],
-                        time: "",
-                        duration: "2",
-                      });
+                    closeAppointmentForm();
                     }}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98]"
+                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-indigo-600 to-indigo-700 text-white rounded-lg font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98]"
                   >
                     Schedule Appointment
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Complaints Modal */}
+        {showComplaints && selectedCustomer && (
+          <div 
+            className="fixed inset-0 backdrop-blur-md bg-black/10 flex items-start justify-center z-[9999] p-4 pt-8"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              style={{ animation: 'slideDownFromTop 0.3s ease-out' }}
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl z-10">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Customer Complaints</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedCustomer.name} - {selectedCustomer.customerNumber}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowComplaints(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+                >
+                  <X size={24} strokeWidth={2} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Mock complaints data - Replace with API call */}
+                {(() => {
+                  // Mock complaints for the selected customer
+                  const mockComplaints = [
+                    {
+                      id: "COMP-001",
+                      customerName: selectedCustomer.name,
+                      phone: selectedCustomer.phone,
+                      vehicle: selectedCustomer.vehicles?.[0] 
+                        ? `${selectedCustomer.vehicles[0].vehicleMake} ${selectedCustomer.vehicles[0].vehicleModel}`
+                        : "N/A",
+                      complaint: "Service quality was poor. The technician did not properly diagnose the issue.",
+                      status: "Open",
+                      date: "2025-01-15",
+                      severity: "Medium",
+                    },
+                    {
+                      id: "COMP-002",
+                      customerName: selectedCustomer.name,
+                      phone: selectedCustomer.phone,
+                      vehicle: selectedCustomer.vehicles?.[0]
+                        ? `${selectedCustomer.vehicles[0].vehicleMake} ${selectedCustomer.vehicles[0].vehicleModel}`
+                        : "N/A",
+                      complaint: "Delayed service delivery. Vehicle was promised to be ready in 2 days but took 5 days.",
+                      status: "Resolved",
+                      date: "2024-12-20",
+                      severity: "High",
+                    },
+                  ];
+
+                  return mockComplaints.length > 0 ? (
+                    <div className="space-y-4">
+                      {mockComplaints.map((complaint) => (
+                        <div
+                          key={complaint.id}
+                          className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${
+                                complaint.severity === "High" || complaint.severity === "Critical"
+                                  ? "bg-red-100"
+                                  : complaint.severity === "Medium"
+                                  ? "bg-amber-100"
+                                  : "bg-blue-100"
+                              }`}>
+                                <AlertTriangle 
+                                  className={
+                                    complaint.severity === "High" || complaint.severity === "Critical"
+                                      ? "text-red-600"
+                                      : complaint.severity === "Medium"
+                                      ? "text-amber-600"
+                                      : "text-blue-600"
+                                  } 
+                                  size={20} 
+                                  strokeWidth={2} 
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold text-gray-900">{complaint.id}</span>
+                                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    complaint.status === "Open"
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : complaint.status === "Resolved"
+                                      ? "bg-green-100 text-green-700"
+                                      : "bg-gray-100 text-gray-700"
+                                  }`}>
+                                    {complaint.status}
+                                  </span>
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                    complaint.severity === "High" || complaint.severity === "Critical"
+                                      ? "bg-red-50 text-red-700"
+                                      : complaint.severity === "Medium"
+                                      ? "bg-amber-50 text-amber-700"
+                                      : "bg-blue-50 text-blue-700"
+                                  }`}>
+                                    {complaint.severity}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  {complaint.date} • {complaint.vehicle}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="ml-12">
+                            <p className="text-sm text-gray-700 leading-relaxed">{complaint.complaint}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                        <CheckCircle className="text-gray-400" size={32} strokeWidth={2} />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">No Complaints Found</h3>
+                      <p className="text-gray-600">
+                        This customer has no complaints registered.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>

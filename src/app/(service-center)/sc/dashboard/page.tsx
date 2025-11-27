@@ -48,21 +48,30 @@ export default function SCDashboard() {
   // Calculate today's appointments from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const appointments = safeStorage.getItem<Array<{
-        id: number;
-        customerName: string;
-        vehicle: string;
-        phone: string;
-        serviceType: string;
-        date: string;
-        time: string;
-        duration: string;
-        status: string;
-      }>>("appointments", []);
+      const calculateTodayAppointments = () => {
+        const appointments = safeStorage.getItem<Array<{
+          id: number;
+          customerName: string;
+          vehicle: string;
+          phone: string;
+          serviceType: string;
+          date: string;
+          time: string;
+          duration: string;
+          status: string;
+        }>>("appointments", []);
 
-      const today = new Date().toISOString().split("T")[0];
-      const todayAppointments = appointments.filter((apt) => apt.date === today);
-      setTodayAppointmentsCount(todayAppointments.length);
+        const today = new Date().toISOString().split("T")[0];
+        const todayAppointments = appointments.filter((apt) => apt.date === today);
+        
+        // Defer state update to avoid synchronous setState in effect
+        requestAnimationFrame(() => {
+          setTodayAppointmentsCount(todayAppointments.length);
+        });
+      };
+
+      // Initial calculation
+      calculateTodayAppointments();
 
       // Listen for storage changes to update count
       const handleStorageChange = () => {
@@ -77,8 +86,13 @@ export default function SCDashboard() {
           duration: string;
           status: string;
         }>>("appointments", []);
+        const today = new Date().toISOString().split("T")[0];
         const todayApts = updatedAppointments.filter((apt) => apt.date === today);
-        setTodayAppointmentsCount(todayApts.length);
+        
+        // Defer state update to avoid synchronous setState in callback
+        requestAnimationFrame(() => {
+          setTodayAppointmentsCount(todayApts.length);
+        });
       };
 
       window.addEventListener("storage", handleStorageChange);

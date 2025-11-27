@@ -33,6 +33,7 @@ interface ServiceCenterForm {
   technicianCount: string;
   serviceRadius: string;
   homeServiceEnabled: boolean;
+  maxAppointmentsPerDay: string;
   // Financial Setup
   invoicePrefix: string;
   bankName: string;
@@ -99,6 +100,7 @@ export default function ServiceCentersPage() {
     technicianCount: "",
     serviceRadius: "",
     homeServiceEnabled: false,
+    maxAppointmentsPerDay: "",
     // Financial Setup
     invoicePrefix: "",
     bankName: "",
@@ -219,6 +221,7 @@ export default function ServiceCentersPage() {
       technicianCount: "",
       serviceRadius: "",
       homeServiceEnabled: false,
+      maxAppointmentsPerDay: "",
       invoicePrefix: "",
       bankName: "",
       bankAccount: "",
@@ -278,6 +281,7 @@ export default function ServiceCentersPage() {
                         technicianCount: storedCenter.technicianCount?.toString() || center.staff.toString(),
                         serviceRadius: storedCenter.serviceRadius?.toString() || "",
                         homeServiceEnabled: storedCenter.homeServiceEnabled || false,
+                        maxAppointmentsPerDay: storedCenter.maxAppointmentsPerDay?.toString() || "",
                         invoicePrefix: storedCenter.invoicePrefix || "",
                         bankName: storedCenter.bankName || "",
                         bankAccount: storedCenter.bankAccount || "",
@@ -601,6 +605,19 @@ export default function ServiceCentersPage() {
                       step="0.1"
                       className="w-full border text-black border-gray-300 rounded-lg px-3 py-2 mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Max Appointments Per Day</label>
+                    <input
+                      type="number"
+                      value={form.maxAppointmentsPerDay}
+                      onChange={(e) => setForm({ ...form, maxAppointmentsPerDay: e.target.value })}
+                      placeholder="e.g., 20"
+                      min="1"
+                      className="w-full border text-black border-gray-300 rounded-lg px-3 py-2 mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Maximum number of appointments that can be scheduled per day</p>
                   </div>
 
                   <div className="flex items-center gap-2">
