@@ -1,4 +1,5 @@
 "use client";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState, useEffect } from "react";
 import {
   Plus,
@@ -250,9 +251,9 @@ export default function JobCards() {
       };
       
       // Also save to localStorage for persistence
-      const existingJobCards = JSON.parse(localStorage.getItem("jobCards") || "[]");
+      const existingJobCards = safeStorage.getItem<unknown[]>("jobCards", []);
       existingJobCards.push(newJobCard);
-      localStorage.setItem("jobCards", JSON.stringify(existingJobCards));
+      safeStorage.setItem("jobCards", existingJobCards);
       
       setJobCards([newJobCard, ...jobCards]);
       setShowCreateModal(false);
@@ -393,15 +394,14 @@ export default function JobCards() {
     fetchJobCards();
     
     // Load job cards from localStorage (created from service requests)
-    const storedJobCards = localStorage.getItem("jobCards");
-    if (storedJobCards) {
+    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    if (storedJobCards.length > 0) {
       try {
-        const parsed = JSON.parse(storedJobCards);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(storedJobCards) && storedJobCards.length > 0) {
           // Merge with existing job cards, avoiding duplicates
           setJobCards((prev) => {
             const existingIds = new Set(prev.map((j) => j.id));
-            const newCards = parsed.filter((j: JobCard) => !existingIds.has(j.id));
+            const newCards = storedJobCards.filter((j) => !existingIds.has(j.id));
             return [...newCards, ...prev];
           });
         }

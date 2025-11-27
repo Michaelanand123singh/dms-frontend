@@ -9,7 +9,6 @@ import {
   FileText,
   AlertCircle,
   ClipboardList,
-  ChevronLeft,
   LogOut,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
@@ -69,38 +68,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         open ? "md:w-64" : "md:w-20"
       )}
     >
-      <div
-        className={clsx(
-          "flex items-center border-b border-gray-200 bg-white transition-all duration-300 relative",
-          open ? "justify-between px-6 py-5" : "justify-center px-0 py-5"
-        )}
-      >
-        {open ? (
-          <>
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-tr from-[#6f42c1] to-[#9b6dff] p-2 rounded-xl shadow-md">
-                <Building size={26} className="text-white" />
-              </div>
-              <h1 className="text-lg font-semibold whitespace-nowrap text-gray-900">Admin Panel</h1>
-            </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="text-gray-900 hover:text-black transition p-2 rounded-lg hover:bg-gray-100"
-              aria-label="Close sidebar"
-            >
-              <ChevronLeft size={22} />
-            </button>
-          </>
-        ) : (
-          <div className="flex items-center justify-center">
-            <div className="bg-gradient-to-tr from-[#6f42c1] to-[#9b6dff] p-2 rounded-xl shadow-md">
-              <Building size={26} className="text-white" />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <nav className="mt-6 flex flex-col flex-grow overflow-y-auto">
+      <nav className="mt-2 flex flex-col flex-grow overflow-y-auto px-2 py-2">
         {menu.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;

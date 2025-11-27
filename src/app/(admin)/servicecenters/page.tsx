@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Star, X, Edit } from "lucide-react";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 
 // Types
 interface ServiceCenter {
@@ -32,6 +33,7 @@ interface ServiceCenterForm {
   technicianCount: string;
   serviceRadius: string;
   homeServiceEnabled: boolean;
+  maxAppointmentsPerDay: string;
   // Financial Setup
   invoicePrefix: string;
   bankName: string;
@@ -98,6 +100,7 @@ export default function ServiceCentersPage() {
     technicianCount: "",
     serviceRadius: "",
     homeServiceEnabled: false,
+    maxAppointmentsPerDay: "",
     // Financial Setup
     invoicePrefix: "",
     bankName: "",
@@ -152,7 +155,7 @@ export default function ServiceCentersPage() {
       setCenters(updatedCenters);
       
       // Update in localStorage
-      const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
+      const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>('serviceCenters', {});
       const updatedCenter = updatedCenters.find(c => c.id === editingCenter.id);
       if (updatedCenter && storedCenters[editingCenter.id]) {
         storedCenters[editingCenter.id] = {
@@ -164,7 +167,7 @@ export default function ServiceCentersPage() {
           staff: updatedCenter.staff,
           jobs: updatedCenter.jobs,
         };
-        localStorage.setItem('serviceCenters', JSON.stringify(storedCenters));
+        safeStorage.setItem('serviceCenters', storedCenters);
       }
       
       alert("Service center updated successfully!");
@@ -197,9 +200,9 @@ export default function ServiceCentersPage() {
         ...form,
       };
       
-      const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
+      const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>('serviceCenters', {});
       storedCenters[newCenter.id] = centerDetailData;
-      localStorage.setItem('serviceCenters', JSON.stringify(storedCenters));
+      safeStorage.setItem('serviceCenters', storedCenters);
       
       alert("Service center created successfully!");
     }
@@ -218,6 +221,7 @@ export default function ServiceCentersPage() {
       technicianCount: "",
       serviceRadius: "",
       homeServiceEnabled: false,
+      maxAppointmentsPerDay: "",
       invoicePrefix: "",
       bankName: "",
       bankAccount: "",
@@ -259,7 +263,7 @@ export default function ServiceCentersPage() {
                     e.stopPropagation();
                     setEditingCenter(center);
                     // Try to load full form data from localStorage
-                    const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
+                    const storedCenters = safeStorage.getItem<Record<string, ServiceCenter & Partial<ServiceCenterForm>>>('serviceCenters', {});
                     const storedCenter = storedCenters[center.id];
                     
                     if (storedCenter && storedCenter.address) {
@@ -277,6 +281,7 @@ export default function ServiceCentersPage() {
                         technicianCount: storedCenter.technicianCount?.toString() || center.staff.toString(),
                         serviceRadius: storedCenter.serviceRadius?.toString() || "",
                         homeServiceEnabled: storedCenter.homeServiceEnabled || false,
+                        maxAppointmentsPerDay: storedCenter.maxAppointmentsPerDay?.toString() || "",
                         invoicePrefix: storedCenter.invoicePrefix || "",
                         bankName: storedCenter.bankName || "",
                         bankAccount: storedCenter.bankAccount || "",
@@ -302,6 +307,7 @@ export default function ServiceCentersPage() {
                         technicianCount: center.staff.toString(),
                         serviceRadius: "",
                         homeServiceEnabled: false,
+                        maxAppointmentsPerDay: "",
                         invoicePrefix: "",
                         bankName: "",
                         bankAccount: "",
@@ -401,6 +407,7 @@ export default function ServiceCentersPage() {
                   technicianCount: "",
                   serviceRadius: "",
                   homeServiceEnabled: false,
+                  maxAppointmentsPerDay: "",
                   invoicePrefix: "",
                   bankName: "",
                   bankAccount: "",
@@ -602,6 +609,19 @@ export default function ServiceCentersPage() {
                     />
                   </div>
 
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Max Appointments Per Day</label>
+                    <input
+                      type="number"
+                      value={form.maxAppointmentsPerDay}
+                      onChange={(e) => setForm({ ...form, maxAppointmentsPerDay: e.target.value })}
+                      placeholder="e.g., 20"
+                      min="1"
+                      className="w-full border text-black border-gray-300 rounded-lg px-3 py-2 mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Maximum number of appointments that can be scheduled per day</p>
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -752,6 +772,7 @@ export default function ServiceCentersPage() {
                         technicianCount: "",
                         serviceRadius: "",
                         homeServiceEnabled: false,
+                        maxAppointmentsPerDay: "",
                         invoicePrefix: "",
                         bankName: "",
                         bankAccount: "",

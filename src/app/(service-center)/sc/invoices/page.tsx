@@ -1,4 +1,5 @@
 "use client";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState } from "react";
 import {
   FileText,
@@ -208,9 +209,9 @@ export default function Invoices() {
     setInvoices([...invoices, newInvoice]);
 
     // Store in localStorage
-    const storedInvoices = JSON.parse(localStorage.getItem("invoices") || "[]");
+    const storedInvoices = safeStorage.getItem<unknown[]>("invoices", []);
     storedInvoices.push(newInvoice);
-    localStorage.setItem("invoices", JSON.stringify(storedInvoices));
+    safeStorage.setItem("invoices", storedInvoices);
 
     // Reset form and close modal
     setInvoiceForm({

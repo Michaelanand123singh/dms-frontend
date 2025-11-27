@@ -20,9 +20,10 @@ export interface PaginatedResponse<T> {
 }
 
 /**
- * Error response
+ * Error response (deprecated - use ApiError class from @/lib/api)
+ * @deprecated Use ApiError from @/lib/api instead
  */
-export interface ApiError {
+export interface ApiErrorResponse {
   message: string;
   code?: string;
   details?: Record<string, unknown>;

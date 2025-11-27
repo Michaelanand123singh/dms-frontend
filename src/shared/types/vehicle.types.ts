@@ -3,7 +3,8 @@
  */
 
 export type SearchType = "phone" | "registration" | "vin";
-export type CustomerSearchType = "phone" | "name" | "customerNumber" | "email";
+export type CustomerSearchType = "phone" | "name" | "customerNumber" | "email" | "vin" | "vehicleNumber" | "auto";
+export type ServiceType = "walk-in" | "home-service";
 
 export type VehicleStatus = "Available" | "Active Job Card";
 
@@ -61,19 +62,38 @@ export interface NewVehicleForm {
   customerPhone: string;
   customerEmail: string;
   customerAddress: string;
-  vehicleMake: string;
-  vehicleModel: string;
-  vehicleYear: string;
-  vehicleColor: string;
-  registration: string;
-  vin: string;
+  vehicleBrand: string; // Vehicle Brand
+  vehicleModel: string; // Vehicle Model
+  registrationNumber: string; // Registration Number
+  vin: string; // VIN / Chassis Number
+  variant?: string; // Variant / Battery Capacity
+  motorNumber?: string; // Motor Number
+  chargerSerialNumber?: string; // Charger Serial Number
+  purchaseDate?: string; // Date of Purchase
+  vehicleAge?: string; // Vehicle Age (alternative to purchase date)
+  warrantyStatus?: string; // Warranty Status
+  insuranceStartDate?: string; // Insurance start date
+  insuranceEndDate?: string; // Insurance end date
+  insuranceCompanyName?: string; // Insurance company name
+  // Legacy fields for backward compatibility
+  vehicleMake?: string;
+  vehicleYear?: string;
+  vehicleColor?: string;
+  registration?: string;
 }
+
+export type CustomerType = "B2C" | "B2B";
 
 export interface NewCustomerForm {
   name: string;
   phone: string;
+  alternateMobile?: string;
   email?: string;
   address?: string;
+  cityState?: string;
+  pincode?: string;
+  customerType?: CustomerType;
+  serviceType?: ServiceType;
 }
 
 export interface CustomerWithVehicles extends Customer {

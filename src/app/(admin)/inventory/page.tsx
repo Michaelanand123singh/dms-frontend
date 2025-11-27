@@ -2,24 +2,16 @@
 
 import { useState, useMemo, useEffect, startTransition } from "react";
 import { Plus, Edit, Package, CheckCircle, AlertTriangle, DollarSign, X, Search } from "lucide-react";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { staticServiceCenters, defaultInventoryData } from "@/__mocks__/data";
 
-// Types
-interface InventoryItem {
-  id: number;
-  partName: string;
-  sku: string;
-  partCode?: string;
-  category: string;
-  quantity: number;
-  price: string;
-  status: "In Stock" | "Low Stock";
-  centerId: number;
-  centerName: string;
-}
+// Types - using InventoryItem from mock data
+import type { InventoryItem } from "@/__mocks__/data";
 
 interface ServiceCenter {
   id: number;
   name: string;
+  location?: string;
 }
 
 interface InventoryForm {
@@ -33,98 +25,21 @@ interface InventoryForm {
   centerId: string;
 }
 
-// Sample inventory data structure - in real app, this would come from API
-const defaultInventoryData: InventoryItem[] = [
-  {
-    id: 1,
-    partName: "Engine Oil 5L",
-    sku: "EO-5L-001",
-    category: "Fluids",
-    quantity: 45,
-    price: "₹450",
-    status: "In Stock",
-    centerId: 1,
-    centerName: "Delhi Central Hub",
-  },
-  {
-    id: 2,
-    partName: "Air Filter",
-    sku: "AF-001",
-    category: "Filters",
-    quantity: 12,
-    price: "₹250",
-    status: "In Stock",
-    centerId: 1,
-    centerName: "Delhi Central Hub",
-  },
-  {
-    id: 3,
-    partName: "Spark Plugs (Set of 4)",
-    sku: "SP-4-001",
-    category: "Ignition",
-    quantity: 15,
-    price: "₹600",
-    status: "In Stock",
-    centerId: 2,
-    centerName: "Mumbai Metroplex",
-  },
-  {
-    id: 4,
-    partName: "Brake Pads",
-    sku: "BP-001",
-    category: "Brakes",
-    quantity: 8,
-    price: "₹1200",
-    status: "In Stock",
-    centerId: 2,
-    centerName: "Mumbai Metroplex",
-  },
-  {
-    id: 5,
-    partName: "Coolant 5L",
-    sku: "CL-5L-001",
-    category: "Fluids",
-    quantity: 6,
-    price: "₹350",
-    status: "Low Stock",
-    centerId: 3,
-    centerName: "Bangalore Innovation Center",
-  },
-  {
-    id: 6,
-    partName: "Oil Filter",
-    sku: "OF-001",
-    category: "Filters",
-    quantity: 4,
-    price: "₹180",
-    status: "Low Stock",
-    centerId: 3,
-    centerName: "Bangalore Innovation Center",
-  },
-];
-
-// Default static centers - same on server and client to prevent hydration mismatch
-const staticCenters: ServiceCenter[] = [
-  { id: 1, name: "Delhi Central Hub" },
-  { id: 2, name: "Mumbai Metroplex" },
-  { id: 3, name: "Bangalore Innovation Center" },
-];
-
 export default function InventoryPage() {
   // Initialize with static centers to ensure server/client match
-  const [centers, setCenters] = useState<ServiceCenter[]>(staticCenters);
+  const [centers, setCenters] = useState<ServiceCenter[]>(staticServiceCenters);
 
   // Load additional centers from localStorage after mount (client-side only)
   useEffect(() => {
-    const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
-    const allCenters = [...staticCenters];
-    Object.values(storedCenters).forEach((center: any) => {
+    const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>('serviceCenters', {});
+    const allCenters = [...staticServiceCenters];
+    Object.values(storedCenters).forEach((center) => {
       if (!allCenters.find(c => c.id === center.id)) {
-        allCenters.push({ id: center.id, name: center.name });
+        allCenters.push({ id: center.id, name: center.name, location: center.location || "" });
       }
     });
     // Only update if we have additional centers beyond the static ones
-    if (allCenters.length > staticCenters.length) {
+    if (allCenters.length > staticServiceCenters.length) {
       startTransition(() => {
         setCenters(allCenters);
       });
@@ -136,7 +51,7 @@ export default function InventoryPage() {
 
   // Load inventory from localStorage after mount (client-side only)
   useEffect(() => {
-    const storedInventory = JSON.parse(localStorage.getItem('inventoryData') || '[]');
+    const storedInventory = safeStorage.getItem<InventoryItem[]>('inventoryData', []);
     if (storedInventory.length > 0) {
       startTransition(() => {
         setInventory(storedInventory);
@@ -214,7 +129,7 @@ export default function InventoryPage() {
       );
       setInventory(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('inventoryData', JSON.stringify(updated));
+        safeStorage.setItem('inventoryData', updated);
       }
       alert("Part updated successfully!");
     } else {
@@ -235,7 +150,7 @@ export default function InventoryPage() {
       const updated = [...inventory, newItem];
       setInventory(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('inventoryData', JSON.stringify(updated));
+        safeStorage.setItem('inventoryData', updated);
       }
       alert("Part added successfully!");
     }
@@ -264,7 +179,7 @@ export default function InventoryPage() {
       quantity: item.quantity.toString(),
       price: item.price,
       status: item.status,
-      centerId: item.centerId.toString(),
+      centerId: item.centerId?.toString() || "",
     });
     setShowAddForm(true);
   };
@@ -280,7 +195,7 @@ export default function InventoryPage() {
       const updated = inventory.filter(item => item.id !== itemToDelete.id);
       setInventory(updated);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('inventoryData', JSON.stringify(updated));
+        safeStorage.setItem('inventoryData', updated);
       }
       alert("Part deleted successfully!");
       setShowDeleteConfirm(false);

@@ -1,9 +1,11 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { Menu, LogOut, Search, Building, User, Package, FileText, X, ArrowRight, LucideIcon } from "lucide-react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { Menu, LogOut, Search, Building, User, Package, X, ArrowRight, LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRole } from "@/shared/hooks";
+import { useDebounce } from "@/shared/hooks";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { staticServiceCenters, defaultUsers, defaultInventory } from "@/__mocks__/data";
 
 interface SearchResult {
   type: string;
@@ -32,18 +34,44 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
   const resultsRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
 
-  const dashboardTitle = userRole === "admin" || userRole === "super_admin" 
-    ? "Admin Dashboard" 
-    : "Service Center Dashboard";
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  const handleLogout = () => {
+  const dashboardTitle = useMemo(() => {
+    if (userRole === "admin" || userRole === "super_admin") {
+      return "Admin Dashboard";
+    } else if (userRole === "call_center") {
+      return "Call Center Panel";
+    } else {
+      return "Service Center Dashboard";
+    }
+  }, [userRole]);
+
+  const handleLogout = useCallback(() => {
     safeStorage.removeItem("userRole");
     safeStorage.removeItem("userInfo");
     safeStorage.removeItem("isLoggedIn");
     router.push("/");
-  };
+  }, [router]);
 
-  const performSearch = (query: string) => {
+  interface ServiceCenter {
+    id: number;
+    name: string;
+    location?: string;
+  }
+
+  interface User {
+    name: string;
+    email: string;
+    role?: string;
+  }
+
+  interface InventoryItem {
+    partName: string;
+    sku?: string;
+    category?: string;
+  }
+
+  const performSearch = useCallback((query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
       setShowResults(false);
@@ -54,15 +82,10 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
     const lowerQuery = query.toLowerCase();
 
     if (typeof window !== "undefined") {
-      const storedCenters = safeStorage.getItem("serviceCenters", {});
-      const staticCenters = [
-        { id: 1, name: "Delhi Central Hub", location: "Connaught Place, New Delhi" },
-        { id: 2, name: "Mumbai Metroplex", location: "Bandra West, Mumbai" },
-        { id: 3, name: "Bangalore Innovation Center", location: "Koramangala, Bangalore" },
-      ];
-
-      const allCenters = [...staticCenters];
-      Object.values(storedCenters).forEach((center: any) => {
+      const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>("serviceCenters", {});
+      const allCenters = [...staticServiceCenters];
+      
+      Object.values(storedCenters).forEach((center) => {
         if (!allCenters.find((c) => c.id === center.id)) {
           allCenters.push({ id: center.id, name: center.name, location: center.location || "" });
         }
@@ -77,7 +100,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
             type: "Service Center",
             id: center.id,
             title: center.name,
-            subtitle: center.location,
+            subtitle: center.location || "",
             icon: Building,
             href: `/servicecenters/${center.id}`,
             color: "text-blue-600",
@@ -85,16 +108,10 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
         }
       });
 
-      const users = safeStorage.getItem("users", []);
-      const defaultUsers = [
-        { name: "Rajesh Kumar Singh", email: "admin@service.com", role: "Super Admin" },
-        { name: "Delhi Manager", email: "delhi@service.com", role: "SC Manager" },
-        { name: "Finance Manager", email: "finance@service.com", role: "Finance Manager" },
-        { name: "Call Center Team", email: "callcenter@service.com", role: "Call Center" },
-      ];
+      const users = safeStorage.getItem<User[]>("users", []);
       const allUsers = [...defaultUsers, ...users];
 
-      allUsers.forEach((user: any) => {
+      allUsers.forEach((user) => {
         if (
           user.name.toLowerCase().includes(lowerQuery) ||
           user.email.toLowerCase().includes(lowerQuery) ||
@@ -104,7 +121,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
             type: "User",
             id: user.email,
             title: user.name,
-            subtitle: `${user.role} • ${user.email}`,
+            subtitle: `${user.role || ""} • ${user.email}`,
             icon: User,
             href: "/user&roles",
             color: "text-purple-600",
@@ -112,15 +129,10 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
         }
       });
 
-      const inventory = safeStorage.getItem("inventoryData", []);
-      const defaultInventory = [
-        { partName: "Engine Oil", sku: "EO-001", category: "Lubricants" },
-        { partName: "Brake Pads", sku: "BP-002", category: "Brakes" },
-        { partName: "Air Filter", sku: "AF-003", category: "Filters" },
-      ];
+      const inventory = safeStorage.getItem<InventoryItem[]>("inventoryData", []);
       const allInventory = [...defaultInventory, ...inventory];
 
-      allInventory.forEach((item: any) => {
+      allInventory.forEach((item) => {
         if (
           item.partName.toLowerCase().includes(lowerQuery) ||
           (item.sku && item.sku.toLowerCase().includes(lowerQuery)) ||
@@ -141,7 +153,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
 
     setSearchResults(results);
     setShowResults(results.length > 0);
-  };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -165,53 +177,72 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleResultClick = (href: string) => {
+  useEffect(() => {
+    if (debouncedSearchQuery) {
+      // Use requestAnimationFrame to avoid synchronous setState in effect
+      const rafId = requestAnimationFrame(() => {
+        performSearch(debouncedSearchQuery);
+      });
+      return () => cancelAnimationFrame(rafId);
+    } else {
+      // Use requestAnimationFrame for else branch as well
+      const rafId = requestAnimationFrame(() => {
+        setSearchResults([]);
+        setShowResults(false);
+      });
+      return () => cancelAnimationFrame(rafId);
+    }
+  }, [debouncedSearchQuery, performSearch]);
+
+  const handleResultClick = useCallback((href: string) => {
     router.push(href);
     setSearchQuery("");
+    setSearchResults([]);
     setShowResults(false);
-  };
+  }, [router]);
 
-  const groupedResults = searchResults.reduce((acc, result) => {
-    if (!acc[result.type]) {
-      acc[result.type] = [];
-    }
-    acc[result.type].push(result);
-    return acc;
-  }, {} as Record<string, SearchResult[]>);
+  const groupedResults = useMemo(() => {
+    return searchResults.reduce((acc, result) => {
+      if (!acc[result.type]) {
+        acc[result.type] = [];
+      }
+      acc[result.type].push(result);
+      return acc;
+    }, {} as Record<string, SearchResult[]>);
+  }, [searchResults]);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-[60] bg-white shadow-sm border-b border-gray-200">
-      <div className="flex items-center px-4 py-3 gap-4 relative">
+    <nav className="fixed top-0 left-0 right-0 z-[60] bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200/80">
+      <div className="flex items-center px-4 md:px-6 py-3.5 gap-4 relative">
         <button
-          className="text-gray-700 hover:text-[#6f42c1] flex-shrink-0 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          className="text-gray-600 hover:text-indigo-600 flex-shrink-0 p-2 rounded-lg hover:bg-gray-50 transition-all duration-200 active:scale-95"
           onClick={() => setOpen((prev) => !prev)}
           aria-label={open ? "Close sidebar" : "Open sidebar"}
         >
-          {open ? <X size={24} /> : <Menu size={24} />}
+          {open ? <X size={20} strokeWidth={2} /> : <Menu size={20} strokeWidth={2} />}
         </button>
 
-        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-lg md:text-xl font-semibold text-[#6f42c1] hidden md:block">
+        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-base md:text-lg font-bold text-gray-900 block tracking-tight">
           {dashboardTitle}
         </h1>
 
         <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
-          <div className="relative w-64" ref={searchRef}>
+          <div className="relative w-56 md:w-72" ref={searchRef}>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} strokeWidth={2} />
               <input
                 type="text"
-                placeholder="Search service centers, users, inventory..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
-                  performSearch(e.target.value);
                 }}
                 onFocus={() => {
                   if (searchResults.length > 0) {
                     setShowResults(true);
                   }
                 }}
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6f42c1] focus:outline-none text-sm text-black"
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-sm text-gray-900 placeholder:text-gray-400 transition-all duration-200"
               />
               {searchQuery && (
                 <button
@@ -230,12 +261,12 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
             {showResults && searchResults.length > 0 && (
               <div
                 ref={resultsRef}
-                className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto z-50"
+                className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-96 overflow-y-auto z-50 backdrop-blur-sm"
               >
                 {Object.entries(groupedResults).map(([category, items]) => (
                   <div key={category} className="border-b border-gray-100 last:border-b-0">
-                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-                      <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="px-4 py-2.5 bg-gray-50/80 border-b border-gray-100">
+                      <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         {category}
                       </h3>
                     </div>
@@ -245,20 +276,20 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
                         <button
                           key={`${item.type}-${item.id}-${index}`}
                           onClick={() => handleResultClick(item.href)}
-                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition text-left"
+                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-indigo-50/50 transition-all duration-150 text-left group"
                         >
-                          <div className={`p-2 rounded-lg bg-gray-100 ${item.color}`}>
-                            <Icon size={18} />
+                          <div className={`p-2 rounded-lg bg-gray-100 group-hover:bg-indigo-100 transition-colors ${item.color}`}>
+                            <Icon size={18} strokeWidth={2} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-700 transition-colors">
                               {item.title}
                             </p>
                             <p className="text-xs text-gray-500 truncate">
                               {item.subtitle}
                             </p>
                           </div>
-                          <ArrowRight size={16} className="text-gray-400 flex-shrink-0" />
+                          <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-600 flex-shrink-0 transition-colors" />
                         </button>
                       );
                     })}
@@ -280,16 +311,16 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
           <div className="relative" ref={userDropdownRef}>
             <button
               onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="w-9 h-9 rounded-full bg-[#6f42c1] text-white flex items-center justify-center font-bold hover:bg-[#5a32a3] transition cursor-pointer"
+              className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 text-white flex items-center justify-center font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
               title="User menu"
             >
               {userRole === "admin" || userRole === "super_admin" ? "R" : "SC"}
             </button>
             
             {showUserDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                <div className="p-4 border-b border-gray-200">
-                  <p className="text-sm font-medium text-gray-900">
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-50 backdrop-blur-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100 bg-gradient-to-br from-gray-50 to-white">
+                  <p className="text-sm font-semibold text-gray-900">
                     {userInfo?.name || (userRole === "admin" || userRole === "super_admin" ? "Admin User" : "Service Center User")}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
@@ -302,9 +333,9 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
                       handleLogout();
                       setShowUserDropdown(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150 font-medium"
                   >
-                    <LogOut size={18} />
+                    <LogOut size={18} strokeWidth={2} />
                     <span>Logout</span>
                   </button>
                 </div>

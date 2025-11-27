@@ -1,4 +1,5 @@
 "use client";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState } from "react";
 import { Users, UserPlus, TrendingUp, Clock, CheckCircle, X, Plus, XCircle } from "lucide-react";
 
@@ -257,9 +258,9 @@ export default function Technicians() {
 
                     setTechnicians([...technicians, newTechnician]);
 
-                    const storedTechnicians = JSON.parse(localStorage.getItem("technicians") || "[]");
+                    const storedTechnicians = safeStorage.getItem<unknown[]>("technicians", []);
                     storedTechnicians.push(newTechnician);
-                    localStorage.setItem("technicians", JSON.stringify(storedTechnicians));
+                    safeStorage.setItem("technicians", storedTechnicians);
 
                     setShowAddModal(false);
                     setTechnicianForm({

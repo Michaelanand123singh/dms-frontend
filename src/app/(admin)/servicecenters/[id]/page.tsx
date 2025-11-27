@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { defaultServiceCenters, vehiclesData, serviceRequestsData, partRequestsData, serviceCenterInventoryData, jobsData, serviceHistoryData } from "@/__mocks__/data";
 import {
   BarChart3,
   Search,
@@ -27,101 +29,11 @@ import {
   Eye,
 } from "lucide-react";
 
-// Sample data - in a real app, this would come from an API
-const centersData = {
-  1: {
-    id: 1,
-    name: "Delhi Central Hub",
-    location: "Connaught Place, New Delhi",
-    staff: 3,
-    jobs: 12,
-    revenue: "₹12.4L",
-    status: "Active",
-    rating: 4.9,
-    staffMembers: [
-      {
-        id: 1,
-        name: "Delhi Manager",
-        role: "SC Manager",
-        email: "delhi@service.com",
-        status: "Active",
-      },
-      {
-        id: 2,
-        name: "Technician Raj",
-        role: "Technician",
-        email: "raj@service.com",
-        status: "Active",
-      },
-      {
-        id: 3,
-        name: "Technician Priya",
-        role: "Technician",
-        email: "priya@service.com",
-        status: "Active",
-      },
-    ],
-  },
-  2: {
-    id: 2,
-    name: "Mumbai Metroplex",
-    location: "Bandra West, Mumbai",
-    staff: 3,
-    jobs: 18,
-    revenue: "₹18.9L",
-    status: "Active",
-    rating: 4.8,
-    staffMembers: [
-      {
-        id: 1,
-        name: "Mumbai Manager",
-        role: "SC Manager",
-        email: "mumbai@service.com",
-        status: "Active",
-      },
-      {
-        id: 2,
-        name: "Technician Amit",
-        role: "Technician",
-        email: "amit@service.com",
-        status: "Active",
-      },
-      {
-        id: 3,
-        name: "Technician Sneha",
-        role: "Technician",
-        email: "sneha@service.com",
-        status: "Active",
-      },
-    ],
-  },
-  3: {
-    id: 3,
-    name: "Bangalore Innovation Center",
-    location: "Koramangala, Bangalore",
-    staff: 2,
-    jobs: 15,
-    revenue: "₹15.6L",
-    status: "Active",
-    rating: 4.9,
-    staffMembers: [
-      {
-        id: 1,
-        name: "Bangalore Manager",
-        role: "SC Manager",
-        email: "bangalore@service.com",
-        status: "Active",
-      },
-      {
-        id: 2,
-        name: "Technician Vikram",
-        role: "Technician",
-        email: "vikram@service.com",
-        status: "Active",
-      },
-    ],
-  },
-};
+// Convert array to object for easier lookup
+const centersData: Record<number, typeof defaultServiceCenters[0]> = {};
+defaultServiceCenters.forEach((center) => {
+  centersData[center.id] = center;
+});
 
 const actionButtons = [
   { name: "Overview", icon: BarChart3 },
@@ -137,263 +49,7 @@ const actionButtons = [
   { name: "Record Payment", icon: CreditCard },
 ];
 
-// Sample data for vehicles
-const vehiclesData = [
-  {
-    id: 1,
-    registrationNumber: "DL-01-AB-1234",
-    make: "Honda",
-    model: "City",
-    year: 2020,
-    customerName: "Rohit Shah",
-    phone: "+91-9876-543-210",
-    email: "rohit.shah@email.com",
-    address: "123 Main Street, New Delhi, 110001",
-    vin: "MBJC123456789012A",
-    totalServices: 5,
-    lastServiceDate: "2024-10-15",
-    currentStatus: "Active Job Card",
-    activeJobCard: "JC001",
-    nextServiceDate: "2025-01-15",
-  },
-  {
-    id: 2,
-    registrationNumber: "DL-01-CD-5678",
-    make: "Maruti",
-    model: "Swift",
-    year: 2021,
-    customerName: "Priya Sharma",
-    phone: "+91-9876-543-211",
-    email: "priya.sharma@email.com",
-    address: "456 Park Avenue, New Delhi, 110002",
-    vin: "MBJC123456789012B",
-    totalServices: 3,
-    lastServiceDate: "2024-09-20",
-    currentStatus: "Available",
-    activeJobCard: null,
-    nextServiceDate: "2025-02-20",
-  },
-  {
-    id: 3,
-    registrationNumber: "DL-01-EF-9012",
-    make: "Hyundai",
-    model: "i20",
-    year: 2019,
-    customerName: "Amit Kumar",
-    phone: "+91-9876-543-212",
-    email: "amit.kumar@email.com",
-    address: "789 MG Road, New Delhi, 110003",
-    vin: "MBJC123456789012C",
-    totalServices: 7,
-    lastServiceDate: "2024-11-05",
-    currentStatus: "Available",
-    activeJobCard: null,
-    nextServiceDate: "2025-01-05",
-  },
-];
-
-// Sample service history data
-const serviceHistoryData = {
-  1: [
-    {
-      id: "SH001",
-      serviceDate: "2024-10-15",
-      serviceType: "Full Service",
-      engineerName: "Technician Raj",
-      partsUsed: ["Engine Oil 5L", "Air Filter", "Spark Plugs"],
-      laborCharges: "₹1500",
-      partsCharges: "₹2500",
-      totalAmount: "₹4000",
-      invoiceNumber: "INV-2024-045",
-      jobCardId: "JC001",
-    },
-    {
-      id: "SH002",
-      serviceDate: "2024-07-10",
-      serviceType: "Maintenance",
-      engineerName: "Technician Priya",
-      partsUsed: ["Engine Oil 5L", "Coolant 5L"],
-      laborCharges: "₹1000",
-      partsCharges: "₹1500",
-      totalAmount: "₹2500",
-      invoiceNumber: "INV-2024-032",
-      jobCardId: "JC002",
-    },
-    {
-      id: "SH003",
-      serviceDate: "2024-04-05",
-      serviceType: "Repair",
-      engineerName: "Technician Raj",
-      partsUsed: ["Brake Pads", "Brake Fluid"],
-      laborCharges: "₹2000",
-      partsCharges: "₹3000",
-      totalAmount: "₹5000",
-      invoiceNumber: "INV-2024-018",
-      jobCardId: "JC003",
-    },
-  ],
-  2: [
-    {
-      id: "SH004",
-      serviceDate: "2024-09-20",
-      serviceType: "Full Service",
-      engineerName: "Technician Amit",
-      partsUsed: ["Engine Oil 5L", "Air Filter"],
-      laborCharges: "₹1200",
-      partsCharges: "₹1800",
-      totalAmount: "₹3000",
-      invoiceNumber: "INV-2024-038",
-      jobCardId: "JC004",
-    },
-  ],
-  3: [
-    {
-      id: "SH005",
-      serviceDate: "2024-11-05",
-      serviceType: "Maintenance",
-      engineerName: "Technician Vikram",
-      partsUsed: ["Engine Oil 5L", "Coolant 5L", "Air Filter"],
-      laborCharges: "₹1500",
-      partsCharges: "₹2000",
-      totalAmount: "₹3500",
-      invoiceNumber: "INV-2024-050",
-      jobCardId: "JC005",
-    },
-  ],
-};
-
-// Sample data for service requests
-const serviceRequestsData = [
-  {
-    id: "SR001",
-    vehicle: "DL-01-AB-1234",
-    customerName: "Rohit Shah",
-    serviceType: "Full Service",
-    description: "Regular maintenance and oil change",
-    estimatedCost: "₹5500",
-    requestedDate: "2024-11-10",
-    status: "Pending",
-  },
-  {
-    id: "SR002",
-    vehicle: "DL-01-CD-5678",
-    customerName: "Priya Sharma",
-    serviceType: "Repair",
-    description: "Brake pad replacement",
-    estimatedCost: "₹3500",
-    requestedDate: "2024-11-11",
-    status: "Pending",
-  },
-];
-
-// Approved requests will be computed dynamically from serviceRequests
-
-// Sample data for part requests
-const partRequestsData = [
-  {
-    id: "PR001",
-    part: "Engine Oil 5L",
-    quantity: 10,
-    reason: "Low Stock",
-    requestedDate: "2024-11-10",
-    status: "Pending",
-  },
-  {
-    id: "PR002",
-    part: "Coolant 5L",
-    quantity: 15,
-    reason: "Replacement",
-    requestedDate: "2024-11-09",
-    status: "Approved",
-  },
-];
-
-// Sample data for inventory
-const inventoryData = [
-  {
-    id: 1,
-    partName: "Engine Oil 5L",
-    sku: "EO-5L-001",
-    category: "Fluids",
-    quantity: 20,
-    price: "₹450",
-    status: "In Stock",
-  },
-  {
-    id: 2,
-    partName: "Air Filter",
-    sku: "AF-001",
-    category: "Filters",
-    quantity: 12,
-    price: "₹250",
-    status: "In Stock",
-  },
-  {
-    id: 3,
-    partName: "Spark Plugs (Set of 4)",
-    sku: "SP-4-001",
-    category: "Ignition",
-    quantity: 15,
-    price: "₹600",
-    status: "In Stock",
-  },
-  {
-    id: 4,
-    partName: "Brake Pads",
-    sku: "BP-001",
-    category: "Brakes",
-    quantity: 8,
-    price: "₹1200",
-    status: "In Stock",
-  },
-  {
-    id: 5,
-    partName: "Coolant 5L",
-    sku: "CL-5L-001",
-    category: "Fluids",
-    quantity: 6,
-    price: "₹350",
-    status: "Low Stock",
-  },
-];
-
-// Sample data for jobs
-const jobsData = [
-  {
-    id: "JC001",
-    vehicle: "DL-01-CD-5678",
-    customerName: "Priya Nair",
-    technician: "Technician Raj",
-    status: "In Progress",
-    estimatedCost: "₹5500",
-  },
-  {
-    id: "JC002",
-    vehicle: "DL-01-AB-1234",
-    customerName: "Rohit Shah",
-    technician: "Technician Priya",
-    status: "Not Started",
-    estimatedCost: "₹3500",
-  },
-  {
-    id: "JC003",
-    vehicle: "DL-01-XY-9999",
-    customerName: "Amit Kumar",
-    technician: "Technician Raj",
-    status: "Completed",
-    estimatedCost: "₹4500",
-  },
-  {
-    id: "JC004",
-    vehicle: "DL-01-MN-8888",
-    customerName: "Sneha Patel",
-    technician: "Technician Priya",
-    status: "Completed",
-    estimatedCost: "₹6200",
-  },
-];
-
-// Sample parts data for request form
+// Parts data for request form
 const partsData = [
   { id: 1, name: "Engine Oil 5L" },
   { id: 2, name: "Coolant 5L" },
@@ -481,7 +137,7 @@ export default function ServiceCenterDetailPage() {
   });
   
   const [partRequests, setPartRequests] = useState(partRequestsData);
-  const [inventory, setInventory] = useState(inventoryData);
+  const [inventory, setInventory] = useState(serviceCenterInventoryData);
   const [jobs, setJobs] = useState(jobsData);
   const [invoices, setInvoices] = useState(invoicesData);
   
@@ -502,7 +158,7 @@ export default function ServiceCenterDetailPage() {
     discount: "0",
     customerName: "",
     customerPhone: "",
-    items: inventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
+    items: serviceCenterInventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
     paymentMethod: "Cash",
   });
   
@@ -542,7 +198,7 @@ export default function ServiceCenterDetailPage() {
   const [otcOrderForm, setOtcOrderForm] = useState({
     customerName: "",
     customerPhone: "",
-    items: inventoryData.map((item: any) => ({ ...item, selectedQuantity: 0 })),
+    items: serviceCenterInventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
     paymentMethod: "Cash",
   });
 
@@ -550,12 +206,28 @@ export default function ServiceCenterDetailPage() {
   const centerId = params?.id ? parseInt(params.id as string) : null;
   
   // Check localStorage first for newly created centers, then fall back to centersData
-  let center: any = null;
-  if (typeof window !== 'undefined' && centerId !== null) {
-    const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
-    center = storedCenters[centerId] || (centersData as any)[centerId];
-  } else if (centerId !== null) {
-    center = (centersData as any)[centerId];
+  interface ServiceCenter {
+    id: number;
+    name: string;
+    location: string;
+    staff: number;
+    jobs: number;
+    revenue: string;
+    status: string;
+    rating: number;
+    staffMembers: Array<{
+      id: number;
+      name: string;
+      role: string;
+      email: string;
+      status: string;
+    }>;
+  }
+
+  let center: ServiceCenter | null = null;
+  if (centerId !== null) {
+    const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>("serviceCenters", {});
+    center = storedCenters[centerId] || centersData[centerId] || null;
   }
   
   // If center still doesn't exist, create a default one with zero data
@@ -575,10 +247,10 @@ export default function ServiceCenterDetailPage() {
 
   // Initialize empty data for newly created centers
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
+    if (centerId !== null) {
+      const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>("serviceCenters", {});
       // If it's a newly created center (in localStorage but not in centersData), start with empty data
-      if (centerId !== null && storedCenters[centerId] && !(centersData as any)[centerId]) {
+      if (storedCenters[centerId] && !centersData[centerId]) {
         // Use setTimeout to avoid synchronous state updates
         setTimeout(() => {
           setVehicles([]);
@@ -592,9 +264,16 @@ export default function ServiceCenterDetailPage() {
   }, [centerId]);
 
   // Filter completed jobs for invoice generation
-  const jobCardsForInvoice = jobs
-    .filter((job: any) => job.status === "Completed")
-    .map((job: any) => ({
+  interface JobForInvoice {
+    id: string;
+    vehicle: string;
+    customerName: string;
+    serviceType: string;
+  }
+
+  const jobCardsForInvoice: JobForInvoice[] = jobs
+    .filter((job) => job.status === "Completed")
+    .map((job) => ({
       id: job.id,
       vehicle: job.vehicle,
       customerName: job.customerName,
@@ -1056,8 +735,8 @@ export default function ServiceCenterDetailPage() {
                     <div id="service-history-section" className="mb-6">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4">Service History Timeline</h3>
                       <div className="space-y-4">
-                        {showVehicleDetails?.id && (serviceHistoryData as any)[showVehicleDetails.id] && (serviceHistoryData as any)[showVehicleDetails.id].length > 0 ? (
-                          (serviceHistoryData as any)[showVehicleDetails.id].map((service: any, index: number) => (
+                        {showVehicleDetails?.id && serviceHistoryData[showVehicleDetails.id] && serviceHistoryData[showVehicleDetails.id].length > 0 ? (
+                          serviceHistoryData[showVehicleDetails.id].map((service, index: number) => (
                             <div key={service.id} className="border-l-4 border-blue-500 pl-4 pb-4 relative">
                               <div className="absolute -left-2 top-0 w-4 h-4 bg-blue-500 rounded-full"></div>
                               <div className="bg-gray-50 rounded-lg p-4">
@@ -2120,7 +1799,7 @@ export default function ServiceCenterDetailPage() {
                       discount: "0",
                       customerName: "",
                       customerPhone: "",
-                      items: inventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
+                      items: serviceCenterInventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
                       paymentMethod: "Cash",
                     });
                   }}
@@ -2489,7 +2168,7 @@ export default function ServiceCenterDetailPage() {
                     setOtcOrderForm({
                       customerName: "",
                       customerPhone: "",
-                      items: inventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
+                      items: serviceCenterInventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
                       paymentMethod: "Cash",
                     });
                   }}
@@ -3083,13 +2762,13 @@ export default function ServiceCenterDetailPage() {
                           category: inventoryForm.category,
                           quantity: parseInt(inventoryForm.quantity),
                           price: `₹${inventoryForm.price}`,
-                          status: inventoryForm.status,
+                          status: inventoryForm.status as "In Stock" | "Low Stock",
                         }
                       : item
                   ));
                   showToast("Part updated successfully!");
                 } else {
-                  const newPart = {
+                  const newPart: typeof inventory[0] = {
                     id: inventory.length + 1,
                     partName: inventoryForm.partName,
                     sku: inventoryForm.sku,
@@ -3097,7 +2776,7 @@ export default function ServiceCenterDetailPage() {
                     category: inventoryForm.category,
                     quantity: parseInt(inventoryForm.quantity),
                     price: `₹${inventoryForm.price}`,
-                    status: inventoryForm.status,
+                    status: inventoryForm.status as "In Stock" | "Low Stock",
                   };
                   setInventory([...inventory, newPart]);
                   showToast("Part added successfully!");

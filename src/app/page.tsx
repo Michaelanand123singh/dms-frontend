@@ -1,12 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, User, ChevronDown } from "lucide-react";
+import Image from "next/image";
+import { User, ChevronDown, Lock, Mail } from "lucide-react";
 import Link from "next/link";
 import type { UserInfo, UserRole } from "@/shared/types";
 import { getRedirectPath } from "@/shared/constants/routes";
 import { safeStorage } from "@/shared/lib/localStorage";
-import { PageLoader } from "@/components/ui/PageLoader";
+import { TopLoadingBar } from "@/components/ui/TopLoadingBar";
 
 interface MockUser {
   email: string;
@@ -141,84 +142,130 @@ export default function LoginPage() {
     }
   };
 
-  if (isLoading) {
-    return <PageLoader message="Signing you in..." fullScreen={true} />;
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E5E9F2] via-[#C7D2FE] to-[#EEF2FF] text-gray-900 relative overflow-hidden">
-      <div className="absolute top-1/4 left-1/3 w-72 h-72 bg-[#3B82F6]/20 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-[#2563EB]/20 rounded-full blur-3xl animate-pulse"></div>
+    <>
+      <TopLoadingBar isLoading={isLoading} />
+      <div className="min-h-screen flex bg-gray-50">
+        {/* Left Side - Branding Section */}
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-800 relative overflow-hidden">
+          {/* Animated Circles */}
+          <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/5 rounded-full blur-2xl"></div>
 
-      <div className="relative w-full max-w-md bg-white/90 backdrop-blur-xl rounded-2xl shadow-lg p-10 text-center border border-gray-200">
-        <div className="flex justify-center mb-6">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#3B82F6] to-[#1E3A8A] blur-xl rounded-2xl opacity-40"></div>
-            <div className="relative bg-gradient-to-br from-[#3B82F6] to-[#1E3A8A] p-5 rounded-2xl shadow-md flex items-center justify-center">
-              <Building2 size={40} strokeWidth={2.2} className="text-white" />
+          {/* Content */}
+          <div className="relative z-10 flex flex-col justify-center items-center px-12 text-white">
+            <div className="mb-8">
+              <div className="bg-white/10 backdrop-blur-sm p-6 rounded-2xl border border-white/20 shadow-xl">
+                <Image
+                  src="/42ev.png"
+                  alt="42 EV Tech & Services"
+                  width={240}
+                  height={100}
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </div>
+            <h1 className="text-4xl font-bold mb-4 text-center">Welcome Back</h1>
+            <p className="text-xl text-indigo-100 text-center max-w-md mb-8">
+              Sign in to access your Service Center Management System
+            </p>
+            <div className="w-full max-w-md space-y-3">
+              <div className="flex items-center gap-3 text-indigo-100">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                <span className="text-sm">Secure & Reliable Platform</span>
+              </div>
+              <div className="flex items-center gap-3 text-indigo-100">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                <span className="text-sm">Manage Your Service Operations</span>
+              </div>
+              <div className="flex items-center gap-3 text-indigo-100">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                <span className="text-sm">Real-time Dashboard & Analytics</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <h1 className="text-3xl font-bold text-gray-800 mb-1">Login</h1>
-        <p className="text-gray-500 mb-4">Service Center Management System</p>
+        {/* Right Side - Login Form */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 lg:p-12">
+          <div className="w-full max-w-md">
+            {/* Mobile Logo */}
+            <div className="lg:hidden flex justify-center mb-8">
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <Image
+                  src="/42ev.png"
+                  alt="42 EV Tech & Services"
+                  width={160}
+                  height={70}
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </div>
 
-        <div className="relative mb-4" ref={roleSelectorRef}>
+            <div className="mb-8">
+              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2 tracking-tight">Sign In</h2>
+              <p className="text-gray-600 text-sm">Enter your credentials to continue</p>
+            </div>
+
+        <div className="relative mb-6" ref={roleSelectorRef}>
           <button
             type="button"
             onClick={() => setShowRoleSelector(!showRoleSelector)}
-            className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-100"
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50/50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-indigo-300 transition-all duration-200"
           >
-            <span className="flex items-center gap-2">
-              <User size={16} />
+            <span className="flex items-center gap-2.5">
+              <User size={18} strokeWidth={2} className="text-indigo-600" />
               {selectedRole
                 ? `Login as ${selectedRole.name}`
                 : "Quick Login (Select Role)"}
             </span>
-            <ChevronDown size={16} />
+            <ChevronDown size={18} className={`text-gray-400 transition-transform duration-200 ${showRoleSelector ? "rotate-180" : ""}`} />
           </button>
 
           {showRoleSelector && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-10 overflow-hidden backdrop-blur-sm">
               <div className="p-2">
-                <p className="text-xs text-gray-500 px-2 py-1 mb-1">Admin</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-2 mb-1">Admin</p>
                 <button
                   onClick={() => quickLogin("admin")}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
                 >
                   admin@service.com
                 </button>
 
-                <p className="text-xs text-gray-500 px-2 py-1 mt-2 mb-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-2 mt-3 mb-1">
                   Service Center Roles
                 </p>
                 <button
                   onClick={() => quickLogin("sc_manager")}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
                 >
                   SC Manager
                 </button>
                 <button
                   onClick={() => quickLogin("sc_staff")}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
                 >
                   SC Staff
                 </button>
                 <button
                   onClick={() => quickLogin("service_engineer")}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
                 >
                   Service Engineer
                 </button>
                 <button
                   onClick={() => quickLogin("service_advisor")}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
                 >
                   Service Advisor
                 </button>
                 <button
                   onClick={() => quickLogin("call_center")}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
                 >
                   Call Center
                 </button>
@@ -227,92 +274,121 @@ export default function LoginPage() {
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="text-left">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Email address
             </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#3B82F6] text-gray-900 placeholder-gray-400"
-            />
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} strokeWidth={2} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full pl-11 pr-4 py-3 rounded-lg bg-gray-50/50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white text-gray-900 placeholder-gray-400 transition-all duration-200"
+              />
+            </div>
           </div>
 
           <div className="text-left">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Password
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#3B82F6] text-gray-900 placeholder-gray-400"
-            />
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} strokeWidth={2} />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full pl-11 pr-4 py-3 rounded-lg bg-gray-50/50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white text-gray-900 placeholder-gray-400 transition-all duration-200"
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center space-x-2 text-gray-700">
+            <label className="flex items-center space-x-2.5 text-gray-700 cursor-pointer group">
               <input
                 type="checkbox"
                 checked={remember}
                 onChange={() => setRemember(!remember)}
-                className="accent-[#3B82F6]"
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 focus:ring-2 cursor-pointer"
               />
-              <span>Remember me</span>
+              <span className="font-medium group-hover:text-gray-900 transition-colors">Remember me</span>
             </label>
             <Link
               href="/forgot-password"
-              className="text-[#3B82F6] hover:underline font-medium"
+              className="text-indigo-600 hover:text-indigo-700 hover:underline font-semibold transition-colors"
             >
               Forgot password?
             </Link>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-2">
+              <span className="text-red-600">⚠</span>
               {error}
             </div>
           )}
 
           <button
             type="submit"
-            className="w-full py-3 bg-[#3B82F6] text-white rounded-lg hover:bg-[#2563EB] transition-all font-semibold shadow-sm"
+            disabled={isLoading}
+            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 font-semibold shadow-sm hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
           >
-            Sign in
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Signing in...
+              </span>
+            ) : (
+              "Sign in"
+            )}
           </button>
         </form>
 
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-left">
-          <p className="text-xs font-semibold text-blue-800 mb-2">
-            Demo Credentials:
-          </p>
-          <div className="text-xs text-blue-700 space-y-1">
-            <p>
-              <strong>Admin:</strong> admin@service.com / admin123
-            </p>
-            <p>
-              <strong>SC Manager:</strong> scmanager@service.com / sc123
-            </p>
-            <p>
-              <strong>SC Staff:</strong> scstaff@service.com / staff123
-            </p>
-            <p>
-              <strong>Engineer:</strong> engineer@service.com / eng123
-            </p>
-            <p>
-              <strong>Advisor:</strong> advisor@service.com / adv123
-            </p>
-            <p>
-              <strong>Call Center:</strong> callcenter@service.com / cc123
-            </p>
+            {/* Demo Credentials - Collapsible */}
+            <div className="mt-6">
+              <details className="group">
+                <summary className="cursor-pointer text-sm font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-2 mb-3">
+                  <span>Demo Credentials</span>
+                  <ChevronDown size={16} className="transition-transform duration-200 group-open:rotate-180" />
+                </summary>
+                <div className="mt-3 p-4 bg-indigo-50/50 border border-indigo-200/50 rounded-xl">
+                  <div className="text-xs text-indigo-800 space-y-2 font-medium">
+                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
+                      <span className="font-semibold">Admin:</span>
+                      <span className="font-mono text-[10px]">admin@service.com / admin123</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
+                      <span className="font-semibold">SC Manager:</span>
+                      <span className="font-mono text-[10px]">scmanager@service.com / sc123</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
+                      <span className="font-semibold">SC Staff:</span>
+                      <span className="font-mono text-[10px]">scstaff@service.com / staff123</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
+                      <span className="font-semibold">Engineer:</span>
+                      <span className="font-mono text-[10px]">engineer@service.com / eng123</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
+                      <span className="font-semibold">Advisor:</span>
+                      <span className="font-mono text-[10px]">advisor@service.com / adv123</span>
+                    </div>
+                    <div className="flex items-center justify-between py-1.5">
+                      <span className="font-semibold">Call Center:</span>
+                      <span className="font-mono text-[10px]">callcenter@service.com / cc123</span>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

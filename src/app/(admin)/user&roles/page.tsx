@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Trash, Key, History, UserCog, Edit, Power, Eye } from "lucide-react";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 
 // Types
 interface User {
@@ -90,7 +91,7 @@ export default function UsersAndRolesPage() {
   // Load service centers using lazy initializer
   const [centers, setCenters] = useState<ServiceCenter[]>(() => {
     if (typeof window !== 'undefined') {
-      const storedCenters = JSON.parse(localStorage.getItem('serviceCenters') || '{}');
+      const storedCenters = safeStorage.getItem<Record<string, unknown>>('serviceCenters', {});
       const staticCenters: ServiceCenter[] = [
         { id: 1, name: "Delhi Central Hub" },
         { id: 2, name: "Mumbai Metroplex" },

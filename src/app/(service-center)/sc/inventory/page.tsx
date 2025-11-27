@@ -1,4 +1,5 @@
 "use client";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState } from "react";
 import {
   Package,
@@ -259,7 +260,7 @@ export default function SCInventory() {
     }
 
     // Store request in localStorage (simulating API call)
-    const requests = JSON.parse(localStorage.getItem("partsRequests") || "[]");
+    const requests = safeStorage.getItem<unknown[]>("partsRequests", []);
     const newRequest = {
       id: Date.now(),
       items: finalItems,
@@ -268,7 +269,7 @@ export default function SCInventory() {
       serviceCenter: "Pune Phase 1", // This would come from user context
     };
     requests.push(newRequest);
-    localStorage.setItem("partsRequests", JSON.stringify(requests));
+    safeStorage.setItem("partsRequests", requests);
 
     alert(`Parts request submitted successfully! ${finalItems.length} item(s) requested.`);
     setShowRequestModal(false);

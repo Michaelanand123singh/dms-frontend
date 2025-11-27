@@ -1,18 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { invoiceData, serviceCentersList, type Invoice } from "@/__mocks__/data";
 import { Eye, FileText, BarChart3, Calendar, X, Building, DollarSign, Check, Download, Printer } from "lucide-react";
 
-// Types
-interface Invoice {
-  id: string;
-  scName: string;
-  customerName: string;
-  amount: string;
-  dateIssued: string;
-  dueDate: string;
-  paymentStatus: "Paid" | "Pending" | "Overdue";
-}
+// Types - Invoice imported from mock data
 
 interface DetailedInvoice extends Invoice {
   location: string;
@@ -71,127 +63,7 @@ const getDetailedInvoiceData = (invoice: Invoice): DetailedInvoice => {
   };
 };
 
-// Sample invoice data
-const invoiceData: Invoice[] = [
-  {
-    id: "INV-2024-001",
-    scName: "Delhi Central Hub",
-    customerName: "Rohit Shah",
-    amount: "₹5,500",
-    dateIssued: "2024-11-01",
-    dueDate: "2024-11-08",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "INV-2024-002",
-    scName: "Mumbai Metroplex",
-    customerName: "Priya Nair",
-    amount: "₹8,200",
-    dateIssued: "2024-11-03",
-    dueDate: "2024-11-10",
-    paymentStatus: "Overdue",
-  },
-  {
-    id: "INV-2024-003",
-    scName: "Bangalore Innovation Center",
-    customerName: "Arjun Mehta",
-    amount: "₹12,500",
-    dateIssued: "2024-11-05",
-    dueDate: "2024-11-12",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "INV-2024-004",
-    scName: "Delhi Central Hub",
-    customerName: "Sneha Patel",
-    amount: "₹6,800",
-    dateIssued: "2024-11-02",
-    dueDate: "2024-11-09",
-    paymentStatus: "Pending",
-  },
-  {
-    id: "INV-2024-005",
-    scName: "Mumbai Metroplex",
-    customerName: "Vikram Singh",
-    amount: "₹9,300",
-    dateIssued: "2024-11-04",
-    dueDate: "2024-11-11",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "INV-2024-006",
-    scName: "Pune Elite Care",
-    customerName: "Anita Desai",
-    amount: "₹7,600",
-    dateIssued: "2024-11-06",
-    dueDate: "2024-11-13",
-    paymentStatus: "Pending",
-  },
-  {
-    id: "INV-2024-007",
-    scName: "Bangalore Innovation Center",
-    customerName: "Rajesh Kumar",
-    amount: "₹11,200",
-    dateIssued: "2024-10-28",
-    dueDate: "2024-11-05",
-    paymentStatus: "Overdue",
-  },
-  {
-    id: "INV-2024-008",
-    scName: "Delhi Central Hub",
-    customerName: "Meera Joshi",
-    amount: "₹4,900",
-    dateIssued: "2024-11-07",
-    dueDate: "2024-11-14",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "INV-2024-009",
-    scName: "Mumbai Metroplex",
-    customerName: "Karan Malhotra",
-    amount: "₹15,000",
-    dateIssued: "2024-11-01",
-    dueDate: "2024-11-08",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "INV-2024-010",
-    scName: "Pune Elite Care",
-    customerName: "Divya Sharma",
-    amount: "₹8,700",
-    dateIssued: "2024-11-03",
-    dueDate: "2024-11-10",
-    paymentStatus: "Pending",
-  },
-  {
-    id: "INV-2024-011",
-    scName: "Delhi Central Hub",
-    customerName: "Amit Verma",
-    amount: "₹6,300",
-    dateIssued: "2024-11-05",
-    dueDate: "2024-11-12",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "INV-2024-012",
-    scName: "Bangalore Innovation Center",
-    customerName: "Pooja Reddy",
-    amount: "₹10,100",
-    dateIssued: "2024-11-06",
-    dueDate: "2024-11-13",
-    paymentStatus: "Paid",
-  },
-];
-
-// Service centers list
-const serviceCenters: string[] = [
-  "All Service Centers",
-  "Delhi Central Hub",
-  "Mumbai Metroplex",
-  "Bangalore Innovation Center",
-  "Pune Elite Care",
-  "Hyderabad Excellence",
-];
+// All data imported from __mocks__/data
 
 export default function FinancePage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -242,14 +114,8 @@ export default function FinancePage() {
 
   const handleExportReport = () => {
     // Handle report export
-    console.log("Exporting report with:", {
-      reportType,
-      fromDate,
-      toDate,
-      selectedServiceCenters,
-      paymentStatus,
-      exportFormat,
-    });
+    // TODO: Implement report export functionality
+    // Exporting report with: reportType, fromDate, toDate, selectedServiceCenters, paymentStatus, exportFormat
     // Close modal after export
     handleCloseReportModal();
   };
@@ -550,7 +416,7 @@ export default function FinancePage() {
                   size={6}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-black"
                 >
-                  {serviceCenters.map((center) => (
+                  {serviceCentersList.map((center) => (
                     <option
                       key={center}
                       value={center}
@@ -835,7 +701,10 @@ export default function FinancePage() {
               <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-between">
                 <div className="flex gap-3">
                   <button
-                    onClick={() => console.log("Download PDF:", detailedInvoice.id)}
+                    onClick={() => {
+                      // TODO: Implement PDF download
+                      window.open(`/api/invoices/${detailedInvoice.id}/pdf`, "_blank");
+                    }}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-black hover:bg-gray-50 transition font-medium flex items-center gap-2"
                   >
                     <Download size={16} />
@@ -850,7 +719,10 @@ export default function FinancePage() {
                   </button>
                 </div>
                 <button
-                  onClick={() => console.log("Create Credit Note:", detailedInvoice.id)}
+                  onClick={() => {
+                    // TODO: Implement credit note creation
+                    alert("Credit note creation feature coming soon");
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-red-600 hover:bg-red-50 transition font-medium flex items-center gap-2"
                 >
                   <FileText size={16} />

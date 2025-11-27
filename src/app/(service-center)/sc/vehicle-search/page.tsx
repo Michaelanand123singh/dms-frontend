@@ -30,17 +30,19 @@ export default function VehicleSearch() {
   const [validationError, setValidationError] = useState<string>("");
   
   // Form state for adding new vehicle
-  const [newVehicleForm, setNewVehicleForm] = useState<NewVehicleForm>({
+  const [newVehicleForm, setNewVehicleForm] = useState<Partial<NewVehicleForm>>({
     customerName: "",
     customerPhone: "",
     customerEmail: "",
     customerAddress: "",
-    vehicleMake: "",
+    vehicleBrand: "",
     vehicleModel: "",
+    registrationNumber: "",
+    vin: "",
     vehicleYear: "",
     vehicleColor: "",
-    registration: "",
-    vin: "",
+    registration: "", // Legacy field for backward compatibility
+    vehicleMake: "", // Legacy field for backward compatibility
   });
 
   // Mock data - replace with API calls
@@ -189,7 +191,8 @@ export default function VehicleSearch() {
     } else if (searchType === "registration") {
       setNewVehicleForm((prev) => ({
         ...prev,
-        registration: searchQuery.toUpperCase(),
+        registrationNumber: searchQuery.toUpperCase(),
+        registration: searchQuery.toUpperCase(), // Legacy field
       }));
     } else if (searchType === "vin") {
       setNewVehicleForm((prev) => ({
@@ -202,13 +205,13 @@ export default function VehicleSearch() {
   const handleSaveNewVehicle = (): void => {
     // Validate form
     if (!newVehicleForm.customerName || !newVehicleForm.customerPhone || 
-        !newVehicleForm.vehicleMake || !newVehicleForm.vehicleModel || 
-        !newVehicleForm.registration) {
+        !newVehicleForm.vehicleBrand || !newVehicleForm.vehicleModel || 
+        !newVehicleForm.registrationNumber) {
       setValidationError("Please fill all required fields");
       return;
     }
 
-    if (newVehicleForm.customerPhone.length !== 10 || !/^\d{10}$/.test(newVehicleForm.customerPhone)) {
+    if (newVehicleForm.customerPhone && (newVehicleForm.customerPhone.length !== 10 || !/^\d{10}$/.test(newVehicleForm.customerPhone))) {
       setValidationError("Phone number must be 10 digits");
       return;
     }
@@ -228,12 +231,14 @@ export default function VehicleSearch() {
       customerPhone: "",
       customerEmail: "",
       customerAddress: "",
-      vehicleMake: "",
+      vehicleBrand: "",
       vehicleModel: "",
+      registrationNumber: "",
+      vin: "",
       vehicleYear: "",
       vehicleColor: "",
       registration: "",
-      vin: "",
+      vehicleMake: "",
     });
   };
 
@@ -666,13 +671,13 @@ export default function VehicleSearch() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Vehicle Make <span className="text-red-500">*</span>
+                      Vehicle Brand <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={newVehicleForm.vehicleMake}
+                      value={newVehicleForm.vehicleBrand || ""}
                       onChange={(e) =>
-                        setNewVehicleForm({ ...newVehicleForm, vehicleMake: e.target.value })
+                        setNewVehicleForm({ ...newVehicleForm, vehicleBrand: e.target.value, vehicleMake: e.target.value })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       required
@@ -685,7 +690,7 @@ export default function VehicleSearch() {
                     </label>
                     <input
                       type="text"
-                      value={newVehicleForm.vehicleModel}
+                      value={newVehicleForm.vehicleModel || ""}
                       onChange={(e) =>
                         setNewVehicleForm({ ...newVehicleForm, vehicleModel: e.target.value })
                       }
@@ -700,7 +705,7 @@ export default function VehicleSearch() {
                     </label>
                     <input
                       type="number"
-                      value={newVehicleForm.vehicleYear}
+                      value={newVehicleForm.vehicleYear || ""}
                       onChange={(e) =>
                         setNewVehicleForm({ ...newVehicleForm, vehicleYear: e.target.value })
                       }
@@ -716,7 +721,7 @@ export default function VehicleSearch() {
                     </label>
                     <input
                       type="text"
-                      value={newVehicleForm.vehicleColor}
+                      value={newVehicleForm.vehicleColor || ""}
                       onChange={(e) =>
                         setNewVehicleForm({ ...newVehicleForm, vehicleColor: e.target.value })
                       }
@@ -730,10 +735,11 @@ export default function VehicleSearch() {
                     </label>
                     <input
                       type="text"
-                      value={newVehicleForm.registration}
+                      value={newVehicleForm.registrationNumber || ""}
                       onChange={(e) =>
                         setNewVehicleForm({
                           ...newVehicleForm,
+                          registrationNumber: e.target.value.toUpperCase(),
                           registration: e.target.value.toUpperCase(),
                         })
                       }
@@ -748,7 +754,7 @@ export default function VehicleSearch() {
                     </label>
                     <input
                       type="text"
-                      value={newVehicleForm.vin}
+                      value={newVehicleForm.vin || ""}
                       onChange={(e) =>
                         setNewVehicleForm({
                           ...newVehicleForm,

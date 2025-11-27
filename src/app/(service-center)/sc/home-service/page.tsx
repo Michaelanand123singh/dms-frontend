@@ -1,4 +1,5 @@
 "use client";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState } from "react";
 import {
   Truck,
@@ -157,9 +158,9 @@ export default function HomeService() {
     setHomeServices([...homeServices, newService]);
 
     // Store in localStorage (simulating API call)
-    const storedServices = JSON.parse(localStorage.getItem("homeServices") || "[]");
+    const storedServices = safeStorage.getItem<unknown[]>("homeServices", []);
     storedServices.push(newService);
-    localStorage.setItem("homeServices", JSON.stringify(storedServices));
+    safeStorage.setItem("homeServices", storedServices);
 
     // Reset form and close modal
     setScheduleForm({

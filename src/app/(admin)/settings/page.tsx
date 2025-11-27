@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import {
   Settings as SettingsIcon,
   Mail,
@@ -57,9 +58,9 @@ export default function SettingsPage() {
 
   useEffect(() => {
     // Load settings from localStorage or API
-    const storedSettings = localStorage.getItem("systemSettings");
+    const storedSettings = safeStorage.getItem<Record<string, { key: string; value: string; category: string; description: string }> | null>("systemSettings", null);
     if (storedSettings) {
-      setSettings(JSON.parse(storedSettings));
+      setSettings(storedSettings);
     } else {
       setSettings(defaultSettings);
     }
@@ -89,7 +90,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setLoading(true);
     // TODO: Replace with API call
-    localStorage.setItem("systemSettings", JSON.stringify(settings));
+    safeStorage.setItem("systemSettings", settings);
     setTimeout(() => {
       setLoading(false);
       setSaved(true);

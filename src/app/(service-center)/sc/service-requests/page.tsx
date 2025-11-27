@@ -1,4 +1,5 @@
 "use client";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState, useEffect } from "react";
 import {
   Search,
@@ -277,9 +278,9 @@ export default function ServiceRequests() {
 
       // Store in localStorage to sync with job cards page
       // In production, this would be handled by the backend
-      const existingJobCards = JSON.parse(localStorage.getItem("jobCards") || "[]");
+      const existingJobCards = safeStorage.getItem<unknown[]>("jobCards", []);
       existingJobCards.push(jobCardData);
-      localStorage.setItem("jobCards", JSON.stringify(existingJobCards));
+      safeStorage.setItem("jobCards", existingJobCards);
       
       // Update local state
       setRequests(
