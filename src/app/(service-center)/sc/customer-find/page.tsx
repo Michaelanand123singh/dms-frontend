@@ -16,9 +16,13 @@ import {
   Clock,
   Home,
   Building2,
+  History,
+  Wrench,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { useRole } from "@/shared/hooks";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import {
   useCustomerSearch,
   useCreateCustomer,
@@ -29,6 +33,8 @@ import type {
   CustomerWithVehicles,
   NewCustomerForm,
   ServiceType,
+  Vehicle,
+  ServiceHistoryItem,
 } from "@/shared/types";
 
 export default function CustomerFind() {
@@ -38,6 +44,11 @@ export default function CustomerFind() {
   const [showCreateCustomer, setShowCreateCustomer] = useState<boolean>(false);
   const [showCreateForm, setShowCreateForm] = useState<boolean>(false);
   const [showServiceTypeSelection, setShowServiceTypeSelection] = useState<boolean>(false);
+  const [showAddVehiclePopup, setShowAddVehiclePopup] = useState<boolean>(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [showVehicleDetails, setShowVehicleDetails] = useState<boolean>(false);
+  const [showScheduleAppointment, setShowScheduleAppointment] = useState<boolean>(false);
+  const [serviceHistory, setServiceHistory] = useState<ServiceHistoryItem[]>([]);
   const [validationError, setValidationError] = useState<string>("");
   const [detectedSearchType, setDetectedSearchType] = useState<CustomerSearchType | null>(null);
 
@@ -52,6 +63,34 @@ export default function CustomerFind() {
     phone: "",
     email: "",
     address: "",
+  });
+
+  // Form state for adding new vehicle
+  const [newVehicleForm, setNewVehicleForm] = useState<{
+    vin: string;
+    modelName: string;
+  }>({
+    vin: "",
+    modelName: "",
+  });
+
+  // Form state for scheduling appointment
+  const [appointmentForm, setAppointmentForm] = useState<{
+    customerName: string;
+    phone: string;
+    vehicle: string;
+    serviceType: string;
+    date: string;
+    time: string;
+    duration: string;
+  }>({
+    customerName: "",
+    phone: "",
+    vehicle: "",
+    serviceType: "",
+    date: new Date().toISOString().split("T")[0],
+    time: "",
+    duration: "2",
   });
 
   // Auto-detect search type based on input
@@ -584,13 +623,19 @@ export default function CustomerFind() {
                     <p className="text-sm text-gray-600 font-medium mt-0.5">Customer #{selectedCustomer.customerNumber}</p>
                   </div>
                 </div>
-                <Link
-                  href={`/sc/vehicle-search?customerId=${selectedCustomer.id}`}
+                <button
+                  onClick={() => {
+                    setShowAddVehiclePopup(true);
+                    setNewVehicleForm({
+                      vin: "",
+                      modelName: "",
+                    });
+                  }}
                   className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg text-sm font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] flex items-center gap-2"
                 >
                   <PlusCircle size={16} strokeWidth={2} />
                   Add Vehicle
-                </Link>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -713,12 +758,44 @@ export default function CustomerFind() {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Link
-                            href={`/sc/job-cards?vehicleId=${vehicle.id}`}
+                          <button
+                            onClick={() => {
+                              setSelectedVehicle(vehicle);
+                              setShowVehicleDetails(true);
+                              // Load mock service history for the vehicle
+                              setServiceHistory([
+                                {
+                                  id: 1,
+                                  date: "2024-12-15",
+                                  type: "Routine Maintenance",
+                                  engineer: "Engineer 1",
+                                  parts: ["Engine Oil", "Air Filter"],
+                                  labor: "₹1,500",
+                                  partsCost: "₹2,500",
+                                  total: "₹4,000",
+                                  invoice: "INV-2024-456",
+                                  status: "Completed",
+                                  odometer: "25,000 km",
+                                },
+                                {
+                                  id: 2,
+                                  date: "2024-11-20",
+                                  type: "Repair",
+                                  engineer: "Engineer 2",
+                                  parts: ["Brake Pads", "Brake Fluid"],
+                                  labor: "₹2,000",
+                                  partsCost: "₹3,500",
+                                  total: "₹5,500",
+                                  invoice: "INV-2024-389",
+                                  status: "Completed",
+                                  odometer: "24,500 km",
+                                },
+                              ]);
+                            }}
                             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
                           >
                             View Details
-                          </Link>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -734,15 +811,627 @@ export default function CustomerFind() {
                 <p className="text-gray-600 mb-4">
                   This customer doesn&apos;t have any vehicles linked yet.
                 </p>
-                <Link
-                  href={`/sc/vehicle-search?customerId=${selectedCustomer.id}`}
+                <button
+                  onClick={() => {
+                    setShowAddVehiclePopup(true);
+                    setNewVehicleForm({
+                      vin: "",
+                      modelName: "",
+                    });
+                  }}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition"
                 >
                   <PlusCircle size={20} />
                   Add First Vehicle
-                </Link>
+                </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Add Vehicle Popup Form */}
+        {showAddVehiclePopup && selectedCustomer && (
+          <div 
+            className="fixed inset-0 backdrop-blur-md bg-black/10 flex items-start justify-center z-[9999] p-4 pt-8"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-xl max-w-md w-full"
+              style={{ animation: 'slideDownFromTop 0.3s ease-out' }}
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl">
+                <h2 className="text-2xl font-bold text-gray-800">Add New Vehicle</h2>
+                <button
+                  onClick={() => {
+                    setShowAddVehiclePopup(false);
+                    setValidationError("");
+                    setNewVehicleForm({
+                      vin: "",
+                      modelName: "",
+                    });
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+                >
+                  <X size={24} strokeWidth={2} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {validationError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+                    <AlertCircle className="text-red-600" size={20} strokeWidth={2} />
+                    <p className="text-red-600 text-sm">{validationError}</p>
+                  </div>
+                )}
+
+                {/* Pre-filled Customer Information */}
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 space-y-2">
+                  <h3 className="text-sm font-semibold text-indigo-900 mb-3">Customer Information</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-indigo-600 font-medium">Name</p>
+                      <p className="text-gray-800 font-semibold">{selectedCustomer.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Phone</p>
+                      <p className="text-gray-800 font-semibold">{selectedCustomer.phone}</p>
+                    </div>
+                    {selectedCustomer.email && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Email</p>
+                        <p className="text-gray-800 font-semibold">{selectedCustomer.email}</p>
+                      </div>
+                    )}
+                    {selectedCustomer.address && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Address</p>
+                        <p className="text-gray-800 font-semibold">{selectedCustomer.address}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vehicle Form Fields */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      VIN Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newVehicleForm.vin}
+                      onChange={(e) =>
+                        setNewVehicleForm({ ...newVehicleForm, vin: e.target.value.toUpperCase() })
+                      }
+                      placeholder="Enter 17-character VIN number"
+                      maxLength={17}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 font-mono transition-all duration-200"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">17 alphanumeric characters</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Model Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newVehicleForm.modelName}
+                      onChange={(e) =>
+                        setNewVehicleForm({ ...newVehicleForm, modelName: e.target.value })
+                      }
+                      placeholder="e.g., Honda City, Toyota Camry"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setShowAddVehiclePopup(false);
+                      setValidationError("");
+                      setNewVehicleForm({
+                        vin: "",
+                        modelName: "",
+                      });
+                    }}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Validate form
+                      if (!newVehicleForm.vin || !newVehicleForm.modelName) {
+                        setValidationError("VIN Number and Model Name are required");
+                        return;
+                      }
+
+                      if (newVehicleForm.vin.length !== 17) {
+                        setValidationError("VIN must be exactly 17 characters");
+                        return;
+                      }
+
+                      // Validate VIN format (alphanumeric, excluding I, O, Q)
+                      const vinRegex = /^[A-HJ-NPR-Z0-9]{17}$/i;
+                      if (!vinRegex.test(newVehicleForm.vin)) {
+                        setValidationError("Invalid VIN format. VIN should contain only alphanumeric characters (excluding I, O, Q)");
+                        return;
+                      }
+
+                      setValidationError("");
+
+                      // TODO: Call API to create vehicle
+                      // For now, show success message
+                      alert(`Vehicle added successfully!\n\nVIN: ${newVehicleForm.vin}\nModel: ${newVehicleForm.modelName}\nCustomer: ${selectedCustomer.name}`);
+
+                      // Close popup and reset form
+                      setShowAddVehiclePopup(false);
+                      setNewVehicleForm({
+                        vin: "",
+                        modelName: "",
+                      });
+
+                      // Optionally refresh customer data to show new vehicle
+                      // You might want to refetch the customer data here
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98]"
+                  >
+                    Add Vehicle
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Vehicle Details Modal */}
+        {showVehicleDetails && selectedVehicle && selectedCustomer && (
+          <div 
+            className="fixed inset-0 backdrop-blur-md bg-black/10 flex items-start justify-center z-[9999] p-4 pt-8"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              style={{ animation: 'slideDownFromTop 0.3s ease-out' }}
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl z-10">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Vehicle Details</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedVehicle.vehicleMake} {selectedVehicle.vehicleModel} ({selectedVehicle.vehicleYear})
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowVehicleDetails(false);
+                    setSelectedVehicle(null);
+                    setServiceHistory([]);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+                >
+                  <X size={24} strokeWidth={2} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Vehicle Information */}
+                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-xl border border-indigo-200">
+                  <h3 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                    <Car className="text-indigo-600" size={20} />
+                    Vehicle Information
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-indigo-600 font-medium">Registration</p>
+                      <p className="text-gray-800 font-semibold">{selectedVehicle.registration}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">VIN Number</p>
+                      <p className="text-gray-800 font-semibold font-mono text-xs">{selectedVehicle.vin}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Color</p>
+                      <p className="text-gray-800 font-semibold">{selectedVehicle.vehicleColor}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Make</p>
+                      <p className="text-gray-800 font-semibold">{selectedVehicle.vehicleMake}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Model</p>
+                      <p className="text-gray-800 font-semibold">{selectedVehicle.vehicleModel}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Year</p>
+                      <p className="text-gray-800 font-semibold">{selectedVehicle.vehicleYear}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Total Services</p>
+                      <p className="text-gray-800 font-semibold">{selectedVehicle.totalServices}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Total Spent</p>
+                      <p className="text-gray-800 font-semibold">{selectedVehicle.totalSpent}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Status</p>
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                        selectedVehicle.currentStatus === "Active Job Card"
+                          ? "bg-orange-100 text-orange-700"
+                          : "bg-green-100 text-green-700"
+                      }`}>
+                        {selectedVehicle.currentStatus}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Service History */}
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                      <History className="text-purple-600" size={20} />
+                      Service History
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowVehicleDetails(false);
+                        setShowScheduleAppointment(true);
+                        // Pre-fill appointment form with customer and vehicle details
+                        setAppointmentForm({
+                          customerName: selectedCustomer.name,
+                          phone: selectedCustomer.phone,
+                          vehicle: `${selectedVehicle.vehicleMake} ${selectedVehicle.vehicleModel} (${selectedVehicle.vehicleYear})`,
+                          serviceType: "",
+                          date: new Date().toISOString().split("T")[0],
+                          time: "",
+                          duration: "2",
+                        });
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg text-sm font-medium hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] flex items-center gap-2"
+                    >
+                      <Calendar size={16} strokeWidth={2} />
+                      Schedule Appointment
+                    </button>
+                  </div>
+
+                  {serviceHistory.length > 0 ? (
+                    <div className="space-y-4">
+                      {serviceHistory.map((service) => (
+                        <div
+                          key={service.id}
+                          className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition"
+                        >
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                                  {service.type}
+                                </span>
+                                <span className="text-sm text-gray-600 flex items-center gap-1">
+                                  <Calendar size={14} />
+                                  {service.date}
+                                </span>
+                                <span className="text-sm text-gray-600 flex items-center gap-1">
+                                  <Wrench size={14} />
+                                  {service.engineer}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-2">
+                                Odometer: {service.odometer}
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {service.parts.map((part, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs"
+                                  >
+                                    {part}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="mt-3 md:mt-0 text-right">
+                              <p className="text-sm text-gray-600">Labor: {service.labor}</p>
+                              <p className="text-sm text-gray-600">Parts: {service.partsCost}</p>
+                              <p className="text-lg font-bold text-gray-800 mt-1">
+                                Total: {service.total}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 justify-end">
+                                <FileText size={12} />
+                                Invoice: {service.invoice}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-center py-8">No service history found</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Schedule Appointment Modal */}
+        {showScheduleAppointment && selectedVehicle && selectedCustomer && (
+          <div 
+            className="fixed inset-0 backdrop-blur-md bg-black/10 flex items-start justify-center z-[9999] p-4 pt-8"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              style={{ animation: 'slideDownFromTop 0.3s ease-out' }}
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl z-10">
+                <h2 className="text-2xl font-bold text-gray-800">Schedule Appointment</h2>
+                <button
+                  onClick={() => {
+                    setShowScheduleAppointment(false);
+                    setAppointmentForm({
+                      customerName: "",
+                      phone: "",
+                      vehicle: "",
+                      serviceType: "",
+                      date: new Date().toISOString().split("T")[0],
+                      time: "",
+                      duration: "2",
+                    });
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+                >
+                  <X size={24} strokeWidth={2} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {validationError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+                    <AlertCircle className="text-red-600" size={20} strokeWidth={2} />
+                    <p className="text-red-600 text-sm">{validationError}</p>
+                  </div>
+                )}
+
+                {/* Pre-filled Customer Information */}
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-indigo-900 mb-3">Customer Information (Pre-filled)</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-indigo-600 font-medium">Name</p>
+                      <p className="text-gray-800 font-semibold">{selectedCustomer.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-600 font-medium">Phone</p>
+                      <p className="text-gray-800 font-semibold">{selectedCustomer.phone}</p>
+                    </div>
+                    {selectedCustomer.email && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Email</p>
+                        <p className="text-gray-800 font-semibold">{selectedCustomer.email}</p>
+                      </div>
+                    )}
+                    {selectedCustomer.address && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Address</p>
+                        <p className="text-gray-800 font-semibold">{selectedCustomer.address}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Appointment Form */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Customer Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={appointmentForm.customerName}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, customerName: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={appointmentForm.phone}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, phone: e.target.value })}
+                      maxLength={10}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Vehicle <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={appointmentForm.vehicle}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, vehicle: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Service Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={appointmentForm.serviceType}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, serviceType: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      required
+                    >
+                      <option value="">Select service type</option>
+                      <option value="Routine Maintenance">Routine Maintenance</option>
+                      <option value="AC Repair">AC Repair</option>
+                      <option value="Oil Change">Oil Change</option>
+                      <option value="Battery Replacement">Battery Replacement</option>
+                      <option value="Tire Service">Tire Service</option>
+                      <option value="Brake Service">Brake Service</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={appointmentForm.date}
+                        onChange={(e) => setAppointmentForm({ ...appointmentForm, date: e.target.value })}
+                        min={new Date().toISOString().split("T")[0]}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Time <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={appointmentForm.time}
+                        onChange={(e) => setAppointmentForm({ ...appointmentForm, time: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Duration (hours) <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={appointmentForm.duration}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, duration: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                      required
+                    >
+                      <option value="1">1 hour</option>
+                      <option value="2">2 hours</option>
+                      <option value="3">3 hours</option>
+                      <option value="4">4 hours</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setShowScheduleAppointment(false);
+                      setAppointmentForm({
+                        customerName: "",
+                        phone: "",
+                        vehicle: "",
+                        serviceType: "",
+                        date: new Date().toISOString().split("T")[0],
+                        time: "",
+                        duration: "2",
+                      });
+                    }}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Validate form
+                      if (!appointmentForm.customerName || !appointmentForm.phone || !appointmentForm.vehicle || !appointmentForm.serviceType || !appointmentForm.date || !appointmentForm.time) {
+                        setValidationError("Please fill all required fields");
+                        return;
+                      }
+
+                      if (appointmentForm.phone.length !== 10 || !/^\d{10}$/.test(appointmentForm.phone)) {
+                        setValidationError("Please enter a valid 10-digit phone number");
+                        return;
+                      }
+
+                      setValidationError("");
+
+                      // Convert time to 12-hour format (e.g., "14:30" -> "2:30 PM")
+                      const formatTime = (time24: string): string => {
+                        const [hours, minutes] = time24.split(":");
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? "PM" : "AM";
+                        const hour12 = hour % 12 || 12;
+                        return `${hour12}:${minutes} ${ampm}`;
+                      };
+
+                      // Get existing appointments from localStorage
+                      const existingAppointments = safeStorage.getItem<Array<{
+                        id: number;
+                        customerName: string;
+                        vehicle: string;
+                        phone: string;
+                        serviceType: string;
+                        date: string;
+                        time: string;
+                        duration: string;
+                        status: string;
+                      }>>("appointments", []);
+
+                      // Create new appointment
+                      const newAppointment = {
+                        id: existingAppointments.length > 0 
+                          ? Math.max(...existingAppointments.map((a) => a.id)) + 1 
+                          : 1,
+                        customerName: appointmentForm.customerName,
+                        vehicle: appointmentForm.vehicle,
+                        phone: appointmentForm.phone,
+                        serviceType: appointmentForm.serviceType,
+                        date: appointmentForm.date,
+                        time: formatTime(appointmentForm.time),
+                        duration: `${appointmentForm.duration} hours`,
+                        status: "Confirmed",
+                      };
+
+                      // Save to localStorage
+                      const updatedAppointments = [...existingAppointments, newAppointment];
+                      safeStorage.setItem("appointments", updatedAppointments);
+
+                      alert(`Appointment scheduled successfully!\n\nCustomer: ${appointmentForm.customerName}\nVehicle: ${appointmentForm.vehicle}\nService: ${appointmentForm.serviceType}\nDate: ${appointmentForm.date}\nTime: ${formatTime(appointmentForm.time)}`);
+
+                      // Close modal and reset form
+                      setShowScheduleAppointment(false);
+                      setAppointmentForm({
+                        customerName: "",
+                        phone: "",
+                        vehicle: "",
+                        serviceType: "",
+                        date: new Date().toISOString().split("T")[0],
+                        time: "",
+                        duration: "2",
+                      });
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98]"
+                  >
+                    Schedule Appointment
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

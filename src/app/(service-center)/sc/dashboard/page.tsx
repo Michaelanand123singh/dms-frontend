@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRole } from "@/shared/hooks";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { useState, useEffect } from "react";
 import type { DashboardCard, Alert, QuickAction, UserRole } from "@/shared/types";
 
 interface DashboardData {
@@ -41,6 +43,54 @@ interface DashboardData {
 export default function SCDashboard() {
   const { userRole, userInfo } = useRole();
   const serviceCenter = userInfo?.serviceCenter || "Pune Phase 1";
+  const [todayAppointmentsCount, setTodayAppointmentsCount] = useState<number>(0);
+
+  // Calculate today's appointments from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const appointments = safeStorage.getItem<Array<{
+        id: number;
+        customerName: string;
+        vehicle: string;
+        phone: string;
+        serviceType: string;
+        date: string;
+        time: string;
+        duration: string;
+        status: string;
+      }>>("appointments", []);
+
+      const today = new Date().toISOString().split("T")[0];
+      const todayAppointments = appointments.filter((apt) => apt.date === today);
+      setTodayAppointmentsCount(todayAppointments.length);
+
+      // Listen for storage changes to update count
+      const handleStorageChange = () => {
+        const updatedAppointments = safeStorage.getItem<Array<{
+          id: number;
+          customerName: string;
+          vehicle: string;
+          phone: string;
+          serviceType: string;
+          date: string;
+          time: string;
+          duration: string;
+          status: string;
+        }>>("appointments", []);
+        const todayApts = updatedAppointments.filter((apt) => apt.date === today);
+        setTodayAppointmentsCount(todayApts.length);
+      };
+
+      window.addEventListener("storage", handleStorageChange);
+      // Also check periodically for same-tab updates
+      const interval = setInterval(handleStorageChange, 1000);
+
+      return () => {
+        window.removeEventListener("storage", handleStorageChange);
+        clearInterval(interval);
+      };
+    }
+  }, []);
 
   const getDashboardData = (): DashboardData => {
     const baseData: Record<UserRole, DashboardData> = {
@@ -300,8 +350,8 @@ export default function SCDashboard() {
           },
           {
             title: "Today's Appointments",
-            value: "6",
-            change: "+1",
+            value: todayAppointmentsCount.toString(),
+            change: todayAppointmentsCount > 0 ? `+${todayAppointmentsCount}` : "0",
             icon: Clock,
             color: "from-green-400/20 to-green-100",
             text: "text-green-600",
