@@ -36,7 +36,6 @@ export const ROUTE_CONFIG = {
     PARTS_REQUEST: "/sc/parts-request",
     LEADS: "/sc/leads",
     QUOTATIONS: "/sc/quotations",
-    FOLLOW_UPS: "/sc/follow-ups",
   },
 } as const;
 

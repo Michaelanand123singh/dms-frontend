@@ -89,7 +89,6 @@ const roleMenus: Record<UserRole, MenuItem[]> = {
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
     { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
     { name: "Complaints", icon: MessageSquare, href: "/sc/complaints" },
-    { name: "Follow-ups", icon: Calendar, href: "/sc/follow-ups" },
   ],
   admin: [],
   super_admin: [],
