@@ -180,27 +180,27 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
   }, {} as Record<string, SearchResult[]>);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-[60] bg-white shadow-sm border-b border-gray-200">
-      <div className="flex items-center px-4 py-3 gap-4 relative">
+    <nav className="fixed top-0 left-0 right-0 z-[60] bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200/80">
+      <div className="flex items-center px-4 md:px-6 py-3.5 gap-4 relative">
         <button
-          className="text-gray-700 hover:text-[#6f42c1] flex-shrink-0 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          className="text-gray-600 hover:text-indigo-600 flex-shrink-0 p-2 rounded-lg hover:bg-gray-50 transition-all duration-200 active:scale-95"
           onClick={() => setOpen((prev) => !prev)}
           aria-label={open ? "Close sidebar" : "Open sidebar"}
         >
-          {open ? <X size={24} /> : <Menu size={24} />}
+          {open ? <X size={20} strokeWidth={2} /> : <Menu size={20} strokeWidth={2} />}
         </button>
 
-        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-lg md:text-xl font-semibold text-[#6f42c1] hidden md:block">
+        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-base md:text-lg font-bold text-gray-900 block tracking-tight">
           {dashboardTitle}
         </h1>
 
         <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
-          <div className="relative w-64" ref={searchRef}>
+          <div className="relative w-56 md:w-72" ref={searchRef}>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} strokeWidth={2} />
               <input
                 type="text"
-                placeholder="Search service centers, users, inventory..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -211,7 +211,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
                     setShowResults(true);
                   }
                 }}
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6f42c1] focus:outline-none text-sm text-black"
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-sm text-gray-900 placeholder:text-gray-400 transition-all duration-200"
               />
               {searchQuery && (
                 <button
@@ -230,12 +230,12 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
             {showResults && searchResults.length > 0 && (
               <div
                 ref={resultsRef}
-                className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto z-50"
+                className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-96 overflow-y-auto z-50 backdrop-blur-sm"
               >
                 {Object.entries(groupedResults).map(([category, items]) => (
                   <div key={category} className="border-b border-gray-100 last:border-b-0">
-                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-                      <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="px-4 py-2.5 bg-gray-50/80 border-b border-gray-100">
+                      <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         {category}
                       </h3>
                     </div>
@@ -245,20 +245,20 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
                         <button
                           key={`${item.type}-${item.id}-${index}`}
                           onClick={() => handleResultClick(item.href)}
-                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition text-left"
+                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-indigo-50/50 transition-all duration-150 text-left group"
                         >
-                          <div className={`p-2 rounded-lg bg-gray-100 ${item.color}`}>
-                            <Icon size={18} />
+                          <div className={`p-2 rounded-lg bg-gray-100 group-hover:bg-indigo-100 transition-colors ${item.color}`}>
+                            <Icon size={18} strokeWidth={2} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-700 transition-colors">
                               {item.title}
                             </p>
                             <p className="text-xs text-gray-500 truncate">
                               {item.subtitle}
                             </p>
                           </div>
-                          <ArrowRight size={16} className="text-gray-400 flex-shrink-0" />
+                          <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-600 flex-shrink-0 transition-colors" />
                         </button>
                       );
                     })}
@@ -280,16 +280,16 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
           <div className="relative" ref={userDropdownRef}>
             <button
               onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="w-9 h-9 rounded-full bg-[#6f42c1] text-white flex items-center justify-center font-bold hover:bg-[#5a32a3] transition cursor-pointer"
+              className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 text-white flex items-center justify-center font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
               title="User menu"
             >
               {userRole === "admin" || userRole === "super_admin" ? "R" : "SC"}
             </button>
             
             {showUserDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                <div className="p-4 border-b border-gray-200">
-                  <p className="text-sm font-medium text-gray-900">
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-50 backdrop-blur-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100 bg-gradient-to-br from-gray-50 to-white">
+                  <p className="text-sm font-semibold text-gray-900">
                     {userInfo?.name || (userRole === "admin" || userRole === "super_admin" ? "Admin User" : "Service Center User")}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
@@ -302,9 +302,9 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
                       handleLogout();
                       setShowUserDropdown(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150 font-medium"
                   >
-                    <LogOut size={18} />
+                    <LogOut size={18} strokeWidth={2} />
                     <span>Logout</span>
                   </button>
                 </div>

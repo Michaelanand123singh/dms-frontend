@@ -48,6 +48,9 @@
         "./src/shared/constants/*"
       ],
       "@/lib/*": [
+        "./src/lib/*"
+      ],
+      "@/shared/lib/*": [
         "./src/shared/lib/*"
       ],
       "@/contexts/*": [

@@ -25,14 +25,14 @@ export function Card({
   const shadowClasses = {
     none: "",
     sm: "shadow-sm",
-    md: "shadow-md",
-    lg: "shadow-lg",
+    md: "shadow-md hover:shadow-lg transition-shadow duration-200",
+    lg: "shadow-lg hover:shadow-xl transition-shadow duration-200",
   };
 
   return (
     <div
       className={clsx(
-        "bg-white rounded-2xl border border-gray-200",
+        "bg-white rounded-xl border border-gray-200/80 backdrop-blur-sm",
         paddingClasses[padding],
         shadowClasses[shadow],
         className

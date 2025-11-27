@@ -13,9 +13,7 @@ import {
   Users,
   MessageSquare,
   Settings,
-  ChevronLeft,
   LogOut,
-  Building,
   Truck,
   BarChart3,
   UserCircle,
@@ -131,44 +129,13 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
   return (
     <aside
       className={clsx(
-        "fixed left-0 bg-white text-gray-900 flex flex-col justify-between shadow-2xl z-40 transition-all duration-300 ease-in-out",
+        "fixed left-0 bg-white/95 backdrop-blur-md text-gray-900 flex flex-col justify-between shadow-lg border-r border-gray-200/80 z-40 transition-all duration-300 ease-in-out",
         "w-64 top-16 h-[calc(100vh-4rem)]",
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         open ? "md:w-64" : "md:w-20"
       )}
     >
-      <div
-        className={clsx(
-          "flex items-center border-b border-gray-200 bg-white transition-all duration-300 relative",
-          open ? "justify-between px-6 py-5" : "justify-center px-0 py-5"
-        )}
-      >
-        {open ? (
-          <>
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-tr from-[#6f42c1] to-[#9b6dff] p-2 rounded-xl shadow-md">
-                <Building size={26} className="text-white" strokeWidth={2} />
-              </div>
-              <h1 className="text-lg font-semibold whitespace-nowrap text-gray-900">Service Center</h1>
-            </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="text-gray-900 hover:text-black transition p-2 rounded-lg hover:bg-gray-100"
-              aria-label="Close sidebar"
-            >
-              <ChevronLeft size={22} className="text-gray-900 hover:text-black" strokeWidth={2} />
-            </button>
-          </>
-        ) : (
-          <div className="flex items-center justify-center">
-            <div className="bg-gradient-to-tr from-[#6f42c1] to-[#9b6dff] p-2 rounded-xl shadow-md">
-              <Building size={26} className="text-white" strokeWidth={2} />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <nav className="mt-6 flex flex-col flex-grow overflow-y-auto">
+      <nav className="mt-2 flex flex-col flex-grow overflow-y-auto px-2 py-2">
         {menu.length > 0 && menu.map((item) => {
           const Icon = item.icon;
           // Check active state - pathname is available on both server and client
@@ -183,23 +150,23 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
                 }
               }}
               className={clsx(
-                "flex items-center text-sm transition-all",
-                open ? "gap-3 px-6 py-3" : "justify-center px-0 py-3 md:px-0",
+                "flex items-center text-sm transition-all duration-200 rounded-lg",
+                open ? "gap-3 px-4 py-2.5" : "justify-center px-0 py-2.5 md:px-0",
                 active
-                  ? "bg-gradient-to-r from-[#6f42c1] to-[#a374ff] text-white font-medium"
-                  : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-medium shadow-sm"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-indigo-600"
               )}
               title={!open ? item.name : ""}
             >
               <Icon 
                 size={18} 
                 className={clsx(
-                  "flex-shrink-0",
-                  active ? "text-white" : "text-gray-700"
+                  "flex-shrink-0 transition-colors",
+                  active ? "text-white" : "text-gray-500"
                 )}
-                strokeWidth={2}
+                strokeWidth={active ? 2.5 : 2}
               />
-              {open && <span className="whitespace-nowrap">{item.name}</span>}
+              {open && <span className="whitespace-nowrap font-medium">{item.name}</span>}
             </Link>
           );
         })}
@@ -207,40 +174,40 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
 
       <div
         className={clsx(
-          "border-t border-gray-200 transition-all duration-300",
-          open ? "p-6" : "p-4 md:p-4"
+          "border-t border-gray-100 bg-gradient-to-br from-gray-50/50 to-white transition-all duration-300",
+          open ? "p-5" : "p-4 md:p-4"
         )}
       >
         {open ? (
           <>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[#6f42c1] flex items-center justify-center text-white font-bold">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center text-white font-semibold shadow-sm">
                 {user.initials}
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500">{user.role}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
+                <p className="text-xs text-gray-500 truncate">{user.role}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition group"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-150 font-medium group"
             >
-              <LogOut size={18} className="text-gray-700 group-hover:text-red-600 transition" strokeWidth={2} />
+              <LogOut size={18} className="text-gray-600 group-hover:text-red-600 transition-colors" strokeWidth={2} />
               Logout
             </button>
           </>
         ) : (
-          <div className="hidden md:flex flex-col items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-[#6f42c1] flex items-center justify-center text-white font-bold">
+          <div className="hidden md:flex flex-col items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center text-white font-semibold shadow-sm">
               {user.initials}
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center justify-center p-2 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition"
+              className="flex items-center justify-center p-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-150"
               title="Logout"
             >
-              <LogOut size={18} className="text-gray-700 hover:text-red-600" strokeWidth={2} />
+              <LogOut size={18} className="text-gray-600 hover:text-red-600 transition-colors" strokeWidth={2} />
             </button>
           </div>
         )}

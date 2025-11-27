@@ -4,9 +4,10 @@
 
 export const API_CONFIG = {
   BASE_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api",
-  TIMEOUT: 30000,
+  TIMEOUT: Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
+  USE_MOCK: process.env.NEXT_PUBLIC_USE_MOCK_API === "true",
 } as const;
 
 export const API_ENDPOINTS = {
@@ -22,6 +23,12 @@ export const API_ENDPOINTS = {
   // Users
   USERS: "/users",
   USER: (id: string) => `/users/${id}`,
+  
+  // Customers
+  CUSTOMERS: "/customers",
+  CUSTOMER: (id: string) => `/customers/${id}`,
+  CUSTOMER_SEARCH: "/customers/search",
+  CUSTOMER_RECENT: "/customers/recent",
   
   // Vehicles
   VEHICLES: "/vehicles",
