@@ -3,10 +3,11 @@
 import { useState, useMemo, useEffect, startTransition } from "react";
 import { Plus, Edit, Package, CheckCircle, AlertTriangle, DollarSign, X, Search } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { staticServiceCenters, defaultInventoryData } from "@/__mocks__/data";
-
-// Types - using InventoryItem from mock data
-import type { InventoryItem } from "@/__mocks__/data";
+import { staticServiceCenters } from "@/__mocks__/data";
+import { 
+  defaultInventoryData, 
+  type InventoryItem as AdminInventoryItem 
+} from "@/__mocks__/data/inventory.mock";
 
 interface ServiceCenter {
   id: number;
@@ -47,11 +48,11 @@ export default function InventoryPage() {
   }, []);
 
   // Initialize with default data to ensure server/client match
-  const [inventory, setInventory] = useState<InventoryItem[]>(defaultInventoryData);
+  const [inventory, setInventory] = useState<AdminInventoryItem[]>(defaultInventoryData as unknown as AdminInventoryItem[]);
 
   // Load inventory from localStorage after mount (client-side only)
   useEffect(() => {
-    const storedInventory = safeStorage.getItem<InventoryItem[]>('inventoryData', []);
+    const storedInventory = safeStorage.getItem<AdminInventoryItem[]>('inventoryData', []);
     if (storedInventory.length > 0) {
       startTransition(() => {
         setInventory(storedInventory);
@@ -61,8 +62,8 @@ export default function InventoryPage() {
 
   const [selectedCenter, setSelectedCenter] = useState<string>("all");
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
-  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
+  const [editingItem, setEditingItem] = useState<AdminInventoryItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<AdminInventoryItem | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -135,7 +136,7 @@ export default function InventoryPage() {
     } else {
       // Add new item
       const selectedCenterName = centers.find(c => c.id === parseInt(form.centerId))?.name || "";
-      const newItem: InventoryItem = {
+      const newItem: AdminInventoryItem = {
         id: inventory.length > 0 ? Math.max(...inventory.map(i => i.id)) + 1 : 1,
         partName: form.partName,
         sku: form.sku,
@@ -169,7 +170,7 @@ export default function InventoryPage() {
     setShowAddForm(false);
   };
 
-  const handleEdit = (item: InventoryItem) => {
+  const handleEdit = (item: AdminInventoryItem) => {
     setEditingItem(item);
     setForm({
       partName: item.partName,

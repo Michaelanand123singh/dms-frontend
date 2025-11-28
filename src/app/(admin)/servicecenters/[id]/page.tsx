@@ -1556,10 +1556,10 @@ export default function ServiceCenterDetailPage() {
                             {item.category}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                            {item.quantity}
+                            {item.currentQty}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                            {item.price}
+                            {item.unitPrice}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <span
@@ -1581,8 +1581,8 @@ export default function ServiceCenterDetailPage() {
                                   sku: item.sku,
                                   partCode: (item as any).partCode || "",
                                   category: item.category,
-                                  quantity: item.quantity.toString(),
-                                  price: item.price.replace('₹', ''),
+                                  quantity: item.currentQty.toString(),
+                                  price: item.unitPrice.replace('₹', ''),
                                   status: item.status,
                                 });
                                 setShowInventoryAddEdit(true);
@@ -1895,7 +1895,7 @@ export default function ServiceCenterDetailPage() {
                                       {item.partName}
                                     </h4>
                                     <p className="text-sm text-gray-600">
-                                      {item.price} • Stock: {item.quantity}
+                                      {item.unitPrice} • Stock: {item.currentQty}
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-3">
@@ -1920,18 +1920,18 @@ export default function ServiceCenterDetailPage() {
                                         onChange={(e) => {
                                           const newItems = [...generateInvoiceForm.items];
                                           const val = parseInt(e.target.value) || 0;
-                                          newItems[index].selectedQuantity = Math.min(val, item.quantity);
+                                          newItems[index].selectedQuantity = Math.min(val, item.currentQty);
                                           setGenerateInvoiceForm({ ...generateInvoiceForm, items: newItems });
                                         }}
                                         min="0"
-                                        max={item.quantity}
+                                        max={item.currentQty}
                                         className="w-16 px-2 py-2 text-center border-0 focus:ring-0 text-gray-900"
                                       />
                                       <button
                                         type="button"
                                         onClick={() => {
                                           const newItems = [...generateInvoiceForm.items];
-                                          if (newItems[index].selectedQuantity < item.quantity) {
+                                          if (newItems[index].selectedQuantity < item.currentQty) {
                                             newItems[index].selectedQuantity += 1;
                                             setGenerateInvoiceForm({ ...generateInvoiceForm, items: newItems });
                                           }
@@ -2223,7 +2223,7 @@ export default function ServiceCenterDetailPage() {
                                   {item.partName}
                                 </h4>
                                 <p className="text-sm text-gray-600">
-                                  {item.price} • Stock: {item.quantity}
+                                  {item.unitPrice} • Stock: {item.currentQty}
                                 </p>
                               </div>
                               <div className="flex items-center gap-3">
@@ -2248,18 +2248,18 @@ export default function ServiceCenterDetailPage() {
                                     onChange={(e) => {
                                       const newItems = [...otcOrderForm.items];
                                       const val = parseInt(e.target.value) || 0;
-                                      newItems[index].selectedQuantity = Math.min(val, item.quantity);
+                                      newItems[index].selectedQuantity = Math.min(val, item.currentQty);
                                       setOtcOrderForm({ ...otcOrderForm, items: newItems });
                                     }}
                                     min="0"
-                                    max={item.quantity}
+                                    max={item.currentQty}
                                     className="w-16 px-2 py-2 text-center border-0 focus:ring-0 text-gray-900"
                                   />
                                   <button
                                     type="button"
                                     onClick={() => {
                                       const newItems = [...otcOrderForm.items];
-                                      if (newItems[index].selectedQuantity < item.quantity) {
+                                      if (newItems[index].selectedQuantity < item.currentQty) {
                                         newItems[index].selectedQuantity += 1;
                                         setOtcOrderForm({ ...otcOrderForm, items: newItems });
                                       }
@@ -2760,8 +2760,12 @@ export default function ServiceCenterDetailPage() {
                           sku: inventoryForm.sku,
                           partCode: inventoryForm.partCode,
                           category: inventoryForm.category,
-                          quantity: parseInt(inventoryForm.quantity),
-                          price: `₹${inventoryForm.price}`,
+                          currentQty: parseInt(inventoryForm.quantity),
+                          minStock: 10,
+                          unitPrice: `₹${inventoryForm.price}`,
+                          costPrice: `₹${parseInt(inventoryForm.price) * 0.8}`,
+                          supplier: "Supplier",
+                          location: "Shelf",
                           status: inventoryForm.status as "In Stock" | "Low Stock",
                         }
                       : item
@@ -2774,8 +2778,12 @@ export default function ServiceCenterDetailPage() {
                     sku: inventoryForm.sku,
                     partCode: inventoryForm.partCode,
                     category: inventoryForm.category,
-                    quantity: parseInt(inventoryForm.quantity),
-                    price: `₹${inventoryForm.price}`,
+                    currentQty: parseInt(inventoryForm.quantity),
+                    minStock: 10,
+                    unitPrice: `₹${inventoryForm.price}`,
+                    costPrice: `₹${parseInt(inventoryForm.price) * 0.8}`,
+                    supplier: "Supplier",
+                    location: "Shelf",
                     status: inventoryForm.status as "In Stock" | "Low Stock",
                   };
                   setInventory([...inventory, newPart]);

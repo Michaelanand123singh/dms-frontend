@@ -26,9 +26,14 @@ import {
   Send,
 } from "lucide-react";
 import type { JobCard, JobCardStatus, Priority, KanbanColumn, ServiceLocation } from "@/shared/types";
-import { API_CONFIG, API_ENDPOINTS } from "@/config/api.config";
-import { defaultJobCards, engineers as engineersList, availableParts as availablePartsList, SERVICE_TYPES as JOB_CARD_SERVICE_TYPES } from "@/__mocks__/data/job-cards.mock";
-import type { Engineer, Part } from "@/__mocks__/data/job-cards.mock";
+import { 
+  defaultJobCards, 
+  engineers as engineersList, 
+  availableParts as availablePartsList, 
+  SERVICE_TYPES as JOB_CARD_SERVICE_TYPES,
+  type Engineer, 
+  type Part 
+} from "@/__mocks__/data/job-cards.mock";
 
 type ViewType = "kanban" | "list";
 type FilterType = "all" | "created" | "assigned" | "in_progress" | "completed";

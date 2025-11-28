@@ -24,7 +24,7 @@ export interface Part {
 
 import type { JobCard } from "@/shared/types";
 
-export const SERVICE_TYPES = [
+export const SERVICE_TYPES: readonly string[] = [
   "Routine Maintenance",
   "Repair",
   "Inspection",
@@ -33,7 +33,7 @@ export const SERVICE_TYPES = [
   "Battery Replacement",
   "Tire Service",
   "Other",
-] as const;
+];
 
 /**
  * Default job cards for the job cards page

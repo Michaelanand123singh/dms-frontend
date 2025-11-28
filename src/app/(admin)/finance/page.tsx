@@ -29,7 +29,7 @@ interface ReportFormData {
 }
 
 // Helper function to get detailed invoice data
-const getDetailedInvoiceData = (invoice: Invoice): DetailedInvoice => {
+const getDetailedInvoiceData = (invoice: LegacyInvoice): DetailedInvoice => {
   // Service center locations mapping
   const scLocations: Record<string, string> = {
     "Delhi Central Hub": "Connaught Place, New Delhi",
@@ -67,7 +67,7 @@ const getDetailedInvoiceData = (invoice: Invoice): DetailedInvoice => {
 // All data imported from __mocks__/data
 
 export default function FinancePage() {
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<LegacyInvoice | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   
