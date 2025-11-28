@@ -19,6 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Invoice, PaymentStatus, InvoiceStats, InvoiceItem } from "@/shared/types";
+import { defaultInvoices } from "@/__mocks__/data/invoices.mock";
 
 type FilterType = "all" | "paid" | "unpaid" | "overdue";
 
@@ -37,59 +38,16 @@ export default function Invoices() {
     items: [{ name: "", qty: 1, price: "" }] as InvoiceItem[],
   });
 
-  // Mock invoices data
-  const [invoices, setInvoices] = useState<Invoice[]>([
-    {
-      id: "INV-2025-001",
-      jobCardId: "JC-2025-001",
-      customerName: "Rajesh Kumar",
-      vehicle: "Honda City 2020",
-      date: "2025-01-15",
-      dueDate: "2025-01-25",
-      amount: "₹4,000",
-      paidAmount: "₹0",
-      balance: "₹4,000",
-      status: "Unpaid",
-      paymentMethod: null,
-      items: [
-        { name: "Engine Oil", qty: 1, price: "₹2,500" },
-        { name: "Labor Charges", qty: 1, price: "₹1,500" },
-      ],
-    },
-    {
-      id: "INV-2025-002",
-      jobCardId: "JC-2025-002",
-      customerName: "Priya Sharma",
-      vehicle: "Maruti Swift 2019",
-      date: "2025-01-15",
-      dueDate: "2025-01-25",
-      amount: "₹4,950",
-      paidAmount: "₹4,950",
-      balance: "₹0",
-      status: "Paid",
-      paymentMethod: "UPI",
-      items: [
-        { name: "Brake Pads", qty: 1, price: "₹3,200" },
-        { name: "Labor Charges", qty: 1, price: "₹1,750" },
-      ],
-    },
-    {
-      id: "INV-2025-003",
-      jobCardId: "JC-2025-003",
-      customerName: "Amit Patel",
-      vehicle: "Hyundai i20 2021",
-      date: "2025-01-10",
-      dueDate: "2025-01-20",
-      amount: "₹1,770",
-      paidAmount: "₹0",
-      balance: "₹1,770",
-      status: "Overdue",
-      paymentMethod: null,
-      items: [
-        { name: "Inspection Charges", qty: 1, price: "₹1,500" },
-      ],
-    },
-  ]);
+  // Use mock data from __mocks__ folder
+  const [invoices, setInvoices] = useState<Invoice[]>(() => {
+    if (typeof window !== "undefined") {
+      const storedInvoices = safeStorage.getItem<Invoice[]>("invoices", []);
+      if (storedInvoices.length > 0) {
+        return storedInvoices;
+      }
+    }
+    return defaultInvoices;
+  });
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch =

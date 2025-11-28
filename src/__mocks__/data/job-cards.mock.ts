@@ -5,7 +5,7 @@
 export interface Engineer {
   id: string;
   name: string;
-  status: string;
+  status: "Available" | "Busy" | "On Leave";
   currentJobs: number;
   skills: string[];
   completedToday?: number;
@@ -22,13 +22,73 @@ export interface Part {
   unitPrice: string;
 }
 
+import type { JobCard } from "@/shared/types";
+
 export const SERVICE_TYPES = [
-  "Full Service",
-  "Maintenance",
+  "Routine Maintenance",
   "Repair",
   "Inspection",
   "Warranty",
+  "AC Service",
+  "Battery Replacement",
+  "Tire Service",
   "Other",
+] as const;
+
+/**
+ * Default job cards for the job cards page
+ * In production, this would be fetched from an API
+ */
+export const defaultJobCards: JobCard[] = [
+  {
+    id: "JC-2025-001",
+    customerName: "Rajesh Kumar",
+    vehicle: "Honda City 2020",
+    registration: "PB10AB1234",
+    serviceType: "Routine Maintenance",
+    description: "Regular service - oil change, filter replacement",
+    status: "In Progress",
+    priority: "Normal",
+    assignedEngineer: "Engineer 1",
+    estimatedCost: "₹3,500",
+    estimatedTime: "2 hours",
+    startTime: "2025-01-15 10:00",
+    createdAt: "2025-01-15 09:30",
+    parts: ["Engine Oil", "Air Filter"],
+    location: "Station",
+  },
+  {
+    id: "JC-2025-002",
+    customerName: "Priya Sharma",
+    vehicle: "Maruti Swift 2019",
+    registration: "MH01XY5678",
+    serviceType: "Repair",
+    description: "Brake pads replacement",
+    status: "Assigned",
+    priority: "High",
+    assignedEngineer: "Engineer 2",
+    estimatedCost: "₹4,200",
+    estimatedTime: "3 hours",
+    createdAt: "2025-01-15 11:15",
+    parts: ["Brake Pads", "Brake Fluid"],
+    location: "Station",
+  },
+  {
+    id: "JC-2025-003",
+    customerName: "Amit Patel",
+    vehicle: "Hyundai i20 2021",
+    registration: "DL05CD9012",
+    serviceType: "Inspection",
+    description: "Pre-purchase inspection",
+    status: "Created",
+    priority: "Normal",
+    assignedEngineer: null,
+    estimatedCost: "₹1,500",
+    estimatedTime: "1 hour",
+    createdAt: "2025-01-15 14:20",
+    parts: [],
+    location: "Station",
+  },
 ];
 
 export const engineers: Engineer[] = [

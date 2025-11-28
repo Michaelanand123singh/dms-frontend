@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { invoiceData, serviceCentersList, type Invoice } from "@/__mocks__/data";
+import { invoiceData, type LegacyInvoice } from "@/__mocks__/data/invoices.mock";
+import { serviceCentersList } from "@/__mocks__/data/service-centers.mock";
 import { Eye, FileText, BarChart3, Calendar, X, Building, DollarSign, Check, Download, Printer } from "lucide-react";
 
-// Types - Invoice imported from mock data
+// Types - LegacyInvoice imported from mock data
 
-interface DetailedInvoice extends Invoice {
+interface DetailedInvoice extends LegacyInvoice {
   location: string;
   paymentTerms: string;
   amountBreakdown: {
@@ -89,7 +90,7 @@ export default function FinancePage() {
   const overdueAmount = "₹16.5K";
   const todayRevenue = "₹19.1K";
 
-  const handleViewDetails = (invoice: Invoice) => {
+  const handleViewDetails = (invoice: LegacyInvoice) => {
     setSelectedInvoice(invoice);
     setShowModal(true);
   };
@@ -120,7 +121,7 @@ export default function FinancePage() {
     handleCloseReportModal();
   };
 
-  const getStatusBadgeClass = (status: Invoice["paymentStatus"]): string => {
+  const getStatusBadgeClass = (status: LegacyInvoice["paymentStatus"]): string => {
     switch (status) {
       case "Paid":
         return "bg-green-100 text-green-800";

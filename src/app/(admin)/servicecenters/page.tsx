@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Star, X, Edit } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { defaultServiceCenters, availableServiceTypes } from "@/__mocks__/data/service-centers.mock";
 
 // Types
 interface ServiceCenter {
@@ -49,38 +50,26 @@ interface ServiceCenterForm {
 
 export default function ServiceCentersPage() {
   const router = useRouter();
-  const [centers, setCenters] = useState<ServiceCenter[]>([
-    {
-      id: 1,
-      name: "Delhi Central Hub",
-      location: "Connaught Place, New Delhi",
-      staff: 3,
-      jobs: 12,
-      revenue: "₹12.4L",
-      status: "Active",
-      rating: 4.9,
-    },
-    {
-      id: 2,
-      name: "Mumbai Metroplex",
-      location: "Bandra West, Mumbai",
-      staff: 3,
-      jobs: 18,
-      revenue: "₹18.9L",
-      status: "Active",
-      rating: 4.8,
-    },
-    {
-      id: 3,
-      name: "Bangalore Innovation Center",
-      location: "Koramangala, Bangalore",
-      staff: 2,
-      jobs: 15,
-      revenue: "₹15.6L",
-      status: "Active",
-      rating: 4.9,
-    },
-  ]);
+  // Initialize with mock data, but allow updates from localStorage
+  const [centers, setCenters] = useState<ServiceCenter[]>(() => {
+    if (typeof window !== "undefined") {
+      const storedCenters = safeStorage.getItem<ServiceCenter[]>("serviceCentersList", []);
+      if (storedCenters.length > 0) {
+        return storedCenters;
+      }
+    }
+    // Convert mock data to ServiceCenter format
+    return defaultServiceCenters.map((center) => ({
+      id: center.id,
+      name: center.name,
+      location: center.location,
+      staff: center.staff,
+      jobs: center.jobs,
+      revenue: center.revenue,
+      status: center.status,
+      rating: center.rating,
+    }));
+  });
 
   const [showForm, setShowForm] = useState(false);
   const [editingCenter, setEditingCenter] = useState<ServiceCenter | null>(null);
@@ -114,18 +103,8 @@ export default function ServiceCentersPage() {
     status: "Active",
   });
 
-  const availableServiceTypes = [
-    "Routine Maintenance",
-    "Repair",
-    "Inspection",
-    "Warranty",
-    "AC Service",
-    "Battery Replacement",
-    "Tire Service",
-    "Body Work",
-    "Paint",
-    "Engine Overhaul",
-  ];
+  // Use service types from mock data
+  const serviceTypesList = availableServiceTypes;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -715,7 +694,7 @@ export default function ServiceCentersPage() {
                   <div>
                     <label className="text-sm font-medium text-gray-600 mb-2 block">Service Types</label>
                     <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-3">
-                      {availableServiceTypes.map((type) => (
+                      {serviceTypesList.map((type) => (
                         <label key={type} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"

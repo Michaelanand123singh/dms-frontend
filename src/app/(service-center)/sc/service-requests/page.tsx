@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { ServiceRequest, RequestStatus, Urgency, ServiceLocation } from "@/shared/types";
 import { API_CONFIG, API_ENDPOINTS } from "@/config/api.config";
+import { defaultServiceRequests } from "@/__mocks__/data/service-requests.mock";
 
 type FilterType = "all" | "pending" | "approved" | "rejected";
 
@@ -101,60 +102,16 @@ export default function ServiceRequests() {
     urgency: "Normal",
   });
 
-  // Mock data - TODO: Replace with API call when backend is ready
-  const [requests, setRequests] = useState<ServiceRequest[]>([
-    {
-      id: "SR-2025-001",
-      customerName: "Rajesh Kumar",
-      phone: "9876543210",
-      vehicle: "Honda City 2020",
-      registration: "PB10AB1234",
-      serviceType: "Routine Maintenance",
-      description: "Regular service - oil change, filter replacement",
-      location: "Station",
-      preferredDate: "2025-01-20",
-      preferredTime: "10:00 AM",
-      estimatedCost: "₹3,500",
-      status: "Pending Approval",
-      urgency: "Normal",
-      createdAt: "2025-01-15 09:30",
-      createdBy: "SC Staff",
-    },
-    {
-      id: "SR-2025-002",
-      customerName: "Priya Sharma",
-      phone: "9876543211",
-      vehicle: "Maruti Swift 2019",
-      registration: "MH01XY5678",
-      serviceType: "Repair",
-      description: "Brake pads replacement",
-      estimatedCost: "₹4,200",
-      location: "Home Service",
-      preferredDate: "2025-01-18",
-      preferredTime: "2:00 PM",
-      status: "Pending Approval",
-      urgency: "High",
-      createdAt: "2025-01-15 11:15",
-      createdBy: "Call Center",
-    },
-    {
-      id: "SR-2025-003",
-      customerName: "Amit Patel",
-      phone: "9876543212",
-      vehicle: "Hyundai i20 2021",
-      registration: "DL05CD9012",
-      serviceType: "Inspection",
-      description: "Pre-purchase inspection",
-      estimatedCost: "₹1,500",
-      location: "Station",
-      preferredDate: "2025-01-19",
-      preferredTime: "3:00 PM",
-      status: "Approved",
-      urgency: "Normal",
-      createdAt: "2025-01-14 14:20",
-      createdBy: "Service Advisor",
-    },
-  ]);
+  // Use mock data from __mocks__ folder
+  const [requests, setRequests] = useState<ServiceRequest[]>(() => {
+    if (typeof window !== "undefined") {
+      const storedRequests = safeStorage.getItem<ServiceRequest[]>("serviceRequests", []);
+      if (storedRequests.length > 0) {
+        return storedRequests;
+      }
+    }
+    return defaultServiceRequests;
+  });
 
   // Filter and search requests
   const filteredRequests = requests.filter((req) => {

@@ -213,7 +213,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-[60] bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200/80">
-      <div className="flex items-center px-4 md:px-6 py-3.5 gap-4 relative">
+      <div className="flex items-center px-3 sm:px-4 md:px-6 py-3 sm:py-3.5 gap-2 sm:gap-4 relative">
         <button
           className="text-gray-600 hover:text-indigo-600 flex-shrink-0 p-2 rounded-lg hover:bg-gray-50 transition-all duration-200 active:scale-95"
           onClick={() => setOpen((prev) => !prev)}
@@ -222,14 +222,14 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
           {open ? <X size={20} strokeWidth={2} /> : <Menu size={20} strokeWidth={2} />}
         </button>
 
-        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-base md:text-lg font-bold text-gray-900 block tracking-tight">
+        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-sm sm:text-base md:text-lg font-bold text-gray-900 tracking-tight hidden sm:block max-w-[200px] sm:max-w-none truncate">
           {dashboardTitle}
         </h1>
 
-        <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
-          <div className="relative w-56 md:w-72" ref={searchRef}>
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 ml-auto">
+          <div className="relative w-40 sm:w-56 md:w-72" ref={searchRef}>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} strokeWidth={2} />
+              <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} strokeWidth={2} style={{ width: '16px', height: '16px' }} />
               <input
                 type="text"
                 placeholder="Search..."
@@ -242,7 +242,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
                     setShowResults(true);
                   }
                 }}
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-sm text-gray-900 placeholder:text-gray-400 transition-all duration-200"
+                className="w-full pl-9 sm:pl-10 pr-9 sm:pr-10 py-2 sm:py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 transition-all duration-200"
               />
               {searchQuery && (
                 <button
@@ -251,9 +251,9 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
                     setSearchResults([]);
                     setShowResults(false);
                   }}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  <X size={18} />
+                  <X size={16} style={{ width: '16px', height: '16px' }} />
                 </button>
               )}
             </div>

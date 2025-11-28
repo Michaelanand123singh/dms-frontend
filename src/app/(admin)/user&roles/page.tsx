@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Trash, Key, History, UserCog, Edit, Power, Eye } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { defaultUsers } from "@/__mocks__/data/users.mock";
 
 // Types
 interface User {
@@ -30,41 +31,16 @@ interface UserFormData {
 export default function UsersAndRolesPage() {
   const [showModal, setShowModal] = useState(false);
 
-  // Dummy users
-  const [users, setUsers] = useState<User[]>([
-    {
-      initials: "RKS",
-      name: "Rajesh Kumar Singh",
-      email: "admin@service.com",
-      role: "Super Admin",
-      assigned: "SC001,SC002,SC003,SC004",
-      status: "Active",
-    },
-    {
-      initials: "DM",
-      name: "Delhi Manager",
-      email: "delhi@service.com",
-      role: "SC Manager",
-      assigned: "SC001",
-      status: "Active",
-    },
-    {
-      initials: "FM",
-      name: "Finance Manager",
-      email: "finance@service.com",
-      role: "Finance Manager",
-      assigned: "SC002,SC003",
-      status: "Inactive",
-    },
-    {
-      initials: "CCT",
-      name: "Call Center Team",
-      email: "callcenter@service.com",
-      role: "Call Center",
-      assigned: "SC002",
-      status: "Active",
-    },
-  ]);
+  // Use mock data from __mocks__ folder
+  const [users, setUsers] = useState<User[]>(() => {
+    if (typeof window !== "undefined") {
+      const storedUsers = safeStorage.getItem<User[]>("users", []);
+      if (storedUsers.length > 0) {
+        return storedUsers;
+      }
+    }
+    return defaultUsers;
+  });
 
   const [filteredUsers, setFilteredUsers] = useState<User[]>(users);
   const [searchTerm, setSearchTerm] = useState("");

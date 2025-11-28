@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import type { InventoryItem, StockStatus, FilterType as InventoryFilterType, StockIndicator } from "@/shared/types";
+import { defaultServiceCenterInventory } from "@/__mocks__/data/inventory.mock";
 
 interface RequestItem {
   partId: number;
@@ -43,74 +44,16 @@ export default function SCInventory() {
     reason: string;
   } | null>(null);
 
-  // Mock inventory data
-  const [inventory, setInventory] = useState<InventoryItem[]>([
-    {
-      id: 1,
-      partName: "Engine Oil 5W-30",
-      sku: "EO-001",
-      category: "Lubricants",
-      currentQty: 45,
-      minStock: 20,
-      unitPrice: "₹450",
-      costPrice: "₹350",
-      supplier: "Shell India",
-      location: "Shelf A-1",
-      status: "In Stock",
-    },
-    {
-      id: 2,
-      partName: "Brake Pads - Front",
-      sku: "BP-002",
-      category: "Brakes",
-      currentQty: 8,
-      minStock: 15,
-      unitPrice: "₹1,200",
-      costPrice: "₹900",
-      supplier: "Bosch",
-      location: "Shelf B-3",
-      status: "Low Stock",
-    },
-    {
-      id: 3,
-      partName: "Air Filter",
-      sku: "AF-003",
-      category: "Filters",
-      currentQty: 0,
-      minStock: 10,
-      unitPrice: "₹350",
-      costPrice: "₹250",
-      supplier: "Mahle",
-      location: "Shelf C-2",
-      status: "Out of Stock",
-    },
-    {
-      id: 4,
-      partName: "AC Gas R134a",
-      sku: "AC-004",
-      category: "AC Parts",
-      currentQty: 12,
-      minStock: 5,
-      unitPrice: "₹800",
-      costPrice: "₹600",
-      supplier: "Denso",
-      location: "Shelf D-1",
-      status: "In Stock",
-    },
-    {
-      id: 5,
-      partName: "Spark Plugs Set",
-      sku: "SP-005",
-      category: "Engine",
-      currentQty: 25,
-      minStock: 10,
-      unitPrice: "₹600",
-      costPrice: "₹450",
-      supplier: "NGK",
-      location: "Shelf E-2",
-      status: "In Stock",
-    },
-  ]);
+  // Use mock data from __mocks__ folder
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const storedInventory = safeStorage.getItem<InventoryItem[]>("inventory", []);
+      if (storedInventory.length > 0) {
+        return storedInventory;
+      }
+    }
+    return defaultServiceCenterInventory;
+  });
 
   const filteredInventory = inventory.filter((item) => {
     const matchesSearch =

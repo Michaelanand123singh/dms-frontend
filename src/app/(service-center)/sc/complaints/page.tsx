@@ -1,35 +1,15 @@
 "use client";
 import { useState } from "react";
 import { AlertCircle, Search, Filter, Eye, CheckCircle } from "lucide-react";
-
-interface Complaint {
-  id: string;
-  customerName: string;
-  phone: string;
-  vehicle: string;
-  complaint: string;
-  status: string;
-  date: string;
-  severity: string;
-}
+import { defaultComplaints, type Complaint } from "@/__mocks__/data/complaints.mock";
 
 type FilterType = "all" | "open" | "resolved" | "closed";
 
 export default function Complaints() {
   const [filter, setFilter] = useState<FilterType>("all");
 
-  const complaints: Complaint[] = [
-    {
-      id: "COMP-001",
-      customerName: "Rajesh Kumar",
-      phone: "9876543210",
-      vehicle: "Honda City",
-      complaint: "Service quality was poor",
-      status: "Open",
-      date: "2025-01-15",
-      severity: "Medium",
-    },
-  ];
+  // Use mock data from __mocks__ folder
+  const complaints: Complaint[] = defaultComplaints;
 
   return (
     <div className="bg-[#f9f9fb] min-h-screen">

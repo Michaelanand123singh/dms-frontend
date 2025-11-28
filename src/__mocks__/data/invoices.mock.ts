@@ -2,7 +2,12 @@
  * Mock data for Invoices
  */
 
-export interface Invoice {
+import type { Invoice } from "@/shared/types";
+
+/**
+ * Legacy invoice interface for admin dashboard (includes scName)
+ */
+export interface LegacyInvoice {
   id: string;
   scName: string;
   customerName: string;
@@ -13,7 +18,7 @@ export interface Invoice {
   jobCardId?: string;
 }
 
-export const invoiceData: Invoice[] = [
+export const invoiceData: LegacyInvoice[] = [
   {
     id: "INV-2024-001",
     scName: "Delhi Central Hub",
@@ -122,6 +127,63 @@ export const invoiceData: Invoice[] = [
     dateIssued: "2024-11-06",
     dueDate: "2024-11-13",
     paymentStatus: "Paid",
+  },
+];
+
+/**
+ * Default invoices for the invoices page
+ * In production, this would be fetched from an API
+ */
+export const defaultInvoices: Invoice[] = [
+  {
+    id: "INV-2025-001",
+    jobCardId: "JC-2025-001",
+    customerName: "Rajesh Kumar",
+    vehicle: "Honda City 2020",
+    date: "2025-01-15",
+    dueDate: "2025-01-25",
+    amount: "₹4,000",
+    paidAmount: "₹0",
+    balance: "₹4,000",
+    status: "Unpaid",
+    paymentMethod: null,
+    items: [
+      { name: "Engine Oil", qty: 1, price: "₹2,500" },
+      { name: "Labor Charges", qty: 1, price: "₹1,500" },
+    ],
+  },
+  {
+    id: "INV-2025-002",
+    jobCardId: "JC-2025-002",
+    customerName: "Priya Sharma",
+    vehicle: "Maruti Swift 2019",
+    date: "2025-01-15",
+    dueDate: "2025-01-25",
+    amount: "₹4,950",
+    paidAmount: "₹4,950",
+    balance: "₹0",
+    status: "Paid",
+    paymentMethod: "UPI",
+    items: [
+      { name: "Brake Pads", qty: 1, price: "₹3,200" },
+      { name: "Labor Charges", qty: 1, price: "₹1,750" },
+    ],
+  },
+  {
+    id: "INV-2025-003",
+    jobCardId: "JC-2025-003",
+    customerName: "Amit Patel",
+    vehicle: "Hyundai i20 2021",
+    date: "2025-01-10",
+    dueDate: "2025-01-20",
+    amount: "₹1,770",
+    paidAmount: "₹0",
+    balance: "₹1,770",
+    status: "Overdue",
+    paymentMethod: null,
+    items: [
+      { name: "Inspection Charges", qty: 1, price: "₹1,500" },
+    ],
   },
 ];
 

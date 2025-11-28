@@ -145,3 +145,19 @@ export const defaultInventory = [
   { partName: "Air Filter", sku: "AF-003", category: "Filters" },
 ];
 
+/**
+ * Available service types for service centers
+ */
+export const availableServiceTypes = [
+  "Routine Maintenance",
+  "Repair",
+  "Inspection",
+  "Warranty",
+  "AC Service",
+  "Battery Replacement",
+  "Tire Service",
+  "Body Work",
+  "Paint",
+  "Engine Overhaul",
+] as const;
+

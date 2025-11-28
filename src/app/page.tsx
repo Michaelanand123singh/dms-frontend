@@ -8,66 +8,7 @@ import type { UserInfo, UserRole } from "@/shared/types";
 import { getRedirectPath } from "@/shared/constants/routes";
 import { safeStorage } from "@/shared/lib/localStorage";
 import { TopLoadingBar } from "@/components/ui/TopLoadingBar";
-
-interface MockUser {
-  email: string;
-  password: string;
-  role: UserRole;
-  name: string;
-  initials: string;
-  serviceCenter: string | null;
-}
-
-const users: MockUser[] = [
-  {
-    email: "admin@service.com",
-    password: "admin123",
-    role: "admin",
-    name: "Rajesh Kumar Singh",
-    initials: "RKS",
-    serviceCenter: null,
-  },
-  {
-    email: "scmanager@service.com",
-    password: "sc123",
-    role: "sc_manager",
-    name: "SC Manager",
-    initials: "SCM",
-    serviceCenter: "Pune Phase 1",
-  },
-  {
-    email: "scstaff@service.com",
-    password: "staff123",
-    role: "sc_staff",
-    name: "SC Staff",
-    initials: "SCS",
-    serviceCenter: "Pune Phase 1",
-  },
-  {
-    email: "engineer@service.com",
-    password: "eng123",
-    role: "service_engineer",
-    name: "Service Engineer",
-    initials: "SE",
-    serviceCenter: "Pune Phase 1",
-  },
-  {
-    email: "advisor@service.com",
-    password: "adv123",
-    role: "service_advisor",
-    name: "Service Advisor",
-    initials: "SA",
-    serviceCenter: "Pune Phase 1",
-  },
-  {
-    email: "callcenter@service.com",
-    password: "cc123",
-    role: "call_center",
-    name: "Call Center Staff",
-    initials: "CC",
-    serviceCenter: null, // Call center can assign to any service center
-  },
-];
+import { mockUsers, type MockUser } from "@/__mocks__/data/auth.mock";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -103,7 +44,7 @@ export default function LoginPage() {
       return;
     }
 
-    const user = users.find(
+    const user = mockUsers.find(
       (u) => u.email === email.toLowerCase() && u.password === password
     );
 
@@ -133,7 +74,7 @@ export default function LoginPage() {
   };
 
   const quickLogin = (role: UserRole) => {
-    const user = users.find((u) => u.role === role);
+    const user = mockUsers.find((u) => u.role === role);
     if (user) {
       setEmail(user.email);
       setPassword(user.password);
@@ -357,30 +298,15 @@ export default function LoginPage() {
                 </summary>
                 <div className="mt-3 p-4 bg-indigo-50/50 border border-indigo-200/50 rounded-xl">
                   <div className="text-xs text-indigo-800 space-y-2 font-medium">
-                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
-                      <span className="font-semibold">Admin:</span>
-                      <span className="font-mono text-[10px]">admin@service.com / admin123</span>
-                    </div>
-                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
-                      <span className="font-semibold">SC Manager:</span>
-                      <span className="font-mono text-[10px]">scmanager@service.com / sc123</span>
-                    </div>
-                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
-                      <span className="font-semibold">SC Staff:</span>
-                      <span className="font-mono text-[10px]">scstaff@service.com / staff123</span>
-                    </div>
-                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
-                      <span className="font-semibold">Engineer:</span>
-                      <span className="font-mono text-[10px]">engineer@service.com / eng123</span>
-                    </div>
-                    <div className="flex items-center justify-between py-1.5 border-b border-indigo-100 last:border-b-0">
-                      <span className="font-semibold">Advisor:</span>
-                      <span className="font-mono text-[10px]">advisor@service.com / adv123</span>
-                    </div>
-                    <div className="flex items-center justify-between py-1.5">
-                      <span className="font-semibold">Call Center:</span>
-                      <span className="font-mono text-[10px]">callcenter@service.com / cc123</span>
-                    </div>
+                    {mockUsers.map((user, index) => (
+                      <div 
+                        key={user.email}
+                        className={`flex items-center justify-between py-1.5 ${index < mockUsers.length - 1 ? "border-b border-indigo-100" : ""}`}
+                      >
+                        <span className="font-semibold">{user.name}:</span>
+                        <span className="font-mono text-[10px]">{user.email} / {user.password}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </details>

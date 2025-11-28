@@ -443,10 +443,7 @@ export default function SCDashboard() {
     <div className="bg-gray-50 min-h-screen">
       <div className="pt-20 px-4 sm:px-6 lg:px-8 pb-10">
         <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Service Center Dashboard</h1>
-          <p className="text-gray-600 mt-1.5 text-sm sm:text-base">
-            Welcome to <span className="font-semibold text-indigo-600">{serviceCenter}</span>
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Service Center</h1>
         </div>
 
         {/* Revenue Summary Section */}
