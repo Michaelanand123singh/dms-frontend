@@ -207,19 +207,37 @@ const Modal = ({
   <div 
     className="fixed inset-0 backdrop-blur-md bg-black/10 flex items-start justify-center z-9999 p-4 pt-8"
     style={{ animation: 'fadeIn 0.2s ease-out' }}
+    onClick={(e) => {
+      // Close modal when clicking on backdrop
+      if (e.target === e.currentTarget) {
+        onClose();
+      }
+    }}
   >
     <div 
       className={`bg-white rounded-2xl shadow-xl ${maxWidth} w-full max-h-[90vh] overflow-y-auto`}
       style={{ animation: 'slideDownFromTop 0.3s ease-out' }}
+      onClick={(e) => e.stopPropagation()}
     >
       <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl z-10">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-          {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors p-2 rounded-lg flex items-center gap-2 font-medium"
+            title="Close and go back to search"
+          >
+            <X size={18} strokeWidth={2} />
+            <span className="text-sm hidden sm:inline">Back</span>
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
+            {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
+          </div>
         </div>
         <button
           onClick={onClose}
           className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+          title="Close"
         >
           <X size={24} strokeWidth={2} />
         </button>
@@ -1014,9 +1032,19 @@ export default function CustomerFind() {
           </div>
         )}
 
-        {/* Selected Customer Details */}
+        {/* Customer Details Modal */}
         {selectedCustomer && (
-          <div className="space-y-6">
+          <Modal 
+            title="Customer Details" 
+            subtitle={`${selectedCustomer.name} - ${selectedCustomer.customerNumber}`}
+            onClose={() => {
+              setSelectedCustomer(null);
+              setSearchQuery("");
+              clearSearch();
+            }}
+            maxWidth="max-w-6xl"
+          >
+            <div className="space-y-6">
             {/* Customer Info Card */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 sm:p-6">
               <div className="flex items-start justify-between mb-6">
@@ -1187,7 +1215,8 @@ export default function CustomerFind() {
                 </button>
               </div>
             )}
-          </div>
+            </div>
+          </Modal>
         )}
 
         {/* Add Vehicle Popup Form */}
