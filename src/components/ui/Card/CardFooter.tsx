@@ -13,7 +13,7 @@ export function CardFooter({ children, className, border = true }: CardFooterPro
     <div
       className={clsx(
         "mt-4",
-        border && "pt-4 border-t border-gray-200",
+        border && "pt-4",
         className
       )}
     >

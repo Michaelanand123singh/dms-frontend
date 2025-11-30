@@ -142,7 +142,7 @@ const FormInput = ({
       placeholder={placeholder}
       maxLength={maxLength}
       readOnly={readOnly}
-      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 ${
+      className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 ${
         readOnly ? "bg-gray-100 cursor-not-allowed" : "bg-gray-50/50 focus:bg-white"
       } ${className}`}
       {...props}
@@ -177,7 +177,7 @@ const FormSelect = ({
     <select
       value={value}
       onChange={onChange}
-      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 ${className}`}
+      className={`w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 ${className}`}
       {...props}
     >
       {placeholder && <option value="">{placeholder}</option>}
@@ -212,7 +212,7 @@ const Modal = ({
       className={`bg-white rounded-2xl shadow-xl ${maxWidth} w-full max-h-[90vh] overflow-y-auto`}
       style={{ animation: 'slideDownFromTop 0.3s ease-out' }}
     >
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl z-10">
+      <div className="sticky top-0 bg-white p-6 flex items-center justify-between rounded-t-2xl z-10">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
           {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
@@ -252,7 +252,7 @@ const Button = ({
   const baseClasses = "rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98] flex items-center gap-2";
   const variantClasses = {
     primary: "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white hover:from-indigo-700 hover:to-indigo-800",
-    secondary: "border border-gray-300 text-gray-700 hover:bg-gray-50",
+    secondary: "text-gray-700 hover:bg-gray-50",
     success: "bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800",
     warning: "bg-gradient-to-r from-amber-600 to-amber-700 text-white hover:from-amber-700 hover:to-amber-800",
     danger: "bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800",
@@ -278,7 +278,7 @@ const Button = ({
 
 // Customer Info Display Component
 const CustomerInfoCard = ({ customer, title = "Customer Information" }: { customer: CustomerWithVehicles; title?: string }) => (
-  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+  <div className="bg-indigo-50 rounded-lg p-4">
     <h3 className="text-sm font-semibold text-indigo-900 mb-3">{title}</h3>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
       <div>
@@ -307,7 +307,7 @@ const CustomerInfoCard = ({ customer, title = "Customer Information" }: { custom
 
 // Error Display Component
 const ErrorAlert = ({ message }: { message: string }) => (
-  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+  <div className="bg-red-50 rounded-lg p-4 flex items-center gap-2">
     <AlertCircle className="text-red-600" size={20} strokeWidth={2} />
     <p className="text-red-600 text-sm">{message}</p>
   </div>
@@ -315,7 +315,7 @@ const ErrorAlert = ({ message }: { message: string }) => (
 
 // Info Card Component (for customer details display)
 const InfoCard = ({ icon: Icon, label, value }: { icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>; label: string; value: string | React.ReactNode }) => (
-  <div className="flex items-center gap-3 p-4 bg-gray-50/50 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+  <div className="flex items-center gap-3 p-4 bg-gray-50/50 rounded-lg hover:bg-gray-50 transition-colors">
     <div className="p-2 rounded-lg bg-indigo-100">
       <Icon className="text-indigo-600" size={18} strokeWidth={2} />
     </div>
@@ -642,9 +642,9 @@ export default function CustomerFind() {
         </div>
 
         {/* Global Search Section */}
-        <div className={`bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 sm:p-6 mb-6 ${showCreateForm ? "opacity-60 pointer-events-none" : ""}`}>
+        <div className={`bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6 ${showCreateForm ? "opacity-60 pointer-events-none" : ""}`}>
           {showCreateForm && (
-            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700 text-sm font-medium">
+            <div className="mb-3 p-3 bg-amber-50 rounded-lg flex items-center gap-2 text-amber-700 text-sm font-medium">
               <AlertCircle size={18} strokeWidth={2} />
               <span>Search is disabled while creating a new customer. Please complete or cancel the form to search again.</span>
             </div>
@@ -663,7 +663,7 @@ export default function CustomerFind() {
                 }}
                 placeholder={showCreateForm ? "Search disabled while creating customer..." : "Search by phone, email, customer ID, VIN, or vehicle number..."}
                 disabled={showCreateForm}
-                className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 placeholder:text-gray-400 transition-all duration-200 ${
+                className={`w-full pl-10 pr-4 py-3 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 placeholder:text-gray-400 transition-all duration-200 ${
                   showCreateForm 
                     ? "bg-gray-100 cursor-not-allowed" 
                     : "bg-gray-50/50 focus:bg-white"
@@ -697,7 +697,7 @@ export default function CustomerFind() {
           </div>
 
           {validationError && (
-            <div className="mt-3 p-3.5 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2.5 text-red-700 text-sm font-medium">
+            <div className="mt-3 p-3.5 bg-red-50 rounded-lg flex items-center gap-2.5 text-red-700 text-sm font-medium">
               <AlertCircle size={18} strokeWidth={2} />
               {validationError}
             </div>
@@ -705,12 +705,12 @@ export default function CustomerFind() {
 
           {/* Search Results Dropdown */}
           {searchResults.length > 0 && searchQuery.trim().length >= 2 && !showCreateForm && (
-            <div className="mt-3 border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto bg-white">
+            <div className="mt-3 rounded-lg shadow-lg max-h-64 overflow-y-auto bg-white">
               {searchResults.map((customer) => (
                 <div
                   key={customer.id}
                   onClick={() => handleCustomerSelect(customer)}
-                  className="p-4 hover:bg-indigo-50/50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-all duration-150 group"
+                  className="p-4 hover:bg-indigo-50/50 cursor-pointer transition-all duration-150 group"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -755,7 +755,7 @@ export default function CustomerFind() {
 
         {/* Recent Customers Section */}
         {!selectedCustomer && !showCreateForm && recentCustomers.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 sm:p-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6">
             <div className="flex items-center gap-2.5 mb-5">
               <div className="p-1.5 rounded-lg bg-indigo-100">
                 <Clock className="text-indigo-600" size={18} strokeWidth={2} />
@@ -770,7 +770,7 @@ export default function CustomerFind() {
                   <div
                     key={customer.id}
                     onClick={() => handleCustomerSelect(customer)}
-                    className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer bg-gray-50/30 hover:bg-indigo-50/30 group"
+                    className="p-4 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer bg-gray-50/30 hover:bg-indigo-50/30 group"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2.5">
@@ -805,7 +805,7 @@ export default function CustomerFind() {
 
         {/* Customer Not Found - Create New */}
         {shouldShowCreateCustomer && !showCreateForm && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-6 sm:p-8 mb-6">
+          <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-6">
             <div className="text-center py-6">
               <div className="mx-auto w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
                 <AlertCircle className="text-amber-600" size={32} strokeWidth={2} />
@@ -827,7 +827,7 @@ export default function CustomerFind() {
 
         {/* Create Customer Form */}
         {showCreateForm && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 sm:p-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Create New Customer</h2>
               <button
@@ -886,7 +886,7 @@ export default function CustomerFind() {
                   }
                   rows={3}
                   placeholder="Enter complete address"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 resize-none"
                 />
               </div>
 
@@ -916,7 +916,7 @@ export default function CustomerFind() {
                     onChange={(e) =>
                       setNewCustomerForm({ ...newCustomerForm, customerType: e.target.value as CustomerType | undefined })
                     }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200"
+                    className="w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200"
                   >
                     <option value="">Select Customer Type</option>
                     <option value="B2C">B2C</option>
@@ -932,10 +932,10 @@ export default function CustomerFind() {
                     <button
                       type="button"
                       onClick={() => handleServiceTypeSelect("walk-in")}
-                      className={`p-4 border-2 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
+                      className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
                         newCustomerForm.serviceType === "walk-in"
-                          ? "border-indigo-500 bg-indigo-50"
-                          : "border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+                          ? "bg-indigo-50"
+                          : "hover:bg-indigo-50/30"
                       }`}
                     >
                       <Building2 className={`${newCustomerForm.serviceType === "walk-in" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
@@ -944,10 +944,10 @@ export default function CustomerFind() {
                     <button
                       type="button"
                       onClick={() => handleServiceTypeSelect("home-service")}
-                      className={`p-4 border-2 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
+                      className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
                         newCustomerForm.serviceType === "home-service"
-                          ? "border-indigo-500 bg-indigo-50"
-                          : "border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+                          ? "bg-indigo-50"
+                          : "hover:bg-indigo-50/30"
                       }`}
                     >
                       <Home className={`${newCustomerForm.serviceType === "home-service" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
@@ -980,7 +980,7 @@ export default function CustomerFind() {
         {selectedCustomer && (
           <div className="space-y-6">
             {/* Customer Info Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 sm:p-6">
+            <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-4">
                   <div className="bg-gradient-to-br from-indigo-100 to-indigo-200 p-3.5 rounded-xl shadow-sm">
@@ -1008,7 +1008,7 @@ export default function CustomerFind() {
                 <InfoCard icon={Calendar} label="Member Since" value={new Date(selectedCustomer.createdAt).toLocaleDateString()} />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <p className="text-2xl font-bold text-blue-600">{selectedCustomer.totalVehicles || 0}</p>
                   <p className="text-sm text-gray-600 mt-1">Total Vehicles</p>
@@ -1039,7 +1039,7 @@ export default function CustomerFind() {
                   {selectedCustomer.vehicles.map((vehicle) => (
                     <div
                       key={vehicle.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow-sm transition"
+                      className="rounded-lg p-4 hover:shadow-sm transition"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div className="flex-1">
@@ -1233,7 +1233,7 @@ export default function CustomerFind() {
                     ]}
                   />
 
-                  <div className="border-t border-gray-200 pt-4">
+                  <div className="pt-4">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Insurance Information</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormInput
@@ -1261,7 +1261,7 @@ export default function CustomerFind() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <div className="flex gap-3 pt-4">
                   <Button onClick={closeVehicleForm} variant="secondary" className="flex-1">
                     Cancel
                   </Button>
@@ -1332,7 +1332,7 @@ export default function CustomerFind() {
           >
             <div className="space-y-6">
                 {/* Vehicle Information */}
-                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-xl border border-indigo-200">
+                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-xl">
                   <h3 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
                     <Car className="text-indigo-600" size={20} />
                     Vehicle Information
@@ -1384,7 +1384,7 @@ export default function CustomerFind() {
                 </div>
 
                 {/* Service History */}
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="bg-white rounded-xl p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                       <History className="text-purple-600" size={20} />
@@ -1408,7 +1408,7 @@ export default function CustomerFind() {
                       {serviceHistory.map((service) => (
                         <div
                           key={service.id}
-                          className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition"
+                          className="rounded-xl p-5 hover:shadow-md transition"
                         >
                           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3">
                             <div>
@@ -1534,7 +1534,7 @@ export default function CustomerFind() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <div className="flex gap-3 pt-4">
                   <Button onClick={closeAppointmentForm} variant="secondary" className="flex-1">
                     Cancel
                   </Button>
@@ -1618,7 +1618,7 @@ export default function CustomerFind() {
                       {mockComplaints.map((complaint) => (
                         <div
                           key={complaint.id}
-                          className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all"
+                          className="rounded-xl p-5 hover:shadow-md transition-all"
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-3">

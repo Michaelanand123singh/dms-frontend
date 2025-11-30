@@ -32,7 +32,7 @@ export function Card({
   return (
     <div
       className={clsx(
-        "bg-white rounded-xl border border-gray-200/80 backdrop-blur-sm",
+        "bg-white rounded-xl backdrop-blur-sm",
         paddingClasses[padding],
         shadowClasses[shadow],
         className

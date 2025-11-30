@@ -212,7 +212,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
   }, [searchResults]);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-[60] bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200/80">
+    <nav className="fixed top-0 left-0 right-0 z-[60] bg-white/95 backdrop-blur-md shadow-sm">
       <div className="flex items-center px-3 sm:px-4 md:px-6 py-3 sm:py-3.5 gap-2 sm:gap-4 relative">
         <button
           className="text-gray-600 hover:text-indigo-600 flex-shrink-0 p-2 rounded-lg hover:bg-gray-50 transition-all duration-200 active:scale-95"
@@ -242,7 +242,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
                     setShowResults(true);
                   }
                 }}
-                className="w-full pl-9 sm:pl-10 pr-9 sm:pr-10 py-2 sm:py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 transition-all duration-200"
+                className="w-full pl-9 sm:pl-10 pr-9 sm:pr-10 py-2 sm:py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 transition-all duration-200"
               />
               {searchQuery && (
                 <button
@@ -261,11 +261,11 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
             {showResults && searchResults.length > 0 && (
               <div
                 ref={resultsRef}
-                className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-96 overflow-y-auto z-50 backdrop-blur-sm"
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl max-h-96 overflow-y-auto z-50 backdrop-blur-sm"
               >
                 {Object.entries(groupedResults).map(([category, items]) => (
-                  <div key={category} className="border-b border-gray-100 last:border-b-0">
-                    <div className="px-4 py-2.5 bg-gray-50/80 border-b border-gray-100">
+                  <div key={category} className="">
+                    <div className="px-4 py-2.5 bg-gray-50/80">
                       <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         {category}
                       </h3>
@@ -301,7 +301,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
             {showResults && searchQuery && searchResults.length === 0 && (
               <div
                 ref={resultsRef}
-                className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-8 text-center z-50"
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg p-8 text-center z-50"
               >
                 <p className="text-gray-500 text-sm">No results found for &quot;{searchQuery}&quot;</p>
               </div>
@@ -318,8 +318,8 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
             </button>
             
             {showUserDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-50 backdrop-blur-sm overflow-hidden">
-                <div className="p-4 border-b border-gray-100 bg-gradient-to-br from-gray-50 to-white">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl z-50 backdrop-blur-sm overflow-hidden">
+                <div className="p-4 bg-gradient-to-br from-gray-50 to-white">
                   <p className="text-sm font-semibold text-gray-900">
                     {userInfo?.name || (userRole === "admin" || userRole === "super_admin" ? "Admin User" : "Service Center User")}
                   </p>

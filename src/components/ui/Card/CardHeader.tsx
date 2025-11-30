@@ -13,7 +13,7 @@ export function CardHeader({ children, className, border = true }: CardHeaderPro
     <div
       className={clsx(
         "mb-4",
-        border && "pb-4 border-b border-gray-200",
+        border && "pb-4",
         className
       )}
     >

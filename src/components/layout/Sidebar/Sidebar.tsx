@@ -106,7 +106,7 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
 
       <div
         className={clsx(
-          "border-t border-gray-200 transition-all duration-300",
+          "transition-all duration-300",
           open ? "p-6" : "p-4 md:p-4"
         )}
       >

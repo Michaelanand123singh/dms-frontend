@@ -128,7 +128,7 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
   return (
     <aside
       className={clsx(
-        "fixed left-0 bg-white/95 backdrop-blur-md text-gray-900 flex flex-col justify-between shadow-lg border-r border-gray-200/80 z-40 transition-all duration-300 ease-in-out",
+        "fixed left-0 bg-white/95 backdrop-blur-md text-gray-900 flex flex-col justify-between shadow-lg z-40 transition-all duration-300 ease-in-out",
         "w-64 top-16 h-[calc(100vh-4rem)]",
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         open ? "md:w-64" : "md:w-20"
@@ -173,7 +173,7 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
 
       <div
         className={clsx(
-          "border-t border-gray-100 bg-gradient-to-br from-gray-50/50 to-white transition-all duration-300",
+          "bg-gradient-to-br from-gray-50/50 to-white transition-all duration-300",
           open ? "p-5" : "p-4 md:p-4"
         )}
       >

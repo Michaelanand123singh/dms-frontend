@@ -21,10 +21,10 @@ export const FormTextarea = forwardRef<HTMLTextAreaElement, FormTextareaProps>(
         <textarea
           ref={ref}
           className={clsx(
-            "w-full px-4 py-2 rounded-lg border transition-all focus:outline-none focus:ring-2 resize-none",
+            "w-full px-4 py-2 rounded-lg transition-all focus:outline-none focus:ring-2 resize-none",
             error
-              ? "border-red-300 focus:ring-red-500 focus:border-red-500"
-              : "border-gray-300 focus:ring-blue-500 focus:border-blue-500",
+              ? "focus:ring-red-500"
+              : "focus:ring-blue-500",
             "text-gray-900 placeholder-gray-400",
             className
           )}
