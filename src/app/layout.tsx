@@ -13,7 +13,7 @@ interface RootLayoutProps {
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [isNavigating, setIsNavigating] = useState(false);
   const { userRole } = useRole();
   const pathname = usePathname();

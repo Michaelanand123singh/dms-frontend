@@ -146,7 +146,16 @@ class CustomerRepository {
 
   async getRecent(limit: number = 10): Promise<CustomerWithVehicles[]> {
     // Get recent customers from localStorage
-    const recentIds = safeStorage.getItem<number[]>("recentCustomerIds", []);
+    let recentIds = safeStorage.getItem<number[]>("recentCustomerIds", []);
+    
+    // If no recent customers, initialize with first few customers from mock data
+    if (recentIds.length === 0 && this.customers.length > 0) {
+      recentIds = this.customers
+        .slice(0, Math.min(limit, this.customers.length))
+        .map((c) => Number(c.id));
+      safeStorage.setItem("recentCustomerIds", recentIds);
+    }
+    
     const recentCustomers = recentIds
       .map((id) => this.customers.find((c) => c.id === id))
       .filter((c): c is CustomerWithVehicles => c !== undefined)

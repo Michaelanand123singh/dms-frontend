@@ -6,7 +6,7 @@ import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { staticServiceCenters } from "@/__mocks__/data";
 import { 
   defaultInventoryData, 
-  type InventoryItem as AdminInventoryItem 
+  type MockInventoryItem as AdminInventoryItem 
 } from "@/__mocks__/data/inventory.mock";
 
 interface ServiceCenter {

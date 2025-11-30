@@ -16,6 +16,8 @@ export const mockCustomers: CustomerWithVehicles[] = [
     totalVehicles: 2,
     totalSpent: "₹45,000",
     lastServiceDate: "2024-12-15",
+    lastServiceCenterId: 1,
+    lastServiceCenterName: "Delhi Central Hub",
     vehicles: [
       {
         id: 1,
@@ -37,6 +39,8 @@ export const mockCustomers: CustomerWithVehicles[] = [
         currentStatus: "Active Job Card",
         activeJobCardId: "JC-2025-001",
         nextServiceDate: "2025-02-15",
+        lastServiceCenterId: 1,
+        lastServiceCenterName: "Delhi Central Hub",
       },
       {
         id: 3,
@@ -57,6 +61,8 @@ export const mockCustomers: CustomerWithVehicles[] = [
         totalSpent: "₹12,000",
         currentStatus: "Available",
         activeJobCardId: null,
+        lastServiceCenterId: 2,
+        lastServiceCenterName: "Mumbai Metroplex",
       },
     ],
   },
@@ -71,6 +77,8 @@ export const mockCustomers: CustomerWithVehicles[] = [
     totalVehicles: 1,
     totalSpent: "₹28,000",
     lastServiceDate: "2024-11-20",
+    lastServiceCenterId: 2,
+    lastServiceCenterName: "Mumbai Metroplex",
     vehicles: [
       {
         id: 2,
@@ -92,6 +100,8 @@ export const mockCustomers: CustomerWithVehicles[] = [
         currentStatus: "Available",
         activeJobCardId: null,
         nextServiceDate: "2025-01-20",
+        lastServiceCenterId: 2,
+        lastServiceCenterName: "Mumbai Metroplex",
       },
     ],
   },

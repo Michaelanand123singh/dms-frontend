@@ -15,10 +15,14 @@ export interface Customer {
   phone: string;
   email?: string;
   address?: string;
+  cityState?: string;
+  pincode?: string;
   createdAt: string;
   totalVehicles?: number;
   totalSpent?: string;
   lastServiceDate?: string;
+  lastServiceCenterId?: number | string; // ID of last service center
+  lastServiceCenterName?: string; // Name of last service center where service was done
 }
 
 export interface Vehicle {
@@ -41,6 +45,8 @@ export interface Vehicle {
   currentStatus: VehicleStatus;
   activeJobCardId: string | null;
   nextServiceDate?: string;
+  lastServiceCenterId?: number | string; // ID of last service center
+  lastServiceCenterName?: string; // Name of last service center where service was done
 }
 
 export interface ServiceHistoryItem {
@@ -55,6 +61,8 @@ export interface ServiceHistoryItem {
   invoice: string;
   status: string;
   odometer: string;
+  serviceCenterId?: number | string; // Service center where this service was done
+  serviceCenterName?: string; // Service center name
 }
 
 export interface NewVehicleForm {

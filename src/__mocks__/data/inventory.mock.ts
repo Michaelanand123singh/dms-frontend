@@ -2,7 +2,7 @@
  * Mock data for Inventory
  */
 
-export interface InventoryItem {
+export interface MockInventoryItem {
   id: number;
   partName: string;
   sku: string;
@@ -15,7 +15,7 @@ export interface InventoryItem {
   centerName?: string;
 }
 
-export const defaultInventoryData: InventoryItem[] = [
+export const defaultInventoryData: MockInventoryItem[] = [
   {
     id: 1,
     partName: "Engine Oil 5L",

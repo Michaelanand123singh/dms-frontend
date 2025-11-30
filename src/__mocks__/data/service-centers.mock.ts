@@ -132,7 +132,7 @@ export const serviceCentersList = [
   "Hyderabad Excellence",
 ];
 
-export const defaultUsers = [
+export const serviceCenterUsers = [
   { name: "Rajesh Kumar Singh", email: "admin@service.com", role: "Super Admin" },
   { name: "Delhi Manager", email: "delhi@service.com", role: "SC Manager" },
   { name: "Finance Manager", email: "finance@service.com", role: "Finance Manager" },

@@ -31,3 +31,6 @@ export * from './otc.types';
 // Home Service types
 export * from './home-service.types';
 
+// Quotation types
+export * from './quotation.types';
+
