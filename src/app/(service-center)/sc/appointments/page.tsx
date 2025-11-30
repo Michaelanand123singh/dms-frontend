@@ -1482,7 +1482,7 @@ export default function Appointments() {
                   {/* Customer ID Proof */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Customer ID Proof
+                      Customer ID Proof <span className="text-xs font-normal text-gray-500">(Optional)</span>
                     </label>
                     <input
                       type="file"
@@ -1515,7 +1515,7 @@ export default function Appointments() {
                   {/* Vehicle RC Copy */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Vehicle RC Copy
+                      Vehicle RC Copy <span className="text-xs font-normal text-gray-500">(Optional)</span>
                     </label>
                     <input
                       type="file"
@@ -1548,7 +1548,7 @@ export default function Appointments() {
                   {/* Warranty Card / Service Book */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Warranty Card / Service Book
+                      Warranty Card / Service Book <span className="text-xs font-normal text-gray-500">(Optional)</span>
                     </label>
                     <input
                       type="file"
@@ -1581,7 +1581,7 @@ export default function Appointments() {
                   {/* Photos/Videos of Vehicle at Drop-off */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Photos/Videos of Vehicle at Drop-off
+                      Photos/Videos of Vehicle at Drop-off <span className="text-xs font-normal text-gray-500">(Optional)</span>
                     </label>
                     <input
                       type="file"

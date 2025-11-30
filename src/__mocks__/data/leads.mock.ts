@@ -4,15 +4,20 @@
 
 export interface Lead {
   id: string;
-  serviceCenterId: string;
+  serviceCenterId?: string;
+  customerId?: string;
   customerName: string;
   phone: string;
   email?: string;
+  vehicleDetails?: string;
   vehicleMake?: string;
   vehicleModel?: string;
+  inquiryType: string;
   serviceType?: string;
   source?: string;
-  status: string;
+  status: "new" | "in_discussion" | "converted" | "lost";
+  convertedTo?: "appointment" | "quotation";
+  convertedId?: string;
   notes?: string;
   followUpDate?: string;
   assignedTo?: string;
@@ -29,6 +34,7 @@ export const defaultLeads: Lead[] = [
     email: "amit@example.com",
     vehicleMake: "Honda",
     vehicleModel: "City",
+    inquiryType: "Service",
     serviceType: "Routine Maintenance",
     source: "walk_in",
     status: "new",
@@ -45,9 +51,10 @@ export const defaultLeads: Lead[] = [
     email: "priya@example.com",
     vehicleMake: "Maruti",
     vehicleModel: "Swift",
+    inquiryType: "Service",
     serviceType: "AC Service",
     source: "phone",
-    status: "contacted",
+    status: "in_discussion",
     notes: "Called for AC service inquiry",
     followUpDate: "2025-01-18",
     createdAt: "2025-01-14T14:00:00Z",
@@ -60,9 +67,10 @@ export const defaultLeads: Lead[] = [
     phone: "9876543212",
     vehicleMake: "Hyundai",
     vehicleModel: "i20",
+    inquiryType: "Service",
     serviceType: "Battery Replacement",
     source: "referral",
-    status: "qualified",
+    status: "converted",
     notes: "Referred by existing customer",
     followUpDate: "2025-01-17",
     createdAt: "2025-01-13T11:00:00Z",

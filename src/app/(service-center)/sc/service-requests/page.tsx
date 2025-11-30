@@ -55,7 +55,7 @@ const REJECTION_REASONS: RejectionReason[] = [
   { id: "out_of_area", label: "Out of serviceable area (home service)" },
   { id: "not_economical", label: "Not economical to repair" },
   { id: "capacity_full", label: "Capacity full (suggest alternative date)" },
-  { id: "invalid_request", label: "Invalid service request" },
+  { id: "invalid_request", label: "Invalid appointment" },
   { id: "other", label: "Other" },
 ];
 
@@ -146,7 +146,7 @@ export default function ServiceRequests() {
       // const data = await response.json();
       // setRequests(data);
     } catch (error) {
-      console.error("Error fetching service requests:", error);
+      console.error("Error fetching appointments:", error);
     } finally {
       setLoading(false);
     }
@@ -188,8 +188,8 @@ export default function ServiceRequests() {
       setShowCreateModal(false);
       resetCreateForm();
     } catch (error) {
-      console.error("Error creating service request:", error);
-      alert("Failed to create service request. Please try again.");
+      console.error("Error creating appointment:", error);
+      alert("Failed to create appointment. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -246,13 +246,13 @@ export default function ServiceRequests() {
         )
       );
       setShowDetails(false);
-      alert(`Service request approved! Job card ${jobCardData.id} has been created.`);
+      alert(`Appointment approved! Job card ${jobCardData.id} has been created.`);
       
       // Optionally redirect to job cards page
       // window.location.href = "/sc/job-cards";
     } catch (error) {
-      console.error("Error approving service request:", error);
-      alert("Failed to approve service request. Please try again.");
+      console.error("Error approving appointment:", error);
+      alert("Failed to approve appointment. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -292,8 +292,8 @@ export default function ServiceRequests() {
       setRejectionComments("");
       setShowDetails(false);
     } catch (error) {
-      console.error("Error rejecting service request:", error);
-      alert("Failed to reject service request. Please try again.");
+      console.error("Error rejecting appointment:", error);
+      alert("Failed to reject appointment. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -417,15 +417,15 @@ export default function ServiceRequests() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-blue-600 mb-2">Service Requests</h1>
-            <p className="text-gray-500">Manage customer service requests and approvals</p>
+            <h1 className="text-3xl font-bold text-blue-600 mb-2">Appointments</h1>
+            <p className="text-gray-500">Manage customer appointments and approvals</p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
             className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
           >
             <PlusCircle size={20} />
-            Create Service Request
+            Create Appointment
           </button>
         </div>
 
@@ -590,7 +590,7 @@ export default function ServiceRequests() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Service Request Details</h2>
+              <h2 className="text-2xl font-bold text-gray-800">Appointment Details</h2>
               <button
                 onClick={() => setShowDetails(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -714,7 +714,7 @@ export default function ServiceRequests() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Create Service Request</h2>
+              <h2 className="text-2xl font-bold text-gray-800">Create Appointment</h2>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
@@ -938,7 +938,7 @@ export default function ServiceRequests() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Reject Service Request</h2>
+              <h2 className="text-2xl font-bold text-gray-800">Reject Appointment</h2>
               <button
                 onClick={() => {
                   setShowRejectModal(false);

@@ -185,7 +185,7 @@ export default function SCDashboard() {
           {
             icon: CheckCircle,
             color: "text-blue-500 border-blue-500",
-            title: "Service request pending approval - ₹3,500",
+            title: "Appointment pending approval - ₹3,500",
             time: "1 hour ago",
             action: "Review",
           },

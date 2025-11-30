@@ -57,6 +57,8 @@ const initialCustomerForm: NewCustomerForm = {
   pincode: "",
   customerType: undefined,
   serviceType: undefined,
+  addressType: undefined,
+  workAddress: "",
 };
 
 const initialVehicleForm: Partial<NewVehicleForm> = {
@@ -521,7 +523,11 @@ export default function CustomerFind() {
 
   // Form reset functions
   const resetCustomerForm = useCallback(() => {
-    setNewCustomerForm({ ...initialCustomerForm });
+    setNewCustomerForm({ 
+      ...initialCustomerForm,
+      addressType: undefined,
+      workAddress: "",
+    });
   }, [setNewCustomerForm]);
 
   const resetVehicleForm = useCallback(() => {
@@ -597,7 +603,13 @@ export default function CustomerFind() {
 
   // Handle service type selection (now integrated in form)
   const handleServiceTypeSelect = useCallback((serviceType: ServiceType): void => {
-    setNewCustomerForm((prev) => ({ ...prev, serviceType }));
+    setNewCustomerForm((prev) => ({ 
+      ...prev, 
+      serviceType,
+      // Reset address type when switching from home-service to walk-in
+      addressType: serviceType === "home-service" ? prev.addressType : undefined,
+      workAddress: serviceType === "home-service" ? prev.workAddress : "",
+    }));
   }, [setNewCustomerForm]);
 
   // Toast function
@@ -651,6 +663,12 @@ export default function CustomerFind() {
     // Validate service type
     if (!newCustomerForm.serviceType) {
       setValidationError("Please select a service type (Walk-in or Home Service)");
+      return;
+    }
+
+    // Validate work address if work address type is selected
+    if (newCustomerForm.addressType === "work" && !newCustomerForm.workAddress?.trim()) {
+      setValidationError("Please enter work address for pickup/drop service");
       return;
     }
 
@@ -735,13 +753,7 @@ export default function CustomerFind() {
         </div>
 
         {/* Global Search Section */}
-        <div className={`bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6 ${showCreateForm ? "opacity-60 pointer-events-none" : ""}`}>
-          {showCreateForm && (
-            <div className="mb-3 p-3 bg-amber-50 rounded-lg flex items-center gap-2 text-amber-700 text-sm font-medium">
-              <AlertCircle size={18} strokeWidth={2} />
-              <span>Search is disabled while creating a new customer. Please complete or cancel the form to search again.</span>
-            </div>
-          )}
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <Search className={`absolute left-3.5 top-1/2 transform -translate-y-1/2 z-10 ${showCreateForm ? "text-gray-300" : "text-gray-400"}`} size={18} strokeWidth={2} />
@@ -1000,19 +1012,14 @@ export default function CustomerFind() {
           </div>
         )}
 
-        {/* Create Customer Form */}
+        {/* Create Customer Form Modal */}
         {showCreateForm && (
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Create New Customer</h2>
-              <button
-                onClick={closeCustomerForm}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
-              >
-                <X size={20} strokeWidth={2} />
-              </button>
-            </div>
-
+          <Modal 
+            title="Create New Customer" 
+            subtitle="Fill in the customer details below"
+            onClose={closeCustomerForm}
+            maxWidth="max-w-3xl"
+          >
             <div className="space-y-4">
               <FormInput
                 label="Full Name"
@@ -1050,9 +1057,47 @@ export default function CustomerFind() {
                 placeholder="Enter email address"
               />
 
+              {/* Address Type Selection - Always visible */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Address
+                  Address Type for Pickup/Drop
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setNewCustomerForm({ ...newCustomerForm, addressType: "home" })}
+                    className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 border-2 ${
+                      newCustomerForm.addressType === "home"
+                        ? "bg-indigo-50 border-indigo-500"
+                        : "border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+                    }`}
+                  >
+                    <Home className={`${newCustomerForm.addressType === "home" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
+                    <span className={`text-sm font-medium ${newCustomerForm.addressType === "home" ? "text-indigo-700" : "text-gray-600"}`}>Home Address</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewCustomerForm({ ...newCustomerForm, addressType: "work" })}
+                    className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 border-2 ${
+                      newCustomerForm.addressType === "work"
+                        ? "bg-indigo-50 border-indigo-500"
+                        : "border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+                    }`}
+                  >
+                    <Building2 className={`${newCustomerForm.addressType === "work" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
+                    <span className={`text-sm font-medium ${newCustomerForm.addressType === "work" ? "text-indigo-700" : "text-gray-600"}`}>Work Address</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Home Address */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  {newCustomerForm.addressType === "home" 
+                    ? "Home Address (Pickup/Drop)" 
+                    : newCustomerForm.addressType === "work"
+                    ? "Home Address"
+                    : "Full Address"}
                 </label>
                 <textarea
                   value={newCustomerForm.address || ""}
@@ -1064,6 +1109,24 @@ export default function CustomerFind() {
                   className="w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 resize-none"
                 />
               </div>
+
+              {/* Work Address - Only show when Work Address is selected */}
+              {newCustomerForm.addressType === "work" && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Work Address (Pickup/Drop) <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={newCustomerForm.workAddress || ""}
+                    onChange={(e) =>
+                      setNewCustomerForm({ ...newCustomerForm, workAddress: e.target.value })
+                    }
+                    rows={3}
+                    placeholder="Enter work address for pickup/drop service"
+                    className="w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 resize-none"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
@@ -1132,7 +1195,9 @@ export default function CustomerFind() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              {validationError && <ErrorAlert message={validationError} />}
+              
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <Button onClick={closeCustomerForm} variant="secondary" className="flex-1">
                   Cancel
                 </Button>
@@ -1148,7 +1213,7 @@ export default function CustomerFind() {
                 </Button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         {/* Customer Details Modal */}
@@ -1872,7 +1937,7 @@ export default function CustomerFind() {
                         {/* Customer ID Proof */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Customer ID Proof
+                            Customer ID Proof <span className="text-xs font-normal text-gray-500">(Optional)</span>
                           </label>
                           <input
                             type="file"
@@ -1905,7 +1970,7 @@ export default function CustomerFind() {
                         {/* Vehicle RC Copy */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Vehicle RC Copy
+                            Vehicle RC Copy <span className="text-xs font-normal text-gray-500">(Optional)</span>
                           </label>
                           <input
                             type="file"

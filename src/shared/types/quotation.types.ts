@@ -52,10 +52,27 @@ export interface Quotation {
   batterySerialNumber?: string;
   customNotes?: string;
   noteTemplateId?: string;
-  status: "draft" | "sent" | "accepted" | "rejected" | "passed_to_manager";
+  status: "draft" | "sent_to_customer" | "customer_approved" | "customer_rejected" | "sent_to_manager" | "manager_approved" | "manager_rejected";
   passedToManager: boolean;
   passedToManagerAt?: string;
   managerId?: string;
+  // Vehicle Location
+  vehicleLocation?: "with_customer" | "at_workshop";
+  // Approval Workflow
+  sentToCustomer?: boolean;
+  sentToCustomerAt?: string;
+  customerApproved?: boolean;
+  customerApprovedAt?: string;
+  customerRejected?: boolean;
+  customerRejectedAt?: string;
+  sentToManager?: boolean;
+  sentToManagerAt?: string;
+  managerApproved?: boolean;
+  managerApprovedAt?: string;
+  managerRejected?: boolean;
+  managerRejectedAt?: string;
+  whatsappSent?: boolean;
+  whatsappSentAt?: string;
   createdAt: string;
   updatedAt: string;
   items: QuotationItem[];
@@ -107,10 +124,11 @@ export interface CreateQuotationForm {
   batterySerialNumber?: string;
   customNotes?: string;
   noteTemplateId?: string;
+  vehicleLocation?: "with_customer" | "at_workshop";
 }
 
-export type QuotationStatus = "draft" | "sent" | "accepted" | "rejected" | "passed_to_manager";
-export type QuotationFilterType = "all" | "draft" | "sent" | "accepted" | "rejected" | "passed_to_manager";
+export type QuotationStatus = "draft" | "sent_to_customer" | "customer_approved" | "customer_rejected" | "sent_to_manager" | "manager_approved" | "manager_rejected";
+export type QuotationFilterType = "all" | "draft" | "sent_to_customer" | "customer_approved" | "customer_rejected" | "sent_to_manager" | "manager_approved" | "manager_rejected";
 
 
 

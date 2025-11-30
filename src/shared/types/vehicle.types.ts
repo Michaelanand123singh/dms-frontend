@@ -102,6 +102,8 @@ export interface NewCustomerForm {
   pincode?: string;
   customerType?: CustomerType;
   serviceType?: ServiceType;
+  addressType?: "home" | "work";
+  workAddress?: string;
 }
 
 export interface CustomerWithVehicles extends Customer {

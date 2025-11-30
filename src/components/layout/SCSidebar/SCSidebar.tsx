@@ -42,14 +42,13 @@ const roleMenus: Record<UserRole, MenuItem[]> = {
   sc_manager: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Service Requests", icon: FileText, href: "/sc/service-requests" },
+    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
     { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
     { name: "Workshop", icon: Wrench, href: "/sc/workshop" },
     { name: "Inventory", icon: Package, href: "/sc/inventory" },
     { name: "OTC Orders", icon: ShoppingCart, href: "/sc/otc-orders" },
     { name: "Home Service", icon: Truck, href: "/sc/home-service" },
     { name: "Invoices", icon: DollarSign, href: "/sc/invoices" },
-    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
     { name: "Technicians", icon: Users, href: "/sc/technicians" },
     { name: "Complaints", icon: MessageSquare, href: "/sc/complaints" },
     { name: "Reports", icon: BarChart3, href: "/sc/reports" },
@@ -59,13 +58,12 @@ const roleMenus: Record<UserRole, MenuItem[]> = {
   sc_staff: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Service Requests", icon: FileText, href: "/sc/service-requests" },
+    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
     { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
     { name: "Workshop", icon: Wrench, href: "/sc/workshop" },
     { name: "Inventory", icon: Package, href: "/sc/inventory" },
     { name: "OTC Orders", icon: ShoppingCart, href: "/sc/otc-orders" },
     { name: "Invoices", icon: DollarSign, href: "/sc/invoices" },
-    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
   ],
   service_engineer: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
@@ -76,10 +74,9 @@ const roleMenus: Record<UserRole, MenuItem[]> = {
   service_advisor: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Service Requests", icon: FileText, href: "/sc/service-requests" },
+    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
     { name: "Leads", icon: Users, href: "/sc/leads" },
     { name: "Quotations", icon: FileText, href: "/sc/quotations" },
-    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
   ],
   call_center: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },

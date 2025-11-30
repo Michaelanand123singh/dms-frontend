@@ -16,7 +16,7 @@ export default function Approvals() {
   const [approvals, setApprovals] = useState<Approval[]>([
     {
       id: "APP-001",
-      type: "Service Request",
+      type: "Appointment",
       description: "Routine maintenance - ₹3,500",
       customer: "Rajesh Kumar",
       amount: "₹3,500",
