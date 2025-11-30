@@ -18,29 +18,36 @@ import {
   XCircle,
   AlertCircle,
   Loader2,
+  ArrowRight,
+  FileText,
 } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { defaultLeads } from "@/__mocks__/data/leads.mock";
 
 interface Lead {
   id: string;
-  serviceCenterId: string;
+  customerId?: string;
   customerName: string;
   phone: string;
   email?: string;
+  vehicleDetails?: string;
   vehicleMake?: string;
   vehicleModel?: string;
+  inquiryType: string;
   serviceType?: string;
   source?: string;
-  status: string;
+  status: "new" | "in_discussion" | "converted" | "lost";
+  convertedTo?: "appointment" | "quotation";
+  convertedId?: string;
   notes?: string;
   followUpDate?: string;
   assignedTo?: string;
+  serviceCenterId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-type LeadStatus = "new" | "contacted" | "qualified" | "converted" | "lost";
+type LeadStatus = "new" | "in_discussion" | "converted" | "lost";
 type LeadFilterType = "all" | LeadStatus;
 
 export default function Leads() {
@@ -57,8 +64,10 @@ export default function Leads() {
     customerName: "",
     phone: "",
     email: "",
+    vehicleDetails: "",
     vehicleMake: "",
     vehicleModel: "",
+    inquiryType: "Service",
     serviceType: "",
     source: "walk_in",
     notes: "",
@@ -95,6 +104,7 @@ export default function Leads() {
         email: form.email || undefined,
         vehicleMake: form.vehicleMake || undefined,
         vehicleModel: form.vehicleModel || undefined,
+        inquiryType: form.inquiryType || "Service",
         serviceType: form.serviceType || undefined,
         source: form.source || "walk_in",
         status: editingLead?.status || "new",
@@ -177,13 +187,71 @@ export default function Leads() {
       customerName: "",
       phone: "",
       email: "",
+      vehicleDetails: "",
       vehicleMake: "",
       vehicleModel: "",
+      inquiryType: "Service",
       serviceType: "",
       source: "walk_in",
       notes: "",
       followUpDate: "",
     });
+  };
+
+  // Convert lead to appointment
+  const handleConvertToAppointment = (lead: Lead) => {
+    if (!confirm("Convert this lead to an appointment?")) {
+      return;
+    }
+
+    try {
+      const updatedLeads = leads.map((l) =>
+        l.id === lead.id
+          ? {
+              ...l,
+              status: "converted" as const,
+              convertedTo: "appointment" as const,
+              convertedId: `appt-${Date.now()}`,
+              updatedAt: new Date().toISOString(),
+            }
+          : l
+      );
+
+      setLeads(updatedLeads);
+      safeStorage.setItem("leads", updatedLeads);
+      alert("Lead converted to appointment successfully!");
+    } catch (error) {
+      console.error("Error converting lead:", error);
+      alert("Failed to convert lead. Please try again.");
+    }
+  };
+
+  // Convert lead to quotation
+  const handleConvertToQuotation = (lead: Lead) => {
+    if (!confirm("Convert this lead to a quotation?")) {
+      return;
+    }
+
+    try {
+      const updatedLeads = leads.map((l) =>
+        l.id === lead.id
+          ? {
+              ...l,
+              status: "converted" as const,
+              convertedTo: "quotation" as const,
+              convertedId: `qt-${Date.now()}`,
+              updatedAt: new Date().toISOString(),
+            }
+          : l
+      );
+
+      setLeads(updatedLeads);
+      safeStorage.setItem("leads", updatedLeads);
+      alert("Lead converted to quotation successfully!");
+    } catch (error) {
+      console.error("Error converting lead:", error);
+      alert("Failed to convert lead. Please try again.");
+    }
   };
 
   const filteredLeads = leads.filter((lead) => {
@@ -205,10 +273,8 @@ export default function Leads() {
     switch (status) {
       case "new":
         return "bg-blue-100 text-blue-700 border-blue-300";
-      case "contacted":
+      case "in_discussion":
         return "bg-yellow-100 text-yellow-700 border-yellow-300";
-      case "qualified":
-        return "bg-purple-100 text-purple-700 border-purple-300";
       case "converted":
         return "bg-green-100 text-green-700 border-green-300";
       case "lost":
@@ -253,7 +319,7 @@ export default function Leads() {
               />
             </div>
             <div className="flex gap-2">
-              {(["all", "new", "contacted", "qualified", "converted", "lost"] as LeadFilterType[]).map((f) => (
+              {(["all", "new", "in_discussion", "converted", "lost"] as LeadFilterType[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
@@ -263,7 +329,9 @@ export default function Leads() {
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                  {f === "all" 
+                    ? "All" 
+                    : f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ")}
                 </button>
               ))}
             </div>
@@ -344,6 +412,24 @@ export default function Leads() {
                           >
                             <Eye size={18} />
                           </button>
+                          {lead.status !== "converted" && lead.status !== "lost" && (
+                            <>
+                              <button
+                                onClick={() => handleConvertToAppointment(lead)}
+                                className="text-green-600 hover:text-green-900"
+                                title="Convert to Appointment"
+                              >
+                                <Calendar size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleConvertToQuotation(lead)}
+                                className="text-purple-600 hover:text-purple-900"
+                                title="Convert to Quotation"
+                              >
+                                <FileText size={18} />
+                              </button>
+                            </>
+                          )}
                           <button
                             onClick={() => {
                               setEditingLead(lead);
@@ -351,8 +437,10 @@ export default function Leads() {
                                 customerName: lead.customerName,
                                 phone: lead.phone,
                                 email: lead.email || "",
+                                vehicleDetails: lead.vehicleDetails || "",
                                 vehicleMake: lead.vehicleMake || "",
                                 vehicleModel: lead.vehicleModel || "",
+                                inquiryType: lead.inquiryType || "Service",
                                 serviceType: lead.serviceType || "",
                                 source: lead.source || "walk_in",
                                 notes: lead.notes || "",
@@ -360,7 +448,7 @@ export default function Leads() {
                               });
                               setShowCreateModal(true);
                             }}
-                            className="text-green-600 hover:text-green-900"
+                            className="text-orange-600 hover:text-orange-900"
                             title="Edit"
                           >
                             <Edit size={18} />

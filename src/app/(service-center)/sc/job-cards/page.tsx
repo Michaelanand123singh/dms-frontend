@@ -122,6 +122,36 @@ export default function JobCards() {
     }
   };
 
+  // Generate job card number in format: SC001-YYYY-MM-####
+  const generateJobCardNumber = (serviceCenterCode: string = "SC001"): string => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    
+    // Get all job cards for this service center and month
+    const currentMonthCards = jobCards.filter((card) => {
+      if (!card.jobCardNumber) return false;
+      const parts = card.jobCardNumber.split("-");
+      return parts[0] === serviceCenterCode && 
+             parts[1] === String(year) && 
+             parts[2] === month;
+    });
+    
+    // Get the highest sequence number for this month
+    const sequenceNumbers = currentMonthCards
+      .map((card) => {
+        const parts = card.jobCardNumber?.split("-");
+        return parts && parts[3] ? parseInt(parts[3], 10) : 0;
+      })
+      .filter((num) => !isNaN(num));
+    
+    const nextSequence = sequenceNumbers.length > 0 
+      ? Math.max(...sequenceNumbers) + 1 
+      : 1;
+    
+    return `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
+  };
+
   const createJobCard = async (formData: CreateJobCardForm) => {
     try {
       setLoading(true);
@@ -142,12 +172,23 @@ export default function JobCards() {
       // });
       // const newJobCard = await response.json();
       
+      // Generate job card number
+      const serviceCenterCode = "SC001"; // In production, get from user context
+      const jobCardNumber = generateJobCardNumber(serviceCenterCode);
+      
       // For now, add to local state
       const newJobCard: JobCard = {
-        id: `JC-2025-${String(jobCards.length + 1).padStart(3, "0")}`,
+        id: `JC-${Date.now()}`,
+        jobCardNumber,
+        serviceCenterId: "sc-001",
+        serviceCenterCode,
+        customerId: formData.customerId,
         customerName: formData.customerName,
+        vehicleId: formData.vehicleId,
         vehicle: `${formData.vehicleMake} ${formData.vehicleModel}`,
         registration: formData.vehicleRegistration,
+        vehicleMake: formData.vehicleMake,
+        vehicleModel: formData.vehicleModel,
         serviceType: formData.serviceType,
         description: formData.description,
         status: "Created",
@@ -155,7 +196,7 @@ export default function JobCards() {
         assignedEngineer: null,
         estimatedCost: `₹${parseFloat(formData.estimatedCost || "0").toLocaleString("en-IN")}`,
         estimatedTime: formData.estimatedTime,
-        createdAt: new Date().toLocaleString(),
+        createdAt: new Date().toISOString(),
         parts: formData.selectedParts,
         location: formData.location,
       };

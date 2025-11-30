@@ -19,11 +19,13 @@ import {
   Camera,
   Upload,
   Image as ImageIcon,
+  Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import type { SearchType, Vehicle, ServiceHistoryItem, NewVehicleForm } from "@/shared/types";
 import { defaultVehicles, defaultVehicleServiceHistory } from "@/__mocks__/data/vehicles.mock";
+import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
 
 export default function VehicleSearch() {
   const [searchType, setSearchType] = useState<SearchType>("phone");
@@ -36,6 +38,8 @@ export default function VehicleSearch() {
   const [vehiclePhotos, setVehiclePhotos] = useState<File[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean>(false);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
+  const [showCheckInSlip, setShowCheckInSlip] = useState<boolean>(false);
+  const [checkInSlipData, setCheckInSlipData] = useState<CheckInSlipData | null>(null);
   
   // Form state for adding new vehicle
   const [newVehicleForm, setNewVehicleForm] = useState<Partial<NewVehicleForm>>({
@@ -853,6 +857,15 @@ export default function VehicleSearch() {
           </div>
         )}
       </div>
+
+      {/* Check-in Slip Modal */}
+      {showCheckInSlip && checkInSlipData && (
+        <CheckInSlip
+          data={checkInSlipData}
+          onClose={() => setShowCheckInSlip(false)}
+          showActions={true}
+        />
+      )}
     </div>
   );
 }

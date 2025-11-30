@@ -22,6 +22,12 @@ import {
   Download,
   Loader2,
   Printer,
+  MessageCircle,
+  UserCheck,
+  UserX,
+  Shield,
+  ShieldCheck,
+  ShieldX,
 } from "lucide-react";
 import { useRole } from "@/shared/hooks";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
@@ -48,7 +54,9 @@ const createEmptyCustomer = (): CustomerWithVehicles => ({
 });
 
 function QuotationsContent() {
-  const { userInfo } = useRole();
+  const { userInfo, userRole } = useRole();
+  const isServiceAdvisor = userRole === "service_advisor";
+  const isServiceManager = userRole === "sc_manager";
   const searchParams = useSearchParams();
   const fromAppointment = searchParams.get("fromAppointment") === "true";
   
@@ -75,6 +83,7 @@ function QuotationsContent() {
     batterySerialNumber: "",
     customNotes: "",
     noteTemplateId: "",
+    vehicleLocation: undefined,
   });
 
   // Data for dropdowns
@@ -392,11 +401,10 @@ function QuotationsContent() {
     }
   };
 
-  // Pass to manager
-  const handlePassToManager = async (quotationId: string) => {
-    if (!confirm("Are you sure you want to pass this quotation to the service manager?")) {
-      return;
-    }
+  // Send to Customer via WhatsApp
+  const handleSendToCustomer = async (quotationId: string) => {
+    const quotation = quotations.find((q) => q.id === quotationId);
+    if (!quotation) return;
 
     try {
       setLoading(true);
@@ -406,9 +414,11 @@ function QuotationsContent() {
         q.id === quotationId
           ? {
               ...q,
-              status: "passed_to_manager" as const,
-              passedToManager: true,
-              passedToManagerAt: new Date().toISOString(),
+              status: "sent_to_customer" as const,
+              sentToCustomer: true,
+              sentToCustomerAt: new Date().toISOString(),
+              whatsappSent: true,
+              whatsappSentAt: new Date().toISOString(),
             }
           : q
       );
@@ -416,10 +426,178 @@ function QuotationsContent() {
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
       
-      alert("Quotation passed to manager successfully!");
+      // Open WhatsApp with quotation details
+      const customerPhone = quotation.customer?.phone?.replace(/\D/g, "") || "";
+      const message = `Hello ${quotation.customer?.firstName || "Customer"}, your quotation ${quotation.quotationNumber} is ready. Please review and approve.`;
+      const whatsappUrl = `https://wa.me/${customerPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, "_blank");
+      
+      alert("Quotation sent to customer via WhatsApp!");
     } catch (error) {
-      console.error("Error passing quotation:", error);
-      alert("Failed to pass quotation. Please try again.");
+      console.error("Error sending quotation:", error);
+      alert("Failed to send quotation. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Customer Approval
+  const handleCustomerApproval = async (quotationId: string) => {
+    if (!confirm("Mark this quotation as customer approved and send to manager?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const updatedQuotations = quotations.map((q) =>
+        q.id === quotationId
+          ? {
+              ...q,
+              status: "customer_approved" as const,
+              customerApproved: true,
+              customerApprovedAt: new Date().toISOString(),
+            }
+          : q
+      );
+      
+      setQuotations(updatedQuotations);
+      safeStorage.setItem("quotations", updatedQuotations);
+      
+      alert("Quotation marked as customer approved!");
+    } catch (error) {
+      console.error("Error approving quotation:", error);
+      alert("Failed to approve quotation. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Customer Rejection
+  const handleCustomerRejection = async (quotationId: string) => {
+    if (!confirm("Mark this quotation as customer rejected? This will end the process.")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const updatedQuotations = quotations.map((q) =>
+        q.id === quotationId
+          ? {
+              ...q,
+              status: "customer_rejected" as const,
+              customerRejected: true,
+              customerRejectedAt: new Date().toISOString(),
+            }
+          : q
+      );
+      
+      setQuotations(updatedQuotations);
+      safeStorage.setItem("quotations", updatedQuotations);
+      
+      alert("Quotation marked as customer rejected.");
+    } catch (error) {
+      console.error("Error rejecting quotation:", error);
+      alert("Failed to reject quotation. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send to Manager
+  const handleSendToManager = async (quotationId: string) => {
+    if (!confirm("Send this quotation to manager for approval?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const updatedQuotations = quotations.map((q) =>
+        q.id === quotationId
+          ? {
+              ...q,
+              status: "sent_to_manager" as const,
+              sentToManager: true,
+              sentToManagerAt: new Date().toISOString(),
+            }
+          : q
+      );
+      
+      setQuotations(updatedQuotations);
+      safeStorage.setItem("quotations", updatedQuotations);
+      
+      alert("Quotation sent to manager!");
+    } catch (error) {
+      console.error("Error sending to manager:", error);
+      alert("Failed to send quotation. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Manager Approval
+  const handleManagerApproval = async (quotationId: string) => {
+    if (!confirm("Approve this quotation? This will allow job card creation.")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const updatedQuotations = quotations.map((q) =>
+        q.id === quotationId
+          ? {
+              ...q,
+              status: "manager_approved" as const,
+              managerApproved: true,
+              managerApprovedAt: new Date().toISOString(),
+              managerId: userInfo?.id || "",
+            }
+          : q
+      );
+      
+      setQuotations(updatedQuotations);
+      safeStorage.setItem("quotations", updatedQuotations);
+      
+      alert("Quotation approved by manager!");
+    } catch (error) {
+      console.error("Error approving quotation:", error);
+      alert("Failed to approve quotation. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Manager Rejection
+  const handleManagerRejection = async (quotationId: string) => {
+    if (!confirm("Reject this quotation?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const updatedQuotations = quotations.map((q) =>
+        q.id === quotationId
+          ? {
+              ...q,
+              status: "manager_rejected" as const,
+              managerRejected: true,
+              managerRejectedAt: new Date().toISOString(),
+              managerId: userInfo?.id || "",
+            }
+          : q
+      );
+      
+      setQuotations(updatedQuotations);
+      safeStorage.setItem("quotations", updatedQuotations);
+      
+      alert("Quotation rejected by manager.");
+    } catch (error) {
+      console.error("Error rejecting quotation:", error);
+      alert("Failed to reject quotation. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -466,14 +644,18 @@ function QuotationsContent() {
     switch (status) {
       case "draft":
         return "bg-gray-100 text-gray-700 border-gray-300";
-      case "sent":
+      case "sent_to_customer":
         return "bg-blue-100 text-blue-700 border-blue-300";
-      case "accepted":
+      case "customer_approved":
         return "bg-green-100 text-green-700 border-green-300";
-      case "rejected":
+      case "customer_rejected":
         return "bg-red-100 text-red-700 border-red-300";
-      case "passed_to_manager":
+      case "sent_to_manager":
         return "bg-purple-100 text-purple-700 border-purple-300";
+      case "manager_approved":
+        return "bg-green-100 text-green-700 border-green-300";
+      case "manager_rejected":
+        return "bg-red-100 text-red-700 border-red-300";
       default:
         return "bg-gray-100 text-gray-700 border-gray-300";
     }
@@ -514,7 +696,7 @@ function QuotationsContent() {
               />
             </div>
             <div className="flex gap-2">
-              {(["all", "draft", "sent", "accepted", "rejected", "passed_to_manager"] as QuotationFilterType[]).map((f) => (
+              {(["all", "draft", "sent_to_customer", "customer_approved", "customer_rejected", "sent_to_manager", "manager_approved", "manager_rejected"] as QuotationFilterType[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
@@ -524,7 +706,9 @@ function QuotationsContent() {
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
-                  {f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ")}
+                  {f === "all" 
+                    ? "All" 
+                    : f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ")}
                 </button>
               ))}
             </div>
@@ -601,11 +785,20 @@ function QuotationsContent() {
                           >
                             <Eye size={18} />
                           </button>
-                          {quotation.status === "draft" && (
+                          {isServiceAdvisor && quotation.status === "draft" && (
                             <button
-                              onClick={() => handlePassToManager(quotation.id)}
+                              onClick={() => handleSendToCustomer(quotation.id)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Send to Customer"
+                            >
+                              <MessageCircle size={18} />
+                            </button>
+                          )}
+                          {isServiceAdvisor && quotation.status === "customer_approved" && (
+                            <button
+                              onClick={() => handleSendToManager(quotation.id)}
                               className="text-purple-600 hover:text-purple-900"
-                              title="Pass to Manager"
+                              title="Send to Manager"
                             >
                               <ArrowRight size={18} />
                             </button>
@@ -653,11 +846,19 @@ function QuotationsContent() {
         <ViewQuotationModal
           quotation={selectedQuotation}
           userInfo={userInfo}
+          userRole={userRole}
+          isServiceAdvisor={isServiceAdvisor}
+          isServiceManager={isServiceManager}
           onClose={() => {
             setShowViewModal(false);
             setSelectedQuotation(null);
           }}
-          onPassToManager={handlePassToManager}
+          onSendToCustomer={handleSendToCustomer}
+          onCustomerApproval={handleCustomerApproval}
+          onCustomerRejection={handleCustomerRejection}
+          onSendToManager={handleSendToManager}
+          onManagerApproval={handleManagerApproval}
+          onManagerRejection={handleManagerRejection}
         />
       )}
     </div>
@@ -1073,7 +1274,20 @@ function CreateQuotationModal({
 }
 
 // View Quotation Modal - Proforma Invoice Template
-function ViewQuotationModal({ quotation, onClose, onPassToManager, userInfo }: any) {
+function ViewQuotationModal({ 
+  quotation, 
+  onClose, 
+  onSendToCustomer,
+  onCustomerApproval,
+  onCustomerRejection,
+  onSendToManager,
+  onManagerApproval,
+  onManagerRejection,
+  userInfo,
+  userRole,
+  isServiceAdvisor,
+  isServiceManager,
+}: any) {
   // Mock service center details (in production, fetch from service center data)
   const serviceCenter = quotation.serviceCenter || {
     name: "42 EV Tech & Services",
@@ -1207,26 +1421,34 @@ function ViewQuotationModal({ quotation, onClose, onPassToManager, userInfo }: a
               <div>
                 <p className="text-sm font-semibold text-gray-700 mb-1">Customer Name</p>
                 <p className="text-gray-900">
-                  {quotation.customer?.firstName} {quotation.customer?.lastName}
+                  {quotation.customer?.firstName || ""} {quotation.customer?.lastName || ""}
                 </p>
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-700 mb-1">Phone Number</p>
-                <p className="text-gray-900">{quotation.customer?.phone}</p>
+                <p className="text-gray-900">{quotation.customer?.phone || "N/A"}</p>
               </div>
               {quotation.vehicle && (
                 <>
                   <div>
                     <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Number</p>
-                    <p className="text-gray-900">{quotation.vehicle.registration}</p>
+                    <p className="text-gray-900">{quotation.vehicle.registration || "N/A"}</p>
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-700 mb-1">Brand and Model</p>
                     <p className="text-gray-900">
-                      {quotation.vehicle.make} {quotation.vehicle.model}
+                      {quotation.vehicle.make || ""} {quotation.vehicle.model || ""}
                     </p>
                   </div>
                 </>
+              )}
+              {quotation.vehicleLocation && (
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Location</p>
+                  <p className="text-gray-900">
+                    {quotation.vehicleLocation === "with_customer" ? "Vehicle with Customer" : "Vehicle at Workshop"}
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -1427,6 +1649,60 @@ function ViewQuotationModal({ quotation, onClose, onPassToManager, userInfo }: a
           </div>
         </div>
 
+        {/* Approval Status Display */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 no-print">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Approval Status</h3>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {quotation.sentToCustomer ? (
+                <CheckCircle className="text-green-600" size={16} />
+              ) : (
+                <Clock className="text-gray-400" size={16} />
+              )}
+              <span className="text-sm text-gray-700">
+                Sent to Customer: {quotation.sentToCustomer ? "Yes" : "No"}
+                {quotation.sentToCustomerAt && ` (${new Date(quotation.sentToCustomerAt).toLocaleString()})`}
+              </span>
+            </div>
+            {quotation.customerApproved !== undefined && (
+              <div className="flex items-center gap-2">
+                {quotation.customerApproved ? (
+                  <UserCheck className="text-green-600" size={16} />
+                ) : (
+                  <UserX className="text-red-600" size={16} />
+                )}
+                <span className="text-sm text-gray-700">
+                  Customer: {quotation.customerApproved ? "Approved" : "Rejected"}
+                  {quotation.customerApprovedAt && ` (${new Date(quotation.customerApprovedAt).toLocaleString()})`}
+                  {quotation.customerRejectedAt && ` (${new Date(quotation.customerRejectedAt).toLocaleString()})`}
+                </span>
+              </div>
+            )}
+            {quotation.sentToManager && (
+              <div className="flex items-center gap-2">
+                <ArrowRight className="text-blue-600" size={16} />
+                <span className="text-sm text-gray-700">
+                  Sent to Manager: {quotation.sentToManagerAt && new Date(quotation.sentToManagerAt).toLocaleString()}
+                </span>
+              </div>
+            )}
+            {quotation.managerApproved !== undefined && (
+              <div className="flex items-center gap-2">
+                {quotation.managerApproved ? (
+                  <ShieldCheck className="text-green-600" size={16} />
+                ) : (
+                  <ShieldX className="text-red-600" size={16} />
+                )}
+                <span className="text-sm text-gray-700">
+                  Manager: {quotation.managerApproved ? "Approved" : "Rejected"}
+                  {quotation.managerApprovedAt && ` (${new Date(quotation.managerApprovedAt).toLocaleString()})`}
+                  {quotation.managerRejectedAt && ` (${new Date(quotation.managerRejectedAt).toLocaleString()})`}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Action Buttons */}
         <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex gap-3 justify-end no-print">
           <button
@@ -1435,13 +1711,71 @@ function ViewQuotationModal({ quotation, onClose, onPassToManager, userInfo }: a
           >
             Close
           </button>
-          {quotation.status === "draft" && (
-            <button
-              onClick={() => onPassToManager(quotation.id)}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
-            >
-              Pass to Manager
-            </button>
+          
+          {/* Service Advisor Actions */}
+          {isServiceAdvisor && onSendToCustomer && onCustomerApproval && onCustomerRejection && onSendToManager && (
+            <>
+              {quotation.status === "draft" && (
+                <button
+                  onClick={() => onSendToCustomer(quotation.id)}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
+                >
+                  <MessageCircle size={18} />
+                  Send to Customer (WhatsApp)
+                </button>
+              )}
+              {quotation.status === "sent_to_customer" && (
+                <>
+                  <button
+                    onClick={() => onCustomerRejection(quotation.id)}
+                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-2"
+                  >
+                    <UserX size={18} />
+                    Customer Rejected
+                  </button>
+                  <button
+                    onClick={() => onCustomerApproval(quotation.id)}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
+                  >
+                    <UserCheck size={18} />
+                    Customer Approved
+                  </button>
+                </>
+              )}
+              {quotation.status === "customer_approved" && (
+                <button
+                  onClick={() => onSendToManager(quotation.id)}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium inline-flex items-center gap-2"
+                >
+                  <ArrowRight size={18} />
+                  Send to Manager
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Service Manager Actions */}
+          {isServiceManager && onManagerApproval && onManagerRejection && (
+            <>
+              {quotation.status === "sent_to_manager" && (
+                <>
+                  <button
+                    onClick={() => onManagerRejection(quotation.id)}
+                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-2"
+                  >
+                    <ShieldX size={18} />
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => onManagerApproval(quotation.id)}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
+                  >
+                    <ShieldCheck size={18} />
+                    Approve
+                  </button>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
