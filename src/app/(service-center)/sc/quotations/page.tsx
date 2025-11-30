@@ -622,9 +622,9 @@ function CreateQuotationModal({
   // This is a placeholder - the full modal will be implemented
   // Due to size constraints, I'll create a comprehensive but focused version
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-[100] p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-[101]">
           <h2 className="text-2xl font-bold text-gray-900">Create Quotation</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={24} />
@@ -1024,10 +1024,10 @@ function ViewQuotationModal({ quotation, onClose, onPassToManager, userInfo }: a
   const quotationDate = new Date(quotation.quotationDate).toLocaleDateString("en-IN");
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-[100] p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[95vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10 no-print">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-[101] no-print">
           <h2 className="text-2xl font-bold text-gray-900">
             {quotation.documentType === "Proforma Invoice" ? "Proforma Invoice" : "Quotation"}
           </h2>

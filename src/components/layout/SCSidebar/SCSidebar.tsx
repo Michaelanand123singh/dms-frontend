@@ -42,7 +42,6 @@ const roleMenus: Record<UserRole, MenuItem[]> = {
   sc_manager: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Vehicle Search", icon: Search, href: "/sc/vehicle-search" },
     { name: "Service Requests", icon: FileText, href: "/sc/service-requests" },
     { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
     { name: "Workshop", icon: Wrench, href: "/sc/workshop" },
@@ -60,7 +59,6 @@ const roleMenus: Record<UserRole, MenuItem[]> = {
   sc_staff: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Vehicle Search", icon: Search, href: "/sc/vehicle-search" },
     { name: "Service Requests", icon: FileText, href: "/sc/service-requests" },
     { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
     { name: "Workshop", icon: Wrench, href: "/sc/workshop" },
@@ -78,7 +76,6 @@ const roleMenus: Record<UserRole, MenuItem[]> = {
   service_advisor: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Vehicle Search", icon: Search, href: "/sc/vehicle-search" },
     { name: "Service Requests", icon: FileText, href: "/sc/service-requests" },
     { name: "Leads", icon: Users, href: "/sc/leads" },
     { name: "Quotations", icon: FileText, href: "/sc/quotations" },

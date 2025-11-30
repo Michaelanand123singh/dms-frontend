@@ -1,7 +1,7 @@
 "use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle } from "lucide-react";
+import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2 } from "lucide-react";
 import { useCustomerSearch } from "../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
@@ -54,8 +54,45 @@ interface ComplaintForm {
   serviceCenterId?: number;
 }
 
+interface DocumentationFiles {
+  files: File[];
+  urls: string[]; // For preview URLs
+}
+
+interface ServiceIntakeForm {
+  // Documentation
+  customerIdProof: DocumentationFiles;
+  vehicleRCCopy: DocumentationFiles;
+  warrantyCardServiceBook: DocumentationFiles;
+  photosVideos: DocumentationFiles;
+  
+  // Vehicle Information
+  vehicleBrand: string;
+  vehicleModel: string;
+  registrationNumber: string;
+  vinChassisNumber: string;
+  variantBatteryCapacity: string;
+  motorNumber: string;
+  chargerSerialNumber: string;
+  dateOfPurchase: string;
+  vehicleAge: string;
+  warrantyStatus: string;
+  insuranceStartDate: string;
+  insuranceEndDate: string;
+  insuranceCompanyName: string;
+  
+  // Service Details
+  serviceType: string;
+  customerComplaintIssue: string;
+  previousServiceHistory: string;
+  estimatedServiceTime: string;
+  estimatedCost: string;
+  odometerReading: string;
+}
+
 type ToastType = "success" | "error";
 type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
+type CustomerArrivalStatus = "arrived" | "not_arrived" | null;
 
 // ==================== Constants ====================
 const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
@@ -76,6 +113,42 @@ const INITIAL_COMPLAINT_FORM: ComplaintForm = {
   complaint: "",
   severity: "Medium",
   serviceCenterId: undefined,
+};
+
+const INITIAL_DOCUMENTATION_FILES: DocumentationFiles = {
+  files: [],
+  urls: [],
+};
+
+const INITIAL_SERVICE_INTAKE_FORM: ServiceIntakeForm = {
+  // Documentation
+  customerIdProof: { ...INITIAL_DOCUMENTATION_FILES },
+  vehicleRCCopy: { ...INITIAL_DOCUMENTATION_FILES },
+  warrantyCardServiceBook: { ...INITIAL_DOCUMENTATION_FILES },
+  photosVideos: { ...INITIAL_DOCUMENTATION_FILES },
+  
+  // Vehicle Information
+  vehicleBrand: "",
+  vehicleModel: "",
+  registrationNumber: "",
+  vinChassisNumber: "",
+  variantBatteryCapacity: "",
+  motorNumber: "",
+  chargerSerialNumber: "",
+  dateOfPurchase: "",
+  vehicleAge: "",
+  warrantyStatus: "",
+  insuranceStartDate: "",
+  insuranceEndDate: "",
+  insuranceCompanyName: "",
+  
+  // Service Details
+  serviceType: "",
+  customerComplaintIssue: "",
+  previousServiceHistory: "",
+  estimatedServiceTime: "",
+  estimatedCost: "",
+  odometerReading: "",
 };
 
 import { defaultAppointments, serviceTypes, type ServiceType } from "@/__mocks__/data/appointments.mock";
@@ -409,6 +482,7 @@ export default function Appointments() {
   const { userInfo, userRole } = useRole();
   const serviceCenterName = userInfo?.serviceCenter;
   const isCallCenter = userRole === "call_center";
+  const isServiceAdvisor = userRole === "service_advisor";
 
   // State Management
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
@@ -449,6 +523,10 @@ export default function Appointments() {
   const [showComplaintCustomerDropdown, setShowComplaintCustomerDropdown] = useState<boolean>(false);
   const [selectedComplaintCustomer, setSelectedComplaintCustomer] = useState<CustomerWithVehicles | null>(null);
   const complaintCustomerDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Service Intake States (for service advisor)
+  const [customerArrivalStatus, setCustomerArrivalStatus] = useState<CustomerArrivalStatus>(null);
+  const [serviceIntakeForm, setServiceIntakeForm] = useState<ServiceIntakeForm>(INITIAL_SERVICE_INTAKE_FORM);
 
   // Customer Search States
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>("");
@@ -496,6 +574,16 @@ export default function Appointments() {
   const closeDetailModal = useCallback(() => {
     setShowDetailModal(false);
     setSelectedAppointment(null);
+    // Clean up object URLs before resetting form
+    setServiceIntakeForm((prev) => {
+      // Revoke all object URLs to prevent memory leaks
+      prev.customerIdProof.urls.forEach((url) => URL.revokeObjectURL(url));
+      prev.vehicleRCCopy.urls.forEach((url) => URL.revokeObjectURL(url));
+      prev.warrantyCardServiceBook.urls.forEach((url) => URL.revokeObjectURL(url));
+      prev.photosVideos.urls.forEach((url) => URL.revokeObjectURL(url));
+      return INITIAL_SERVICE_INTAKE_FORM;
+    });
+    setCustomerArrivalStatus(null);
   }, []);
 
   const closeVehicleDetailsModal = useCallback(() => {
@@ -509,6 +597,9 @@ export default function Appointments() {
     setSelectedAppointment(appointment);
     setShowDetailModal(true);
     setIsEditing(false);
+    // Reset service intake form when opening appointment details
+    setCustomerArrivalStatus(null);
+    setServiceIntakeForm(INITIAL_SERVICE_INTAKE_FORM);
   }, []);
 
   const handleEditAppointment = useCallback(
@@ -818,6 +909,83 @@ export default function Appointments() {
     closeComplaintModal();
   }, [complaintForm, complaints, isCallCenter, availableServiceCenters, showToast, closeComplaintModal]);
 
+  // File Upload Handlers
+  const handleDocumentUpload = useCallback(
+    (documentType: keyof Pick<ServiceIntakeForm, "customerIdProof" | "vehicleRCCopy" | "warrantyCardServiceBook" | "photosVideos">, files: FileList | null) => {
+      if (!files || files.length === 0) return;
+
+      const fileArray = Array.from(files);
+      const newUrls = fileArray.map((file) => URL.createObjectURL(file));
+
+      setServiceIntakeForm((prev) => ({
+        ...prev,
+        [documentType]: {
+          files: [...prev[documentType].files, ...fileArray],
+          urls: [...prev[documentType].urls, ...newUrls],
+        },
+      }));
+    },
+    []
+  );
+
+  const handleRemoveDocument = useCallback(
+    (documentType: keyof Pick<ServiceIntakeForm, "customerIdProof" | "vehicleRCCopy" | "warrantyCardServiceBook" | "photosVideos">, index: number) => {
+      setServiceIntakeForm((prev) => {
+        const updated = { ...prev };
+        const doc = updated[documentType];
+        
+        // Revoke object URL to free memory
+        if (doc.urls[index]) {
+          URL.revokeObjectURL(doc.urls[index]);
+        }
+        
+        updated[documentType] = {
+          files: doc.files.filter((_, i) => i !== index),
+          urls: doc.urls.filter((_, i) => i !== index),
+        };
+        return updated;
+      });
+    },
+    []
+  );
+
+  // Service Intake Handlers
+  const handleServiceIntakeSubmit = useCallback(() => {
+    if (!selectedAppointment) return;
+
+    // Basic validation
+    if (!serviceIntakeForm.vehicleBrand || !serviceIntakeForm.registrationNumber || !serviceIntakeForm.serviceType || !serviceIntakeForm.customerComplaintIssue) {
+      showToast("Please fill in all required fields.", "error");
+      return;
+    }
+
+    // Here you would typically save the service intake data and upload files
+    // For now, we'll just show a success message
+    const totalFiles = 
+      serviceIntakeForm.customerIdProof.files.length +
+      serviceIntakeForm.vehicleRCCopy.files.length +
+      serviceIntakeForm.warrantyCardServiceBook.files.length +
+      serviceIntakeForm.photosVideos.files.length;
+    
+    showToast(
+      `Service intake form submitted successfully! ${totalFiles > 0 ? `${totalFiles} file(s) uploaded.` : ""}`,
+      "success"
+    );
+    
+    // Update appointment status to indicate customer has arrived
+    const updatedAppointments = appointments.map((apt) =>
+      apt.id === selectedAppointment.id
+        ? { ...apt, status: "In Progress" }
+        : apt
+    );
+    setAppointments(updatedAppointments);
+    safeStorage.setItem("appointments", updatedAppointments);
+    
+    // Reset form after submission
+    setServiceIntakeForm(INITIAL_SERVICE_INTAKE_FORM);
+    setCustomerArrivalStatus(null);
+  }, [selectedAppointment, serviceIntakeForm, appointments, showToast]);
+
   // ==================== Effects ====================
   // Watch for customer search results to populate vehicle details
   useEffect(() => {
@@ -861,6 +1029,14 @@ export default function Appointments() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showCustomerDropdown, showComplaintCustomerDropdown]);
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup will happen when form is reset or component unmounts
+      // URLs are already cleaned up in closeDetailModal and handleRemoveDocument
+    };
+  }, []);
 
   // ==================== Render ====================
   return (
@@ -1187,7 +1363,12 @@ export default function Appointments() {
       </Modal>
 
       {/* Appointment Detail Modal */}
-      <Modal show={showDetailModal} onClose={closeDetailModal} title="Appointment Details">
+      <Modal 
+        show={showDetailModal} 
+        onClose={closeDetailModal} 
+        title="Appointment Details"
+        maxWidth={isServiceAdvisor && customerArrivalStatus === "arrived" ? "4xl" : "2xl"}
+      >
         {selectedAppointment && (
           <div className="space-y-6">
             {/* Customer Information */}
@@ -1272,6 +1453,431 @@ export default function Appointments() {
                 </div>
               </div>
             </div>
+
+            {/* Customer Arrival Section (Service Advisor Only) */}
+            {isServiceAdvisor && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <CheckCircle size={20} className="text-blue-600" />
+                  Customer Arrival Status
+                </h3>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setCustomerArrivalStatus("arrived");
+                      // Pre-fill form with appointment data
+                      if (selectedAppointment) {
+                        setServiceIntakeForm({
+                          ...INITIAL_SERVICE_INTAKE_FORM,
+                          serviceType: selectedAppointment.serviceType,
+                          vehicleBrand: selectedAppointment.vehicle.split(" ")[0] || "",
+                          vehicleModel: selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
+                        });
+                      }
+                    }}
+                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition ${
+                      customerArrivalStatus === "arrived"
+                        ? "bg-green-600 text-white"
+                        : "bg-white text-gray-700 border border-gray-300 hover:bg-green-50"
+                    }`}
+                  >
+                    <CheckCircle size={18} className="inline mr-2" />
+                    Customer Arrived
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCustomerArrivalStatus("not_arrived");
+                      setServiceIntakeForm(INITIAL_SERVICE_INTAKE_FORM);
+                    }}
+                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition ${
+                      customerArrivalStatus === "not_arrived"
+                        ? "bg-red-600 text-white"
+                        : "bg-white text-gray-700 border border-gray-300 hover:bg-red-50"
+                    }`}
+                  >
+                    <AlertCircle size={18} className="inline mr-2" />
+                    Customer Not Arrived
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Service Intake Form (Service Advisor Only - When Customer Arrived) */}
+            {isServiceAdvisor && customerArrivalStatus === "arrived" && (
+              <div className="space-y-6 border-t border-gray-200 pt-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Service Intake Form</h3>
+                
+                {/* Documentation Section */}
+                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-xl border border-indigo-200">
+                  <h4 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-6 bg-indigo-600 rounded"></span>
+                    Documentation
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Customer ID Proof */}
+                    <div className="bg-white rounded-lg p-4 border border-indigo-200">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        Customer ID Proof
+                      </label>
+                      <div className="space-y-3">
+                        <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                          <div className="flex flex-col items-center gap-2">
+                            <Upload className="text-indigo-600" size={24} />
+                            <span className="text-sm text-gray-600 font-medium">Click to upload or drag and drop</span>
+                            <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            multiple
+                            onChange={(e) => handleDocumentUpload("customerIdProof", e.target.files)}
+                          />
+                        </label>
+                        {serviceIntakeForm.customerIdProof.files.length > 0 && (
+                          <div className="space-y-2">
+                            {serviceIntakeForm.customerIdProof.files.map((file, index) => (
+                              <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                <FileText className="text-indigo-600 shrink-0" size={18} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
+                                  <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                                </div>
+                                <button
+                                  onClick={() => handleRemoveDocument("customerIdProof", index)}
+                                  className="text-red-600 hover:text-red-700 p-1 rounded transition"
+                                  title="Remove file"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Vehicle RC Copy */}
+                    <div className="bg-white rounded-lg p-4 border border-indigo-200">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        Vehicle RC Copy
+                      </label>
+                      <div className="space-y-3">
+                        <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                          <div className="flex flex-col items-center gap-2">
+                            <Upload className="text-indigo-600" size={24} />
+                            <span className="text-sm text-gray-600 font-medium">Click to upload or drag and drop</span>
+                            <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            multiple
+                            onChange={(e) => handleDocumentUpload("vehicleRCCopy", e.target.files)}
+                          />
+                        </label>
+                        {serviceIntakeForm.vehicleRCCopy.files.length > 0 && (
+                          <div className="space-y-2">
+                            {serviceIntakeForm.vehicleRCCopy.files.map((file, index) => (
+                              <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                <FileText className="text-indigo-600 shrink-0" size={18} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
+                                  <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                                </div>
+                                <button
+                                  onClick={() => handleRemoveDocument("vehicleRCCopy", index)}
+                                  className="text-red-600 hover:text-red-700 p-1 rounded transition"
+                                  title="Remove file"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Warranty Card / Service Book */}
+                    <div className="bg-white rounded-lg p-4 border border-indigo-200">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        Warranty Card / Service Book
+                      </label>
+                      <div className="space-y-3">
+                        <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                          <div className="flex flex-col items-center gap-2">
+                            <Upload className="text-indigo-600" size={24} />
+                            <span className="text-sm text-gray-600 font-medium">Click to upload or drag and drop</span>
+                            <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            multiple
+                            onChange={(e) => handleDocumentUpload("warrantyCardServiceBook", e.target.files)}
+                          />
+                        </label>
+                        {serviceIntakeForm.warrantyCardServiceBook.files.length > 0 && (
+                          <div className="space-y-2">
+                            {serviceIntakeForm.warrantyCardServiceBook.files.map((file, index) => (
+                              <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                <FileText className="text-indigo-600 shrink-0" size={18} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
+                                  <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                                </div>
+                                <button
+                                  onClick={() => handleRemoveDocument("warrantyCardServiceBook", index)}
+                                  className="text-red-600 hover:text-red-700 p-1 rounded transition"
+                                  title="Remove file"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Photos/Videos of Vehicle at Drop-off */}
+                    <div className="bg-white rounded-lg p-4 border border-indigo-200">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        Photos/Videos of Vehicle at Drop-off
+                      </label>
+                      <div className="space-y-3">
+                        <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                          <div className="flex flex-col items-center gap-2">
+                            <ImageIcon className="text-indigo-600" size={24} />
+                            <span className="text-sm text-gray-600 font-medium">Click to upload or drag and drop</span>
+                            <span className="text-xs text-gray-500">JPG, PNG, MP4, MOV (Max 50MB)</span>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".jpg,.jpeg,.png,.mp4,.mov"
+                            multiple
+                            onChange={(e) => handleDocumentUpload("photosVideos", e.target.files)}
+                          />
+                        </label>
+                        {serviceIntakeForm.photosVideos.files.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {serviceIntakeForm.photosVideos.files.map((file, index) => (
+                              <div key={index} className="relative group bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                                {file.type.startsWith("image/") ? (
+                                  <img
+                                    src={serviceIntakeForm.photosVideos.urls[index]}
+                                    alt={file.name}
+                                    className="w-full h-32 object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-32 flex items-center justify-center bg-gray-100">
+                                    <FileText className="text-gray-400" size={32} />
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <button
+                                    onClick={() => handleRemoveDocument("photosVideos", index)}
+                                    className="text-white hover:text-red-300 p-2 rounded transition"
+                                    title="Remove file"
+                                  >
+                                    <Trash2 size={20} />
+                                  </button>
+                                </div>
+                                <div className="p-2 bg-white">
+                                  <p className="text-xs font-medium text-gray-800 truncate">{file.name}</p>
+                                  <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vehicle Information Section */}
+                <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
+                  <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-6 bg-green-600 rounded"></span>
+                    Vehicle Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormInput
+                      label="Vehicle Brand"
+                      required
+                      value={serviceIntakeForm.vehicleBrand}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, vehicleBrand: e.target.value })}
+                      placeholder="Enter vehicle brand"
+                    />
+                    <FormInput
+                      label="Vehicle Model"
+                      required
+                      value={serviceIntakeForm.vehicleModel}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, vehicleModel: e.target.value })}
+                      placeholder="Enter vehicle model"
+                    />
+                    <FormInput
+                      label="Registration Number"
+                      required
+                      value={serviceIntakeForm.registrationNumber}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, registrationNumber: e.target.value.toUpperCase() })}
+                      placeholder="Enter registration number"
+                    />
+                    <FormInput
+                      label="VIN / Chassis Number"
+                      value={serviceIntakeForm.vinChassisNumber}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, vinChassisNumber: e.target.value.toUpperCase() })}
+                      placeholder="Enter VIN/Chassis number"
+                    />
+                    <FormInput
+                      label="Variant / Battery Capacity"
+                      value={serviceIntakeForm.variantBatteryCapacity}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, variantBatteryCapacity: e.target.value })}
+                      placeholder="Enter variant/battery capacity"
+                    />
+                    <FormInput
+                      label="Motor Number"
+                      value={serviceIntakeForm.motorNumber}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, motorNumber: e.target.value })}
+                      placeholder="Enter motor number"
+                    />
+                    <FormInput
+                      label="Charger Serial Number"
+                      value={serviceIntakeForm.chargerSerialNumber}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, chargerSerialNumber: e.target.value })}
+                      placeholder="Enter charger serial number"
+                    />
+                    <FormInput
+                      label="Date of Purchase / Vehicle Age"
+                      value={serviceIntakeForm.dateOfPurchase}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, dateOfPurchase: e.target.value })}
+                      type="date"
+                    />
+                    <FormInput
+                      label="Vehicle Age"
+                      value={serviceIntakeForm.vehicleAge}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, vehicleAge: e.target.value })}
+                      placeholder="Enter vehicle age"
+                    />
+                    <FormSelect
+                      label="Warranty Status"
+                      value={serviceIntakeForm.warrantyStatus}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, warrantyStatus: e.target.value })}
+                      options={[
+                        { value: "", label: "Select warranty status" },
+                        { value: "Active", label: "Active" },
+                        { value: "Expired", label: "Expired" },
+                        { value: "Not Applicable", label: "Not Applicable" },
+                      ]}
+                    />
+                    <FormInput
+                      label="Insurance Start Date"
+                      value={serviceIntakeForm.insuranceStartDate}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, insuranceStartDate: e.target.value })}
+                      type="date"
+                    />
+                    <FormInput
+                      label="Insurance End Date"
+                      value={serviceIntakeForm.insuranceEndDate}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, insuranceEndDate: e.target.value })}
+                      type="date"
+                    />
+                    <FormInput
+                      label="Insurance Company Name"
+                      value={serviceIntakeForm.insuranceCompanyName}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, insuranceCompanyName: e.target.value })}
+                      placeholder="Enter insurance company name"
+                    />
+                  </div>
+                </div>
+
+                {/* Service Details Section */}
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200">
+                  <h4 className="text-lg font-semibold text-purple-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-6 bg-purple-600 rounded"></span>
+                    Service Details
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormSelect
+                      label="Service Type"
+                      required
+                      value={serviceIntakeForm.serviceType}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, serviceType: e.target.value })}
+                      placeholder="Select service type"
+                      options={SERVICE_TYPES.map((type) => ({ value: type, label: type }))}
+                    />
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Customer Complaint / Issue Description <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={serviceIntakeForm.customerComplaintIssue}
+                        onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, customerComplaintIssue: e.target.value })}
+                        rows={3}
+                        placeholder="Describe the customer complaint or issue..."
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Previous Service History
+                      </label>
+                      <textarea
+                        value={serviceIntakeForm.previousServiceHistory}
+                        onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, previousServiceHistory: e.target.value })}
+                        rows={3}
+                        placeholder="Enter previous service history..."
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
+                      />
+                    </div>
+                    <FormInput
+                      label="Estimated Service Time"
+                      value={serviceIntakeForm.estimatedServiceTime}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, estimatedServiceTime: e.target.value })}
+                      placeholder="e.g., 2 hours"
+                    />
+                    <FormInput
+                      label="Estimated Cost"
+                      value={serviceIntakeForm.estimatedCost}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, estimatedCost: e.target.value })}
+                      placeholder="Enter estimated cost"
+                      type="number"
+                    />
+                    <FormInput
+                      label="Odometer Reading"
+                      value={serviceIntakeForm.odometerReading}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, odometerReading: e.target.value })}
+                      placeholder="Enter odometer reading"
+                      type="number"
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Button for Service Intake */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      setCustomerArrivalStatus(null);
+                      setServiceIntakeForm(INITIAL_SERVICE_INTAKE_FORM);
+                    }}
+                    className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleServiceIntakeSubmit}
+                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+                  >
+                    Submit Service Intake
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4 border-t border-gray-200">
