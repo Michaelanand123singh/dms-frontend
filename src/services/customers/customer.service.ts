@@ -79,16 +79,32 @@ class CustomerService {
   }
 
   async getAll(): Promise<CustomerWithVehicles[]> {
+    // Use repository directly when in mock mode
+    if (this.useMock) {
+      return customerRepository.getAll();
+    }
     const response = await apiClient.get<CustomerWithVehicles[]>(API_ENDPOINTS.CUSTOMERS);
     return response.data;
   }
 
   async getById(id: number | string): Promise<CustomerWithVehicles> {
+    // Use repository directly when in mock mode
+    if (this.useMock) {
+      const customer = await customerRepository.getById(id);
+      if (!customer) {
+        throw new Error("Customer not found");
+      }
+      return customer;
+    }
     const response = await apiClient.get<CustomerWithVehicles>(API_ENDPOINTS.CUSTOMER(String(id)));
     return response.data;
   }
 
   async search(query: string, type: CustomerSearchType = "auto"): Promise<CustomerWithVehicles[]> {
+    // Use repository directly when in mock mode
+    if (this.useMock) {
+      return customerRepository.search(query, type);
+    }
     const response = await apiClient.get<CustomerWithVehicles[]>(API_ENDPOINTS.CUSTOMER_SEARCH, {
       params: { query, type },
     });
@@ -96,6 +112,10 @@ class CustomerService {
   }
 
   async getRecent(limit: number = 10): Promise<CustomerWithVehicles[]> {
+    // Use repository directly when in mock mode
+    if (this.useMock) {
+      return customerRepository.getRecent(limit);
+    }
     const response = await apiClient.get<CustomerWithVehicles[]>(API_ENDPOINTS.CUSTOMER_RECENT, {
       params: { limit },
     });
@@ -103,6 +123,15 @@ class CustomerService {
   }
 
   async create(data: NewCustomerForm): Promise<CustomerWithVehicles> {
+    // Use repository directly when in mock mode
+    if (this.useMock) {
+      const customer = await customerRepository.create(data);
+      // Add to recent
+      if (customer.id) {
+        await customerRepository.addToRecent(customer.id);
+      }
+      return customer;
+    }
     const response = await apiClient.post<CustomerWithVehicles>(API_ENDPOINTS.CUSTOMERS, data);
     
     // Add to recent if using mock

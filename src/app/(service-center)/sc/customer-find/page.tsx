@@ -27,7 +27,6 @@ import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import {
   useCustomerSearch,
   useCreateCustomer,
-  useRecentCustomers,
 } from "../../../../hooks/api";
 import type {
   CustomerSearchType,
@@ -41,6 +40,7 @@ import type {
 } from "@/shared/types";
 import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
 import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
+import { mockCustomers } from "@/__mocks__/data/customers.mock";
 
 // Initial form states (constants for reuse)
 const initialCustomerForm: NewCustomerForm = {
@@ -351,7 +351,9 @@ export default function CustomerFind() {
   // Hooks for data fetching
   const { results: searchResults, loading: searchLoading, search: performSearch, clear: clearSearch } = useCustomerSearch();
   const { loading: createLoading, error: createError, createCustomer } = useCreateCustomer();
-  const { customers: recentCustomers, loading: recentLoading } = useRecentCustomers(10);
+  
+  // Use mock customers directly for recent customers list (show first 10)
+  const recentCustomers = mockCustomers.slice(0, 10);
 
   // Form state for creating new customer
   const [newCustomerForm, setNewCustomerForm] = useState<NewCustomerForm>(initialCustomerForm);
@@ -753,53 +755,89 @@ export default function CustomerFind() {
           )}
         </div>
 
-        {/* Recent Customers Section */}
-        {!selectedCustomer && !showCreateForm && recentCustomers.length > 0 && (
+        {/* Recent Customers Section - Always show when no customer selected and not creating */}
+        {!selectedCustomer && !showCreateForm && searchQuery.length < 2 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-4 sm:p-6 mb-6">
-            <div className="flex items-center gap-2.5 mb-5">
-              <div className="p-1.5 rounded-lg bg-indigo-100">
-                <Clock className="text-indigo-600" size={18} strokeWidth={2} />
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-indigo-100">
+                  <Clock className="text-indigo-600" size={18} strokeWidth={2} />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900">Recent Customers</h2>
+                <span className="text-sm text-gray-500 font-medium">({recentCustomers.length})</span>
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">Recent Customers</h2>
             </div>
-            {recentLoading ? (
-              <div className="text-center py-8 text-gray-500 text-sm">Loading recent customers...</div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {recentCustomers.map((customer) => (
-                  <div
-                    key={customer.id}
-                    onClick={() => handleCustomerSelect(customer)}
-                    className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer bg-gray-50/30 hover:bg-indigo-50/30 group"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-indigo-100 group-hover:bg-indigo-200 transition-colors">
-                          <User className="text-indigo-600" size={16} strokeWidth={2} />
-                        </div>
-                        <h3 className="font-semibold text-gray-900 truncate group-hover:text-indigo-700 transition-colors">{customer.name}</h3>
-                      </div>
-                    </div>
-                    <div className="space-y-1.5 text-sm text-gray-600 ml-8">
-                      <div className="flex items-center gap-1.5">
-                        <Hash size={12} strokeWidth={2} />
-                        <span className="font-mono text-xs text-gray-700">{customer.customerNumber}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Phone size={12} strokeWidth={2} />
-                        <span>{customer.phone}</span>
-                      </div>
-                      {customer.totalVehicles && customer.totalVehicles > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Car size={12} />
-                          <span>{customer.totalVehicles} vehicle{customer.totalVehicles > 1 ? "s" : ""}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+            <div className="overflow-x-auto">
+              <div className="min-w-full">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer ID</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Vehicles</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Spent</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {recentCustomers.map((customer) => (
+                      <tr
+                        key={customer.id}
+                        onClick={() => handleCustomerSelect(customer)}
+                        className="hover:bg-indigo-50/50 cursor-pointer transition-colors duration-150 group"
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm shadow-sm group-hover:shadow-md transition-shadow">
+                              {customer.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors">{customer.name}</p>
+                              {customer.address && (
+                                <p className="text-xs text-gray-500 truncate max-w-[200px] mt-0.5">{customer.address}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="font-mono text-sm text-gray-700 font-medium">{customer.customerNumber}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <Phone size={14} className="text-gray-400" strokeWidth={2} />
+                            <span className="text-sm text-gray-700">{customer.phone}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          {customer.email ? (
+                            <div className="flex items-center gap-1.5">
+                              <Mail size={14} className="text-gray-400" strokeWidth={2} />
+                              <span className="text-sm text-gray-700 truncate max-w-[180px]">{customer.email}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <Car size={14} className="text-gray-400" strokeWidth={2} />
+                            <span className="text-sm text-gray-700 font-medium">
+                              {customer.totalVehicles || 0}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {customer.totalSpent || "₹0"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -1006,6 +1044,13 @@ export default function CustomerFind() {
                 {selectedCustomer.email && <InfoCard icon={Mail} label="Email" value={selectedCustomer.email} />}
                 {selectedCustomer.address && <InfoCard icon={MapPin} label="Address" value={<span className="line-clamp-1">{selectedCustomer.address}</span>} />}
                 <InfoCard icon={Calendar} label="Member Since" value={new Date(selectedCustomer.createdAt).toLocaleDateString()} />
+                {selectedCustomer.lastServiceCenterName && (
+                  <InfoCard 
+                    icon={Building2} 
+                    label="Last Service Center" 
+                    value={selectedCustomer.lastServiceCenterName} 
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
@@ -1078,6 +1123,15 @@ export default function CustomerFind() {
                                 {vehicle.totalServices} ({vehicle.totalSpent})
                               </p>
                             </div>
+                            {vehicle.lastServiceCenterName && (
+                              <div className="sm:col-span-4">
+                                <p className="text-gray-500 flex items-center gap-1">
+                                  <Building2 size={14} />
+                                  Last Service Center
+                                </p>
+                                <p className="font-medium text-gray-800">{vehicle.lastServiceCenterName}</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -1380,6 +1434,15 @@ export default function CustomerFind() {
                         {selectedVehicle.currentStatus}
                       </span>
                     </div>
+                    {selectedVehicle.lastServiceCenterName && (
+                      <div className="sm:col-span-3">
+                        <p className="text-indigo-600 font-medium flex items-center gap-1">
+                          <Building2 size={14} />
+                          Last Service Center
+                        </p>
+                        <p className="text-gray-800 font-semibold">{selectedVehicle.lastServiceCenterName}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1428,6 +1491,12 @@ export default function CustomerFind() {
                               <p className="text-sm text-gray-600 mb-2">
                                 Odometer: {service.odometer}
                               </p>
+                              {service.serviceCenterName && (
+                                <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+                                  <Building2 size={14} />
+                                  Service Center: <span className="font-medium">{service.serviceCenterName}</span>
+                                </p>
+                              )}
                               <div className="flex flex-wrap gap-2">
                                 {service.parts.map((part, idx) => (
                                   <span

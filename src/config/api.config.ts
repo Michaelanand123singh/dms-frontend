@@ -7,7 +7,8 @@ export const API_CONFIG = {
   TIMEOUT: Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
-  USE_MOCK: process.env.NEXT_PUBLIC_USE_MOCK_API === "true",
+  // Default to mock mode if not explicitly set to "false"
+  USE_MOCK: process.env.NEXT_PUBLIC_USE_MOCK_API !== "false",
 } as const;
 
 export const API_ENDPOINTS = {
@@ -54,5 +55,27 @@ export const API_ENDPOINTS = {
   // Appointments
   APPOINTMENTS: "/appointments",
   APPOINTMENT: (id: string) => `/appointments/${id}`,
+  
+  // Quotations
+  QUOTATIONS: "/service-center/quotations",
+  QUOTATION: (id: string) => `/service-center/quotations/${id}`,
+  QUOTATION_PASS_TO_MANAGER: (id: string) => `/service-center/quotations/${id}/pass-to-manager`,
+  QUOTATION_STATUS: (id: string) => `/service-center/quotations/${id}/status`,
+  
+  // Insurers
+  INSURERS: "/insurers",
+  INSURER: (id: string) => `/insurers/${id}`,
+  
+  // Notes Templates
+  NOTES_TEMPLATES: "/notes-templates",
+  NOTES_TEMPLATE: (id: string) => `/notes-templates/${id}`,
+  
+  // Leads
+  LEADS: "/service-center/leads",
+  LEAD: (id: string) => `/service-center/leads/${id}`,
+  
+  // Vehicle Photos
+  VEHICLE_PHOTOS: "/service-center/vehicle-photos",
+  VEHICLE_PHOTO: (id: string) => `/service-center/vehicle-photos/${id}`,
 } as const;
 

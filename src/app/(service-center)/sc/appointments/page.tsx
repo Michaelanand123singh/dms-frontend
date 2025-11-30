@@ -1,7 +1,7 @@
 "use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye } from "lucide-react";
+import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle } from "lucide-react";
 import { useCustomerSearch } from "../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
@@ -17,6 +17,8 @@ interface Appointment {
   time: string;
   duration: string;
   status: string;
+  serviceCenterId?: number;
+  serviceCenterName?: string;
 }
 
 interface AppointmentForm {
@@ -27,6 +29,29 @@ interface AppointmentForm {
   date: string;
   time: string;
   duration: string;
+  serviceCenterId?: number;
+}
+
+interface Complaint {
+  id: number;
+  customerName: string;
+  vehicle: string;
+  phone: string;
+  complaint: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  status: "Open" | "In Progress" | "Resolved" | "Closed";
+  serviceCenterId?: number;
+  serviceCenterName?: string;
+  createdAt: string;
+}
+
+interface ComplaintForm {
+  customerName: string;
+  vehicle: string;
+  phone: string;
+  complaint: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  serviceCenterId?: number;
 }
 
 type ToastType = "success" | "error";
@@ -41,9 +66,20 @@ const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   date: new Date().toISOString().split("T")[0],
   time: "",
   duration: "2",
+  serviceCenterId: undefined,
+};
+
+const INITIAL_COMPLAINT_FORM: ComplaintForm = {
+  customerName: "",
+  vehicle: "",
+  phone: "",
+  complaint: "",
+  severity: "Medium",
+  serviceCenterId: undefined,
 };
 
 import { defaultAppointments, serviceTypes, type ServiceType } from "@/__mocks__/data/appointments.mock";
+import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
 
 const SERVICE_TYPES = serviceTypes;
 
@@ -66,12 +102,15 @@ const getStatusBadgeClass = (status: string): string => {
   return `px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`;
 };
 
-const validateAppointmentForm = (form: AppointmentForm): string | null => {
+const validateAppointmentForm = (form: AppointmentForm, isCallCenter: boolean = false): string | null => {
   if (!form.customerName || !form.phone || !form.vehicle || !form.serviceType || !form.date || !form.time) {
     return "Please fill in all required fields.";
   }
   if (!/^\d{10}$/.test(form.phone)) {
     return "Please enter a valid 10-digit phone number.";
+  }
+  if (isCallCenter && !form.serviceCenterId) {
+    return "Please select a service center to assign this appointment.";
   }
   return null;
 };
@@ -114,6 +153,136 @@ const getMaxAppointmentsPerDay = (serviceCenterName: string | null | undefined):
 const countAppointmentsForDate = (appointments: Appointment[], date: string): number => {
   return appointments.filter((apt) => apt.date === date).length;
 };
+
+// ==================== Reusable Components ====================
+// Form Input Component
+const FormInput = ({ 
+  label, 
+  required, 
+  value, 
+  onChange, 
+  placeholder, 
+  type = "text", 
+  maxLength,
+  readOnly,
+  className = "",
+  ...props 
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  type?: string;
+  maxLength?: number;
+  readOnly?: boolean;
+  className?: string;
+  [key: string]: any;
+}) => (
+  <div>
+    <label className="block text-sm font-semibold text-gray-700 mb-2">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      readOnly={readOnly}
+      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 ${
+        readOnly ? "bg-gray-100 cursor-not-allowed" : "bg-gray-50/50 focus:bg-white"
+      } ${className}`}
+      {...props}
+    />
+  </div>
+);
+
+// Form Select Component
+const FormSelect = ({
+  label,
+  required,
+  value,
+  onChange,
+  options,
+  placeholder,
+  className = "",
+  ...props
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+  className?: string;
+  [key: string]: any;
+}) => (
+  <div>
+    <label className="block text-sm font-semibold text-gray-700 mb-2">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+    <select
+      value={value}
+      onChange={onChange}
+      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 ${className}`}
+      {...props}
+    >
+      {placeholder && <option value="">{placeholder}</option>}
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+// Customer Info Card Component
+const CustomerInfoCard = ({ customer, title = "Customer Information" }: { customer: CustomerWithVehicles; title?: string }) => (
+  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+    <h3 className="text-sm font-semibold text-indigo-900 mb-3">{title}</h3>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+      <div>
+        <p className="text-indigo-600 font-medium">Name</p>
+        <p className="text-gray-800 font-semibold">{customer.name}</p>
+      </div>
+      <div>
+        <p className="text-indigo-600 font-medium">Phone</p>
+        <p className="text-gray-800 font-semibold">{customer.phone}</p>
+      </div>
+      {customer.email && (
+        <div>
+          <p className="text-indigo-600 font-medium">Email</p>
+          <p className="text-gray-800 font-semibold">{customer.email}</p>
+        </div>
+      )}
+      {customer.address && (
+        <div>
+          <p className="text-indigo-600 font-medium">Address</p>
+          <p className="text-gray-800 font-semibold">{customer.address}</p>
+        </div>
+      )}
+      {customer.lastServiceCenterName && (
+        <div className="sm:col-span-2">
+          <p className="text-indigo-600 font-medium flex items-center gap-1">
+            <Building2 size={14} />
+            Last Service Center
+          </p>
+          <p className="text-gray-800 font-semibold">{customer.lastServiceCenterName}</p>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+// Error Alert Component
+const ErrorAlert = ({ message }: { message: string }) => (
+  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+    <AlertCircle className="text-red-600" size={20} strokeWidth={2} />
+    <p className="text-red-600 text-sm">{message}</p>
+  </div>
+);
 
 // ==================== Components ====================
 interface ToastProps {
@@ -199,10 +368,40 @@ const Modal = ({ show, onClose, title, subtitle, children, maxWidth = "2xl" }: M
   );
 };
 
+// ==================== Utility Functions ====================
+/**
+ * Find nearest service center based on customer address
+ * Uses simple city matching for mock implementation
+ */
+const findNearestServiceCenter = (customerAddress: string | undefined): number | null => {
+  if (!customerAddress) return null;
+
+  const addressLower = customerAddress.toLowerCase();
+  
+  // Extract city from address (simple pattern matching)
+  const cities = [
+    { city: "delhi", centerId: 1 },
+    { city: "mumbai", centerId: 2 },
+    { city: "bangalore", centerId: 3 },
+    { city: "bengaluru", centerId: 3 },
+  ];
+
+  for (const { city, centerId } of cities) {
+    if (addressLower.includes(city)) {
+      return centerId;
+    }
+  }
+
+  // If no match, return first active service center
+  const activeCenters = defaultServiceCenters.filter((sc) => sc.status === "Active");
+  return activeCenters.length > 0 ? activeCenters[0].id : null;
+};
+
 // ==================== Main Component ====================
 export default function Appointments() {
-  const { userInfo } = useRole();
+  const { userInfo, userRole } = useRole();
   const serviceCenterName = userInfo?.serviceCenter;
+  const isCallCenter = userRole === "call_center";
 
   // State Management
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
@@ -218,11 +417,31 @@ export default function Appointments() {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  
+  // Service Center States (for call center)
+  const [availableServiceCenters] = useState(() => {
+    return defaultServiceCenters.filter((sc) => sc.status === "Active");
+  });
 
   // Modal States
   const [showAppointmentModal, setShowAppointmentModal] = useState<boolean>(false);
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [showVehicleDetails, setShowVehicleDetails] = useState<boolean>(false);
+  const [showComplaintModal, setShowComplaintModal] = useState<boolean>(false);
+  
+  // Complaint States
+  const [complaints, setComplaints] = useState<Complaint[]>(() => {
+    if (typeof window !== "undefined") {
+      const storedComplaints = safeStorage.getItem<Complaint[]>("complaints", []);
+      return storedComplaints;
+    }
+    return [];
+  });
+  const [complaintForm, setComplaintForm] = useState<ComplaintForm>(INITIAL_COMPLAINT_FORM);
+  const [complaintCustomerSearchQuery, setComplaintCustomerSearchQuery] = useState<string>("");
+  const [showComplaintCustomerDropdown, setShowComplaintCustomerDropdown] = useState<boolean>(false);
+  const [selectedComplaintCustomer, setSelectedComplaintCustomer] = useState<CustomerWithVehicles | null>(null);
+  const complaintCustomerDropdownRef = useRef<HTMLDivElement>(null);
 
   // Customer Search States
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>("");
@@ -297,6 +516,7 @@ export default function Appointments() {
         date: appointment.date,
         time: appointment.time,
         duration: "2",
+        serviceCenterId: appointment.serviceCenterId,
       });
       setCustomerSearchQuery(appointment.customerName);
       setSelectedCustomer(null);
@@ -358,14 +578,24 @@ export default function Appointments() {
       const firstVehicle =
         customer.vehicles && customer.vehicles.length > 0 ? formatVehicleString(customer.vehicles[0]) : "";
 
+      // Auto-suggest nearest service center for call center users
+      let suggestedServiceCenterId: number | undefined = undefined;
+      if (isCallCenter && customer.address) {
+        const nearestId = findNearestServiceCenter(customer.address);
+        if (nearestId) {
+          suggestedServiceCenterId = nearestId;
+        }
+      }
+
       setAppointmentForm((prev) => ({
         ...prev,
         customerName: customer.name,
         phone: customer.phone,
         vehicle: firstVehicle,
+        serviceCenterId: suggestedServiceCenterId,
       }));
     },
-    [clearCustomerSearch]
+    [clearCustomerSearch, isCallCenter]
   );
 
   const handleViewVehicleDetails = useCallback(() => {
@@ -375,7 +605,7 @@ export default function Appointments() {
   }, [selectedAppointment, searchCustomer]);
 
   const handleSubmitAppointment = useCallback(() => {
-    const validationError = validateAppointmentForm(appointmentForm);
+    const validationError = validateAppointmentForm(appointmentForm, isCallCenter);
     if (validationError) {
       showToast(validationError, "error");
       return;
@@ -413,38 +643,173 @@ export default function Appointments() {
         }
       }
 
+      // Get service center name if service center is selected
+      const selectedServiceCenter = appointmentForm.serviceCenterId
+        ? availableServiceCenters.find((sc) => sc.id === appointmentForm.serviceCenterId)
+        : null;
+
       const updatedAppointments = appointments.map((apt) =>
         apt.id === selectedAppointment.id
           ? {
               ...apt,
               ...appointmentForm,
               duration: "2 hours",
+              serviceCenterId: appointmentForm.serviceCenterId,
+              serviceCenterName: selectedServiceCenter?.name,
             }
           : apt
       );
       setAppointments(updatedAppointments);
       safeStorage.setItem("appointments", updatedAppointments);
-      showToast("Appointment updated successfully!", "success");
+      
+      const successMessage = selectedServiceCenter
+        ? `Appointment updated and assigned to ${selectedServiceCenter.name}!`
+        : "Appointment updated successfully!";
+      showToast(successMessage, "success");
     } else {
+      // Get service center name if service center is selected
+      const selectedServiceCenter = appointmentForm.serviceCenterId
+        ? availableServiceCenters.find((sc) => sc.id === appointmentForm.serviceCenterId)
+        : null;
+
       const newAppointment: Appointment = {
         id: getNextAppointmentId(appointments),
         ...appointmentForm,
         duration: "2 hours",
         status: "Confirmed",
+        serviceCenterId: appointmentForm.serviceCenterId,
+        serviceCenterName: selectedServiceCenter?.name,
       };
       const updatedAppointments = [...appointments, newAppointment];
       setAppointments(updatedAppointments);
       safeStorage.setItem("appointments", updatedAppointments);
-      showToast("Appointment scheduled successfully!", "success");
+      
+      const successMessage = selectedServiceCenter
+        ? `Appointment scheduled successfully and assigned to ${selectedServiceCenter.name}!`
+        : "Appointment scheduled successfully!";
+      showToast(successMessage, "success");
     }
 
     closeAppointmentModal();
-  }, [appointmentForm, isEditing, selectedAppointment, appointments, serviceCenterName, showToast, closeAppointmentModal]);
+  }, [appointmentForm, isEditing, selectedAppointment, appointments, serviceCenterName, availableServiceCenters, isCallCenter, showToast, closeAppointmentModal]);
 
   const handleOpenNewAppointment = useCallback(() => {
     setShowAppointmentModal(true);
     resetAppointmentForm();
   }, [resetAppointmentForm]);
+
+  // Complaint handlers
+  const resetComplaintForm = useCallback(() => {
+    setComplaintForm(INITIAL_COMPLAINT_FORM);
+    setComplaintCustomerSearchQuery("");
+    setSelectedComplaintCustomer(null);
+    setShowComplaintCustomerDropdown(false);
+    clearCustomerSearch();
+  }, [clearCustomerSearch]);
+
+  const closeComplaintModal = useCallback(() => {
+    setShowComplaintModal(false);
+    resetComplaintForm();
+  }, [resetComplaintForm]);
+
+  const handleComplaintCustomerSearchChange = useCallback(
+    (value: string) => {
+      setComplaintCustomerSearchQuery(value);
+      setComplaintForm((prev) => ({ ...prev, customerName: value }));
+
+      if (value.trim().length >= 2) {
+        searchCustomer(value, "name");
+        setShowComplaintCustomerDropdown(true);
+      } else {
+        clearCustomerSearch();
+        setShowComplaintCustomerDropdown(false);
+        setSelectedComplaintCustomer(null);
+        setComplaintForm((prev) => ({
+          ...prev,
+          customerName: value,
+          phone: "",
+          vehicle: "",
+        }));
+      }
+    },
+    [searchCustomer, clearCustomerSearch]
+  );
+
+  const handleComplaintCustomerSelect = useCallback(
+    (customer: CustomerWithVehicles) => {
+      setSelectedComplaintCustomer(customer);
+      setComplaintCustomerSearchQuery(customer.name);
+      setShowComplaintCustomerDropdown(false);
+      clearCustomerSearch();
+
+      const firstVehicle =
+        customer.vehicles && customer.vehicles.length > 0 ? formatVehicleString(customer.vehicles[0]) : "";
+
+      // Auto-suggest nearest service center for call center users
+      let suggestedServiceCenterId: number | undefined = undefined;
+      if (isCallCenter && customer.address) {
+        const nearestId = findNearestServiceCenter(customer.address);
+        if (nearestId) {
+          suggestedServiceCenterId = nearestId;
+        }
+      }
+
+      setComplaintForm((prev) => ({
+        ...prev,
+        customerName: customer.name,
+        phone: customer.phone,
+        vehicle: firstVehicle,
+        serviceCenterId: suggestedServiceCenterId,
+      }));
+    },
+    [clearCustomerSearch, isCallCenter]
+  );
+
+  const handleSubmitComplaint = useCallback(() => {
+    if (!complaintForm.customerName || !complaintForm.phone || !complaintForm.vehicle || !complaintForm.complaint) {
+      showToast("Please fill in all required fields.", "error");
+      return;
+    }
+
+    if (!/^\d{10}$/.test(complaintForm.phone)) {
+      showToast("Please enter a valid 10-digit phone number.", "error");
+      return;
+    }
+
+    if (isCallCenter && !complaintForm.serviceCenterId) {
+      showToast("Please select a service center to assign this complaint.", "error");
+      return;
+    }
+
+    // Get service center name if service center is selected
+    const selectedServiceCenter = complaintForm.serviceCenterId
+      ? availableServiceCenters.find((sc) => sc.id === complaintForm.serviceCenterId)
+      : null;
+
+    const newComplaint: Complaint = {
+      id: complaints.length > 0 ? Math.max(...complaints.map((c) => c.id)) + 1 : 1,
+      customerName: complaintForm.customerName,
+      vehicle: complaintForm.vehicle,
+      phone: complaintForm.phone,
+      complaint: complaintForm.complaint,
+      severity: complaintForm.severity,
+      status: "Open",
+      serviceCenterId: complaintForm.serviceCenterId,
+      serviceCenterName: selectedServiceCenter?.name,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+
+    const updatedComplaints = [...complaints, newComplaint];
+    setComplaints(updatedComplaints);
+    safeStorage.setItem("complaints", updatedComplaints);
+
+    const successMessage = selectedServiceCenter
+      ? `Complaint created successfully and assigned to ${selectedServiceCenter.name}!`
+      : "Complaint created successfully!";
+    showToast(successMessage, "success");
+
+    closeComplaintModal();
+  }, [complaintForm, complaints, isCallCenter, availableServiceCenters, showToast, closeComplaintModal]);
 
   // ==================== Effects ====================
   // Watch for customer search results to populate vehicle details
@@ -476,16 +841,19 @@ export default function Appointments() {
       if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target as Node)) {
         setShowCustomerDropdown(false);
       }
+      if (complaintCustomerDropdownRef.current && !complaintCustomerDropdownRef.current.contains(event.target as Node)) {
+        setShowComplaintCustomerDropdown(false);
+      }
     };
 
-    if (showCustomerDropdown) {
+    if (showCustomerDropdown || showComplaintCustomerDropdown) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showCustomerDropdown]);
+  }, [showCustomerDropdown, showComplaintCustomerDropdown]);
 
   // ==================== Render ====================
   return (
@@ -499,13 +867,27 @@ export default function Appointments() {
             <h1 className="text-3xl font-bold text-blue-600 mb-2">Appointments</h1>
             <p className="text-gray-500">Schedule and manage customer appointments</p>
           </div>
-          <button
-            onClick={handleOpenNewAppointment}
-            className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
-          >
-            <PlusCircle size={20} />
-            New Appointment
-          </button>
+          <div className="flex gap-3">
+            {isCallCenter && (
+              <button
+                onClick={() => {
+                  setShowComplaintModal(true);
+                  resetComplaintForm();
+                }}
+                className="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
+              >
+                <AlertTriangle size={20} />
+                Create Complaint
+              </button>
+            )}
+            <button
+              onClick={handleOpenNewAppointment}
+              className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
+            >
+              <PlusCircle size={20} />
+              New Appointment
+            </button>
+          </div>
         </div>
 
         {/* Appointments Grid */}
@@ -541,6 +923,12 @@ export default function Appointments() {
                     <Phone size={12} className="text-gray-400" />
                     <p className="text-xs text-gray-500">{apt.phone}</p>
                   </div>
+                  {isCallCenter && apt.serviceCenterName && (
+                    <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">
+                      <Building2 size={12} className="text-indigo-500" />
+                      <p className="text-xs text-indigo-600 font-medium">{apt.serviceCenterName}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -549,179 +937,133 @@ export default function Appointments() {
       </div>
 
       {/* New Appointment Modal */}
-      <Modal show={showAppointmentModal} onClose={closeAppointmentModal} title={isEditing ? "Edit Appointment" : "New Appointment"}>
-        <div className="space-y-4">
-          {/* Customer Information */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Modal show={showAppointmentModal} onClose={closeAppointmentModal} title={isEditing ? "Edit Appointment" : "New Appointment"} maxWidth="2xl">
+        <div className="space-y-6">
+          {/* Customer Information Section */}
+          {selectedCustomer && (
+            <CustomerInfoCard customer={selectedCustomer} title="Customer Information (Pre-filled)" />
+          )}
+
+          {/* Customer Search (if no customer selected) */}
+          {!selectedCustomer && (
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h3>
               <div className="relative" ref={customerDropdownRef}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Customer Name <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={customerSearchQuery}
-                    onChange={(e) => handleCustomerSearchChange(e.target.value)}
-                    onFocus={() => {
-                      if (customerSearchQuery.trim().length >= 2 && customerSearchResults.length > 0) {
-                        setShowCustomerDropdown(true);
-                      }
-                    }}
-                    placeholder="Start typing customer name..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
-                  />
-                  {showCustomerDropdown && customerSearchResults.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {customerSearchResults.map((customer) => (
-                        <div
-                          key={customer.id}
-                          onClick={() => handleCustomerSelect(customer)}
-                          className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-1.5 rounded-lg bg-blue-100">
-                              <User className="text-blue-600" size={16} strokeWidth={2} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 truncate">{customer.name}</p>
-                              <div className="flex items-center gap-3 text-xs text-gray-600 mt-1">
-                                <span className="flex items-center gap-1">
-                                  <Phone size={12} />
-                                  {customer.phone}
-                                </span>
-                                {customer.vehicles && customer.vehicles.length > 0 && (
-                                  <span className="flex items-center gap-1">
-                                    <Car size={12} />
-                                    {customer.vehicles.length} vehicle{customer.vehicles.length > 1 ? "s" : ""}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {selectedCustomer?.id === customer.id && (
-                              <CheckCircle className="text-blue-600 shrink-0" size={18} strokeWidth={2} />
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {customerSearchLoading && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={appointmentForm.phone}
-                  onChange={(e) =>
-                    setAppointmentForm({ ...appointmentForm, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })
-                  }
-                  placeholder="9876543210"
-                  maxLength={10}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                <FormInput
+                  label="Customer Name"
                   required
+                  value={customerSearchQuery}
+                  onChange={(e) => handleCustomerSearchChange(e.target.value)}
+                  placeholder="Start typing customer name..."
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Vehicle <span className="text-red-500">*</span>
-                </label>
-                {selectedCustomer && selectedCustomer.vehicles && selectedCustomer.vehicles.length > 0 ? (
-                  <select
-                    value={appointmentForm.vehicle}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, vehicle: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
-                  >
-                    <option value="">Select Vehicle</option>
-                    {selectedCustomer.vehicles.map((vehicle) => (
-                      <option key={vehicle.id} value={formatVehicleString(vehicle)}>
-                        {formatVehicleString(vehicle)} - {vehicle.registration}
-                      </option>
+                {showCustomerDropdown && customerSearchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {customerSearchResults.map((customer) => (
+                      <div
+                        key={customer.id}
+                        onClick={() => handleCustomerSelect(customer)}
+                        className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-1.5 rounded-lg bg-indigo-100">
+                            <User className="text-indigo-600" size={16} strokeWidth={2} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">{customer.name}</p>
+                            <div className="flex items-center gap-3 text-xs text-gray-600 mt-1">
+                              <span className="flex items-center gap-1">
+                                <Phone size={12} />
+                                {customer.phone}
+                              </span>
+                              {customer.vehicles && customer.vehicles.length > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <Car size={12} />
+                                  {customer.vehicles.length} vehicle{customer.vehicles.length > 1 ? "s" : ""}
+                                </span>
+                              )}
+                              {customer.lastServiceCenterName && (
+                                <span className="flex items-center gap-1">
+                                  <Building2 size={12} />
+                                  {customer.lastServiceCenterName}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {selectedCustomer?.id === customer.id && (
+                            <CheckCircle className="text-indigo-600 shrink-0" size={18} strokeWidth={2} />
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={appointmentForm.vehicle}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, vehicle: e.target.value })}
-                    placeholder={selectedCustomer ? "No vehicles found for this customer" : "Select a customer first"}
-                    disabled={!selectedCustomer}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                    required
-                  />
+                  </div>
+                )}
+                {customerSearchLoading && (
+                  <div className="absolute right-3 top-10 transform -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
                 )}
               </div>
             </div>
+          )}
 
-            {/* Selected Customer Info Display */}
-            {selectedCustomer && (
-              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-blue-900 mb-3">Selected Customer Information</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-blue-600 font-medium">Customer Number</p>
-                    <p className="text-gray-800 font-semibold">{selectedCustomer.customerNumber}</p>
-                  </div>
-                  {selectedCustomer.email && (
-                    <div>
-                      <p className="text-blue-600 font-medium">Email</p>
-                      <p className="text-gray-800 font-semibold">{selectedCustomer.email}</p>
-                    </div>
-                  )}
-                  {selectedCustomer.address && (
-                    <div className="sm:col-span-2">
-                      <p className="text-blue-600 font-medium">Address</p>
-                      <p className="text-gray-800 font-semibold">{selectedCustomer.address}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Appointment Form */}
+          <div className="space-y-4">
+            <FormInput
+              label="Customer Name"
+              required
+              value={appointmentForm.customerName}
+              onChange={() => {}}
+              readOnly
+            />
+            <FormInput
+              label="Phone Number"
+              required
+              type="tel"
+              value={appointmentForm.phone}
+              onChange={() => {}}
+              maxLength={10}
+              readOnly
+            />
+            <div>
+              <FormInput
+                label="Vehicle"
+                required
+                value={appointmentForm.vehicle}
+                onChange={() => {}}
+                readOnly
+              />
+              {selectedCustomer && appointmentForm.vehicle && (() => {
+                const selectedVehicle = selectedCustomer.vehicles?.find((v) => 
+                  formatVehicleString(v) === appointmentForm.vehicle
+                );
+                return selectedVehicle?.lastServiceCenterName ? (
+                  <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                    <Building2 size={12} />
+                    Last serviced at: {selectedVehicle.lastServiceCenterName}
+                  </p>
+                ) : null;
+              })()}
+            </div>
 
-          {/* Appointment Details */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Appointment Details</h3>
+            <FormSelect
+              label="Service Type"
+              required
+              value={appointmentForm.serviceType}
+              onChange={(e) => setAppointmentForm({ ...appointmentForm, serviceType: e.target.value })}
+              placeholder="Select service type"
+              options={SERVICE_TYPES.map((type) => ({ value: type, label: type }))}
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Service Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={appointmentForm.serviceType}
-                  onChange={(e) => setAppointmentForm({ ...appointmentForm, serviceType: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                <FormInput
+                  label="Date"
                   required
-                >
-                  <option value="">Select service type</option>
-                  {SERVICE_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <input
                   type="date"
                   value={appointmentForm.date}
                   onChange={(e) => setAppointmentForm({ ...appointmentForm, date: e.target.value })}
+                  // @ts-ignore
                   min={new Date().toISOString().split("T")[0]}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  required
                 />
                 {appointmentForm.date && (
                   <div className="mt-2 text-xs">
@@ -751,20 +1093,75 @@ export default function Appointments() {
                   </div>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Time <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="time"
-                  value={appointmentForm.time}
-                  onChange={(e) => setAppointmentForm({ ...appointmentForm, time: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  required
-                />
-              </div>
+              <FormInput
+                label="Time"
+                required
+                type="time"
+                value={appointmentForm.time}
+                onChange={(e) => setAppointmentForm({ ...appointmentForm, time: e.target.value })}
+              />
             </div>
           </div>
+
+          {/* Service Center Selection (for Call Center only) */}
+          {isCallCenter && (
+            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <Building2 className="text-indigo-600" size={20} />
+                Service Center Assignment
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assign to Service Center <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={appointmentForm.serviceCenterId || ""}
+                    onChange={(e) =>
+                      setAppointmentForm({
+                        ...appointmentForm,
+                        serviceCenterId: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+                    required
+                  >
+                    <option value="">Select Service Center</option>
+                    {availableServiceCenters.map((center) => (
+                      <option key={center.id} value={center.id}>
+                        {center.name} - {center.location}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedCustomer?.address && appointmentForm.serviceCenterId && (
+                  <div className="bg-white border border-indigo-200 rounded-lg p-3 flex items-start gap-3">
+                    <MapPin className="text-indigo-600 shrink-0 mt-0.5" size={18} strokeWidth={2} />
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-indigo-700 mb-1">Nearest Service Center Suggested</p>
+                      <p className="text-sm text-gray-700">
+                        Based on customer address: <span className="font-medium">{selectedCustomer.address}</span>
+                      </p>
+                      {(() => {
+                        const suggestedId = findNearestServiceCenter(selectedCustomer.address);
+                        const isSuggested = suggestedId === appointmentForm.serviceCenterId;
+                        return isSuggested ? (
+                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            <CheckCircle size={12} />
+                            This is the nearest service center to the customer
+                          </p>
+                        ) : (
+                          <p className="text-xs text-amber-600 mt-1">
+                            Note: A different service center may be closer to the customer
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Submit Buttons */}
           <div className="flex gap-3 pt-4 border-t border-gray-200">
@@ -812,6 +1209,28 @@ export default function Appointments() {
                 </div>
               </div>
             </div>
+
+            {/* Service Center Assignment (for Call Center) */}
+            {isCallCenter && selectedAppointment.serviceCenterName && (
+              <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <Building2 className="text-indigo-600" size={20} />
+                  Assigned Service Center
+                </h3>
+                <div className="flex items-center gap-3">
+                  <MapPin className="text-indigo-600" size={18} strokeWidth={2} />
+                  <div>
+                    <p className="font-semibold text-gray-900">{selectedAppointment.serviceCenterName}</p>
+                    {(() => {
+                      const center = availableServiceCenters.find(
+                        (sc) => sc.name === selectedAppointment.serviceCenterName
+                      );
+                      return center && <p className="text-sm text-gray-600">{center.location}</p>;
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Appointment Details */}
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -1026,6 +1445,288 @@ export default function Appointments() {
           )}
         </div>
       </Modal>
+
+      {/* Create Complaint Modal (for Call Center) */}
+      {isCallCenter && (
+        <Modal show={showComplaintModal} onClose={closeComplaintModal} title="Create Complaint">
+          <div className="space-y-4">
+            {/* Customer Information */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative" ref={complaintCustomerDropdownRef}>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Customer Name <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={complaintCustomerSearchQuery}
+                      onChange={(e) => handleComplaintCustomerSearchChange(e.target.value)}
+                      onFocus={() => {
+                        if (complaintCustomerSearchQuery.trim().length >= 2 && customerSearchResults.length > 0) {
+                          setShowComplaintCustomerDropdown(true);
+                        }
+                      }}
+                      placeholder="Start typing customer name..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                      required
+                    />
+                    {showComplaintCustomerDropdown && customerSearchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {customerSearchResults.map((customer) => (
+                          <div
+                            key={customer.id}
+                            onClick={() => handleComplaintCustomerSelect(customer)}
+                            className="p-3 hover:bg-red-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-1.5 rounded-lg bg-red-100">
+                                <User className="text-red-600" size={16} strokeWidth={2} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-gray-900 truncate">{customer.name}</p>
+                                <div className="flex items-center gap-3 text-xs text-gray-600 mt-1">
+                                  <span className="flex items-center gap-1">
+                                    <Phone size={12} />
+                                    {customer.phone}
+                                  </span>
+                                  {customer.vehicles && customer.vehicles.length > 0 && (
+                                    <span className="flex items-center gap-1">
+                                      <Car size={12} />
+                                      {customer.vehicles.length} vehicle{customer.vehicles.length > 1 ? "s" : ""}
+                                    </span>
+                                  )}
+                                  {customer.lastServiceCenterName && (
+                                    <span className="flex items-center gap-1">
+                                      <Building2 size={12} />
+                                      {customer.lastServiceCenterName}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {selectedComplaintCustomer?.id === customer.id && (
+                                <CheckCircle className="text-red-600 shrink-0" size={18} strokeWidth={2} />
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {customerSearchLoading && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={complaintForm.phone}
+                    onChange={(e) =>
+                      setComplaintForm({ ...complaintForm, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })
+                    }
+                    placeholder="9876543210"
+                    maxLength={10}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Vehicle <span className="text-red-500">*</span>
+                  </label>
+                  {selectedComplaintCustomer && selectedComplaintCustomer.vehicles && selectedComplaintCustomer.vehicles.length > 0 ? (
+                    <div>
+                      <select
+                        value={complaintForm.vehicle}
+                        onChange={(e) => setComplaintForm({ ...complaintForm, vehicle: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                        required
+                      >
+                        <option value="">Select Vehicle</option>
+                        {selectedComplaintCustomer.vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={formatVehicleString(vehicle)}>
+                            {formatVehicleString(vehicle)} - {vehicle.registration}
+                          </option>
+                        ))}
+                      </select>
+                      {complaintForm.vehicle && (() => {
+                        const selectedVehicle = selectedComplaintCustomer.vehicles.find((v) => 
+                          formatVehicleString(v) === complaintForm.vehicle
+                        );
+                        return selectedVehicle?.lastServiceCenterName ? (
+                          <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                            <Building2 size={12} />
+                            Last serviced at: {selectedVehicle.lastServiceCenterName}
+                          </p>
+                        ) : null;
+                      })()}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={complaintForm.vehicle}
+                      onChange={(e) => setComplaintForm({ ...complaintForm, vehicle: e.target.value })}
+                      placeholder={selectedComplaintCustomer ? "No vehicles found" : "Select a customer first"}
+                      disabled={!selectedComplaintCustomer}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      required
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Selected Customer Info Display */}
+              {selectedComplaintCustomer && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-red-900 mb-3">Selected Customer Information</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-red-600 font-medium">Customer Number</p>
+                      <p className="text-gray-800 font-semibold">{selectedComplaintCustomer.customerNumber}</p>
+                    </div>
+                    {selectedComplaintCustomer.email && (
+                      <div>
+                        <p className="text-red-600 font-medium">Email</p>
+                        <p className="text-gray-800 font-semibold">{selectedComplaintCustomer.email}</p>
+                      </div>
+                    )}
+                    {selectedComplaintCustomer.address && (
+                      <div className="sm:col-span-2">
+                        <p className="text-red-600 font-medium">Address</p>
+                        <p className="text-gray-800 font-semibold">{selectedComplaintCustomer.address}</p>
+                      </div>
+                    )}
+                    {selectedComplaintCustomer.lastServiceCenterName && (
+                      <div className="sm:col-span-2">
+                        <p className="text-red-600 font-medium flex items-center gap-1">
+                          <Building2 size={14} />
+                          Last Service Center
+                        </p>
+                        <p className="text-gray-800 font-semibold">{selectedComplaintCustomer.lastServiceCenterName}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Complaint Details */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Complaint Details</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Complaint Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={complaintForm.complaint}
+                    onChange={(e) => setComplaintForm({ ...complaintForm, complaint: e.target.value })}
+                    rows={4}
+                    placeholder="Describe the complaint in detail..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none resize-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Severity <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={complaintForm.severity}
+                    onChange={(e) => setComplaintForm({ ...complaintForm, severity: e.target.value as ComplaintForm["severity"] })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    required
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Service Center Selection (for Call Center) */}
+            {isCallCenter && (
+              <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <Building2 className="text-indigo-600" size={20} />
+                  Service Center Assignment
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Assign to Service Center <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={complaintForm.serviceCenterId || ""}
+                      onChange={(e) =>
+                        setComplaintForm({
+                          ...complaintForm,
+                          serviceCenterId: e.target.value ? Number(e.target.value) : undefined,
+                        })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+                      required
+                    >
+                      <option value="">Select Service Center</option>
+                      {availableServiceCenters.map((center) => (
+                        <option key={center.id} value={center.id}>
+                          {center.name} - {center.location}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedComplaintCustomer?.address && complaintForm.serviceCenterId && (
+                    <div className="bg-white border border-indigo-200 rounded-lg p-3 flex items-start gap-3">
+                      <MapPin className="text-indigo-600 shrink-0 mt-0.5" size={18} strokeWidth={2} />
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-indigo-700 mb-1">Nearest Service Center Suggested</p>
+                        <p className="text-sm text-gray-700">
+                          Based on customer address: <span className="font-medium">{selectedComplaintCustomer.address}</span>
+                        </p>
+                        {(() => {
+                          const suggestedId = findNearestServiceCenter(selectedComplaintCustomer.address);
+                          const isSuggested = suggestedId === complaintForm.serviceCenterId;
+                          return isSuggested ? (
+                            <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                              <CheckCircle size={12} />
+                              This is the nearest service center to the customer
+                            </p>
+                          ) : (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Note: A different service center may be closer to the customer
+                            </p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Submit Buttons */}
+            <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <button onClick={closeComplaintModal} className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition">
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitComplaint}
+                className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+              >
+                Create Complaint
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

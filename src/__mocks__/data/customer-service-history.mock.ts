@@ -24,6 +24,8 @@ export const getMockServiceHistory = (vehicleId?: number | string): ServiceHisto
       invoice: "INV-2024-456",
       status: "Completed",
       odometer: "25,000 km",
+      serviceCenterId: 1,
+      serviceCenterName: "Delhi Central Hub",
     },
     {
       id: 2,
@@ -37,6 +39,8 @@ export const getMockServiceHistory = (vehicleId?: number | string): ServiceHisto
       invoice: "INV-2024-389",
       status: "Completed",
       odometer: "24,500 km",
+      serviceCenterId: 2,
+      serviceCenterName: "Mumbai Metroplex",
     },
   ];
 };

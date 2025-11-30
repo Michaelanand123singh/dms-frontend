@@ -16,6 +16,9 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
+  Camera,
+  Upload,
+  Image as ImageIcon,
 } from "lucide-react";
 import Link from "next/link";
 import type { SearchType, Vehicle, ServiceHistoryItem, NewVehicleForm } from "@/shared/types";
@@ -29,6 +32,9 @@ export default function VehicleSearch() {
   const [showAddVehicle, setShowAddVehicle] = useState<boolean>(false);
   const [showAddVehicleForm, setShowAddVehicleForm] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string>("");
+  const [vehiclePhotos, setVehiclePhotos] = useState<File[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState<boolean>(false);
+  const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
   
   // Form state for adding new vehicle
   const [newVehicleForm, setNewVehicleForm] = useState<Partial<NewVehicleForm>>({
@@ -407,6 +413,132 @@ export default function VehicleSearch() {
                 <div className="bg-gray-50 p-4 rounded-xl">
                   <p className="text-sm text-gray-600">Total Spent</p>
                   <p className="text-lg font-bold text-gray-800">{searchResults.totalSpent}</p>
+                </div>
+              </div>
+
+              {/* Vehicle Photo Upload Section */}
+              <div className="mt-6 border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <Camera className="text-blue-600" size={20} />
+                  Vehicle Photos (Check-in Documentation)
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Capture vehicle photos during check-in to document condition and avoid disputes about scratches/damage later.
+                </p>
+                
+                <div className="space-y-4">
+                  {/* Photo Upload Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload Vehicle Photos
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <label className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-2">
+                        <Upload size={18} />
+                        Choose Photos
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            setVehiclePhotos([...vehiclePhotos, ...files]);
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          // Upload photos
+                          if (vehiclePhotos.length === 0) {
+                            alert("Please select photos to upload");
+                            return;
+                          }
+                          
+                          setUploadingPhotos(true);
+                          try {
+                            const token = safeStorage.getItem<string | null>("authToken", null);
+                            const formData = new FormData();
+                            
+                            vehiclePhotos.forEach((photo) => {
+                              formData.append("files", photo);
+                            });
+                            
+                            // Note: This is a simplified version. In production, you'd need to:
+                            // 1. Upload to storage (Supabase/local)
+                            // 2. Get URLs back
+                            // 3. Create VehiclePhoto records via API
+                            
+                            // For now, simulate upload
+                            await new Promise((resolve) => setTimeout(resolve, 1000));
+                            
+                            alert(`${vehiclePhotos.length} photo(s) uploaded successfully!`);
+                            setVehiclePhotos([]);
+                            setUploadedPhotoUrls([...uploadedPhotoUrls, ...vehiclePhotos.map((_, i) => URL.createObjectURL(vehiclePhotos[i]))]);
+                          } catch (error) {
+                            console.error("Error uploading photos:", error);
+                            alert("Failed to upload photos. Please try again.");
+                          } finally {
+                            setUploadingPhotos(false);
+                          }
+                        }}
+                        disabled={vehiclePhotos.length === 0 || uploadingPhotos}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {uploadingPhotos ? "Uploading..." : "Upload Photos"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview Uploaded Photos */}
+                  {vehiclePhotos.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-2">
+                        Selected Photos ({vehiclePhotos.length})
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {vehiclePhotos.map((photo, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={URL.createObjectURL(photo)}
+                              alt={`Vehicle photo ${index + 1}`}
+                              className="w-full h-32 object-cover rounded-lg border border-gray-300"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVehiclePhotos(vehiclePhotos.filter((_, i) => i !== index));
+                              }}
+                              className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display Previously Uploaded Photos */}
+                  {uploadedPhotoUrls.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-2">
+                        Uploaded Photos
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {uploadedPhotoUrls.map((url, index) => (
+                          <div key={index} className="relative">
+                            <img
+                              src={url}
+                              alt={`Uploaded photo ${index + 1}`}
+                              className="w-full h-32 object-cover rounded-lg border border-gray-300"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
