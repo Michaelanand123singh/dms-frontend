@@ -40,11 +40,13 @@ import type {
   ServiceHistoryItem,
   CustomerType,
   NewVehicleForm,
+  UserRole,
 } from "@/shared/types";
 import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
 import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
 import { mockCustomers } from "@/__mocks__/data/customers.mock";
 import { serviceTypes } from "@/__mocks__/data/appointments.mock";
+import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
 
 // Initial form states (constants for reuse)
 const initialCustomerForm: NewCustomerForm = {
@@ -54,8 +56,8 @@ const initialCustomerForm: NewCustomerForm = {
   alternateMobile: "",
   email: "",
   address: "",
-  cityState: "",
   pincode: "",
+  cityState: "",
   customerType: undefined,
   serviceType: undefined,
   addressType: undefined,
@@ -71,7 +73,6 @@ const initialVehicleForm: Partial<NewVehicleForm> = {
   motorNumber: "",
   chargerSerialNumber: "",
   purchaseDate: "",
-  vehicleAge: "",
   warrantyStatus: "",
   insuranceStartDate: "",
   insuranceEndDate: "",
@@ -99,12 +100,15 @@ const initialAppointmentForm = {
   duration: "2",
   // Customer Information
   customerType: undefined as "B2C" | "B2B" | undefined,
+  alternateMobile: undefined as string | undefined,
   // Service Details
   customerComplaintIssue: undefined as string | undefined,
   previousServiceHistory: undefined as string | undefined,
   estimatedServiceTime: undefined as string | undefined,
   estimatedCost: undefined as string | undefined,
   odometerReading: undefined as string | undefined,
+  engineNumber: undefined as string | undefined,
+  insuranceExpiry: undefined as string | undefined,
   // Documentation
   customerIdProof: undefined as DocumentationFiles | undefined,
   vehicleRCCopy: undefined as DocumentationFiles | undefined,
@@ -118,11 +122,13 @@ const initialAppointmentForm = {
   pickupAddress: undefined as string | undefined,
   dropAddress: undefined as string | undefined,
   preferredCommunicationMode: undefined as "Phone" | "Email" | "SMS" | "WhatsApp" | undefined,
+  assignedServiceCenter: undefined as string | undefined,
   // Billing & Payment
   paymentMethod: undefined as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | undefined,
   gstRequirement: undefined as boolean | undefined,
   businessNameForInvoice: undefined as string | undefined,
   // Post-Service Survey
+  serviceStatus: undefined as string | undefined,
   feedbackRating: undefined as number | undefined,
   nextServiceDueDate: undefined as string | undefined,
   amcSubscriptionStatus: undefined as string | undefined,
@@ -395,6 +401,47 @@ export default function CustomerFind() {
   const { userRole, userInfo } = useRole();
   const isCallCenter = userRole === "call_center";
   const isServiceAdvisor = userRole === "service_advisor";
+  const isServiceManager = userRole === "sc_manager";
+  const isTechnician = userRole === "service_engineer";
+  const isInventoryManager = userRole === "sc_staff";
+  const isAdminRole = userRole === "admin" || userRole === "super_admin";
+
+  const hasRoleAccess = (roles: UserRole[]): boolean => {
+    return isAdminRole || roles.includes(userRole);
+  };
+
+  const canAccessCustomerType = hasRoleAccess(["call_center", "service_advisor", "sc_staff"]);
+  const canAccessServiceDetails = hasRoleAccess(["call_center", "service_advisor", "sc_manager", "service_engineer"]);
+  const canAccessEstimatedCost = hasRoleAccess(["service_advisor", "sc_manager"]);
+  const canAccessOdometer = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
+  const hasDocUploadAccess = hasRoleAccess(["call_center", "service_advisor"]);
+  const hasDropoffMediaAccess = hasRoleAccess([
+    "call_center",
+    "service_advisor",
+    "sc_manager",
+    "sc_staff",
+  ]);
+  const canAccessOperationalDetails = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
+  const canAssignTechnician = hasRoleAccess(["service_advisor", "sc_manager", "service_engineer"]);
+  const canAccessPreferredCommunication = hasRoleAccess([
+    "call_center",
+    "service_advisor",
+    "sc_manager",
+  ]);
+  const canAccessPostServiceSurvey = hasRoleAccess([
+    "call_center",
+    "service_advisor",
+    "sc_manager",
+    "service_engineer",
+  ]);
+  const canAccessAMCStatus = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
+  const canAccessPickupAddress = hasRoleAccess(["call_center", "service_advisor"]);
+  const canAccessVehicleInfo = hasRoleAccess(["call_center", "service_advisor"]);
+  const canAccessBillingSection = hasRoleAccess(["service_advisor", "sc_manager", "sc_staff"]);
+  const canAccessBusinessName = hasRoleAccess(["service_advisor", "sc_manager", "sc_staff"]);
+  const canAccessServiceStatus = hasRoleAccess(["call_center", "service_advisor", "sc_manager", "service_engineer"]);
+  const canViewCostEstimation = canAccessEstimatedCost || isInventoryManager;
+  const canAssignServiceCenter = canAccessOperationalDetails;
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
   const [showCreateCustomer, setShowCreateCustomer] = useState<boolean>(false);
@@ -408,9 +455,29 @@ export default function CustomerFind() {
   const [serviceHistory, setServiceHistory] = useState<ServiceHistoryItem[]>([]);
   const [validationError, setValidationError] = useState<string>("");
   const [detectedSearchType, setDetectedSearchType] = useState<CustomerSearchType | null>(null);
+  const getNearestServiceCenter = useCallback(() => {
+    const defaultCenter = staticServiceCenters[0]?.name ?? "";
+    if (!selectedCustomer) return defaultCenter;
+    const normalizedCity = selectedCustomer.cityState?.split(",")[0]?.trim().toLowerCase();
+    if (normalizedCity) {
+      const match = staticServiceCenters.find(
+        (center) =>
+          center.location.toLowerCase().includes(normalizedCity) ||
+          center.name.toLowerCase().includes(normalizedCity)
+      );
+      if (match) return match.name;
+    }
+    return defaultCenter;
+  }, [selectedCustomer]);
+
+  const handleAssignNearestCenter = useCallback(() => {
+    const nearest = getNearestServiceCenter();
+    if (nearest) {
+      setAppointmentForm((prev) => ({ ...prev, assignedServiceCenter: nearest }));
+    }
+  }, [getNearestServiceCenter]);
   const [whatsappSameAsMobile, setWhatsappSameAsMobile] = useState<boolean>(false);
   const [pickupAddressDifferent, setPickupAddressDifferent] = useState<boolean>(false);
-  const [customerPickupSameAsAddress, setCustomerPickupSameAsAddress] = useState<boolean>(false);
   
   // Toast notification state
   const [toast, setToast] = useState<{ show: boolean; message: string; type?: "success" | "error" }>({
@@ -437,6 +504,7 @@ export default function CustomerFind() {
     ...initialAppointmentForm,
     date: new Date().toISOString().split("T")[0],
   }));
+
 
   // Auto-detect search type based on input
   const detectSearchType = (query: string): CustomerSearchType => {
@@ -533,7 +601,6 @@ export default function CustomerFind() {
       workAddress: "",
     });
     setWhatsappSameAsMobile(false);
-    setCustomerPickupSameAsAddress(false);
   }, [setNewCustomerForm]);
 
   const resetVehicleForm = useCallback(() => {
@@ -1123,6 +1190,22 @@ export default function CustomerFind() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormInput
+                  label="City / State"
+                  value={newCustomerForm.cityState || ""}
+                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, cityState: e.target.value })}
+                  placeholder="Enter city and state"
+                />
+                <FormInput
+                  label="Pincode"
+                  value={newCustomerForm.pincode || ""}
+                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) })}
+                  placeholder="6-digit pincode"
+                  maxLength={6}
+                />
+              </div>
+
               {/* Service Type */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1175,130 +1258,6 @@ export default function CustomerFind() {
                 </div>
               </div>
 
-              {/* Pickup / Drop Service Preference at Customer Level */}
-              <div className="space-y-3">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Pickup / Drop Service
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newCustomerForm.pickupDropRequired || false}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setNewCustomerForm({
-                        ...newCustomerForm,
-                        pickupDropRequired: checked,
-                        ...(checked
-                          ? {}
-                          : {
-                              pickupAddress: "",
-                              dropAddress: "",
-                            }),
-                      });
-                      if (!checked) {
-                        setCustomerPickupSameAsAddress(false);
-                      }
-                    }}
-                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                  />
-                  <span className="text-sm text-gray-700">Customer wants Pickup / Drop service</span>
-                </label>
-
-                {newCustomerForm.pickupDropRequired && (
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={customerPickupSameAsAddress}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setCustomerPickupSameAsAddress(checked);
-                          setNewCustomerForm({
-                            ...newCustomerForm,
-                            pickupAddress: checked ? newCustomerForm.address || "" : "",
-                            dropAddress: checked ? newCustomerForm.address || "" : "",
-                          });
-                        }}
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <span className="text-sm text-gray-700">Same as full address provided</span>
-                    </label>
-
-                    {!customerPickupSameAsAddress && (
-                      <>
-                        <FormInput
-                          label="Pickup Address"
-                          value={newCustomerForm.pickupAddress || ""}
-                          onChange={(e) =>
-                            setNewCustomerForm({ ...newCustomerForm, pickupAddress: e.target.value })
-                          }
-                          placeholder="Enter pickup address (if different from full address)"
-                        />
-                        <FormInput
-                          label="Drop Address"
-                          value={newCustomerForm.dropAddress || ""}
-                          onChange={(e) =>
-                            setNewCustomerForm({ ...newCustomerForm, dropAddress: e.target.value })
-                          }
-                          placeholder="Enter drop address (if different from full address)"
-                        />
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Address Type Selection - Always visible */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Address Type for Pickup/Drop
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setNewCustomerForm({ ...newCustomerForm, addressType: "home" })}
-                    className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 border-2 ${
-                      newCustomerForm.addressType === "home"
-                        ? "bg-indigo-50 border-indigo-500"
-                        : "border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30"
-                    }`}
-                  >
-                    <Home className={`${newCustomerForm.addressType === "home" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
-                    <span className={`text-sm font-medium ${newCustomerForm.addressType === "home" ? "text-indigo-700" : "text-gray-600"}`}>Home Address</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewCustomerForm({ ...newCustomerForm, addressType: "work" })}
-                    className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 border-2 ${
-                      newCustomerForm.addressType === "work"
-                        ? "bg-indigo-50 border-indigo-500"
-                        : "border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30"
-                    }`}
-                  >
-                    <Building2 className={`${newCustomerForm.addressType === "work" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
-                    <span className={`text-sm font-medium ${newCustomerForm.addressType === "work" ? "text-indigo-700" : "text-gray-600"}`}>Work Address</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Work Address - Only show when Work Address is selected */}
-              {newCustomerForm.addressType === "work" && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Work Address (Pickup/Drop) <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={newCustomerForm.workAddress || ""}
-                    onChange={(e) =>
-                      setNewCustomerForm({ ...newCustomerForm, workAddress: e.target.value })
-                    }
-                    rows={3}
-                    placeholder="Enter work address for pickup/drop service"
-                    className="w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 resize-none"
-                  />
-                </div>
-              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
@@ -1609,12 +1568,6 @@ export default function CustomerFind() {
                       value={newVehicleForm.purchaseDate || ""}
                       onChange={(e) => setNewVehicleForm({ ...newVehicleForm, purchaseDate: e.target.value })}
                     />
-                    <FormInput
-                      label="Vehicle Age"
-                      value={newVehicleForm.vehicleAge || ""}
-                      onChange={(e) => setNewVehicleForm({ ...newVehicleForm, vehicleAge: e.target.value })}
-                      placeholder="e.g., 2 years, 6 months"
-                    />
                   </div>
 
                   <FormSelect
@@ -1905,6 +1858,90 @@ export default function CustomerFind() {
                   ) : (
                     <p className="text-gray-500 text-center py-8">No service history found</p>
                   )}
+                  {canAccessPostServiceSurvey && serviceHistory.length > 0 && (
+                    <div className="bg-teal-50 p-4 rounded-lg border border-teal-200 mt-6">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <CheckCircle className="text-teal-600" size={20} />
+                        Post-Service Feedback
+                      </h3>
+                      <div className="space-y-4">
+                        {canAccessServiceStatus && (
+                          <FormSelect
+                            label="Service Status"
+                            value={appointmentForm.serviceStatus || ""}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, serviceStatus: e.target.value })}
+                            placeholder="Select service status"
+                            options={[
+                              { value: "Pending", label: "Pending" },
+                              { value: "In Service", label: "In Service" },
+                              { value: "Ready for Delivery", label: "Ready for Delivery" },
+                              { value: "Delivered", label: "Delivered" },
+                              { value: "Cancelled", label: "Cancelled" },
+                            ]}
+                          />
+                        )}
+
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Feedback Rating
+                          </label>
+                          <div className="flex items-center gap-2">
+                            {[1, 2, 3, 4, 5].map((rating) => (
+                              <button
+                                key={rating}
+                                type="button"
+                                onClick={() => setAppointmentForm({ ...appointmentForm, feedbackRating: rating })}
+                                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
+                                  appointmentForm.feedbackRating === rating
+                                    ? "bg-teal-600 text-white scale-110"
+                                    : "bg-gray-200 text-gray-600 hover:bg-teal-100 hover:text-teal-700"
+                                }`}
+                              >
+                                {rating}
+                              </button>
+                            ))}
+                            {appointmentForm.feedbackRating && (
+                              <span className="text-sm text-gray-600 ml-2">
+                                {appointmentForm.feedbackRating === 5
+                                  ? "Excellent"
+                                  : appointmentForm.feedbackRating === 4
+                                  ? "Very Good"
+                                  : appointmentForm.feedbackRating === 3
+                                  ? "Good"
+                                  : appointmentForm.feedbackRating === 2
+                                  ? "Fair"
+                                  : "Poor"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {canAccessServiceStatus && (
+                          <FormInput
+                            label="Next Service Due Date"
+                            type="date"
+                            value={appointmentForm.nextServiceDueDate || ""}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, nextServiceDueDate: e.target.value })}
+                          />
+                        )}
+
+                        {canAccessAMCStatus && (
+                          <FormSelect
+                            label="AMC / Subscription Status"
+                            value={appointmentForm.amcSubscriptionStatus || ""}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, amcSubscriptionStatus: e.target.value })}
+                            placeholder="Select AMC/Subscription status"
+                            options={[
+                              { value: "Active", label: "Active" },
+                              { value: "Expired", label: "Expired" },
+                              { value: "Not Applicable", label: "Not Applicable" },
+                              { value: "Pending Renewal", label: "Pending Renewal" },
+                            ]}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
             </div>
           </Modal>
@@ -1915,26 +1952,103 @@ export default function CustomerFind() {
           <Modal title="Schedule Appointment" onClose={closeAppointmentForm} maxWidth="2xl">
             <div className="space-y-6">
                 {validationError && <ErrorAlert message={validationError} />}
-                <CustomerInfoCard customer={selectedCustomer} title="Customer Information (Pre-filled)" />
+                {canAccessCustomerType && (
+                  <div className="space-y-4">
+                    <CustomerInfoCard customer={selectedCustomer} title="Customer Information (Pre-filled)" />
+                    <div className="space-y-4">
+                      <FormInput
+                        label="Customer Name"
+                        required
+                        value={appointmentForm.customerName}
+                        onChange={() => {}}
+                        readOnly
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormInput
+                          label="Phone Number"
+                          required
+                          type="tel"
+                          value={appointmentForm.phone}
+                          onChange={() => {}}
+                          maxLength={10}
+                          readOnly
+                        />
+                        <FormInput
+                          label="WhatsApp Number"
+                          required
+                          type="tel"
+                          value={selectedCustomer.whatsappNumber || selectedCustomer.phone}
+                          onChange={() => {}}
+                          maxLength={10}
+                          readOnly
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormInput
+                          label="Alternate Mobile"
+                          type="tel"
+                          value={appointmentForm.alternateMobile || ""}
+                          onChange={(e) =>
+                            setAppointmentForm({ ...appointmentForm, alternateMobile: e.target.value.replace(/\D/g, "").slice(0, 10) })
+                          }
+                          placeholder="Optional alternate contact"
+                          maxLength={10}
+                        />
+                        <FormInput
+                          label="Email ID"
+                          type="email"
+                          value={selectedCustomer.email || ""}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                      </div>
+                      {selectedCustomer.address && (
+                        <FormInput
+                          label="Address"
+                          value={selectedCustomer.address}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                      )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedCustomer.cityState && (
+                          <FormInput
+                            label="City / State"
+                            value={selectedCustomer.cityState || ""}
+                            onChange={() => {}}
+                            readOnly
+                          />
+                        )}
+                        <FormInput
+                          label="Pincode"
+                          value={selectedCustomer.pincode || ""}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+                        {selectedCustomer.customerType && (
+                          <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
+                            Customer Type: {selectedCustomer.customerType}
+                          </span>
+                        )}
+                        {selectedCustomer.serviceType && (
+                          <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
+                            Service Type: {selectedCustomer.serviceType}
+                          </span>
+                        )}
+                        {selectedCustomer.addressType && (
+                          <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
+                            Address Type: {selectedCustomer.addressType === "home" ? "Home" : "Work"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Appointment Form */}
                 <div className="space-y-4">
-                  <FormInput
-                    label="Customer Name"
-                    required
-                    value={appointmentForm.customerName}
-                    onChange={() => {}}
-                    readOnly
-                  />
-                  <FormInput
-                    label="Phone Number"
-                    required
-                    type="tel"
-                    value={appointmentForm.phone}
-                    onChange={() => {}}
-                    maxLength={10}
-                    readOnly
-                  />
                   <div>
                     {selectedCustomer && selectedCustomer.vehicles && selectedCustomer.vehicles.length > 1 ? (
                       <FormSelect
@@ -1979,8 +2093,36 @@ export default function CustomerFind() {
                     options={serviceTypes.map((type) => ({ value: type, label: type }))}
                   />
 
-                  {/* Customer Type (Call Center, Service Advisor) */}
-                  {(isCallCenter || isServiceAdvisor) && (
+                  {canAssignServiceCenter && (
+                    <div className="space-y-2">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <FormSelect
+                          label="Service Center"
+                          value={appointmentForm.assignedServiceCenter || ""}
+                          onChange={(e) =>
+                            setAppointmentForm({ ...appointmentForm, assignedServiceCenter: e.target.value })
+                          }
+                          placeholder="Select service center"
+                          options={staticServiceCenters.map((center) => ({
+                            value: center.name,
+                            label: `${center.name} • ${center.location}`,
+                          }))}
+                          className="flex-1"
+                        />
+                        <Button onClick={handleAssignNearestCenter} variant="secondary" size="sm" className="whitespace-nowrap">
+                          Assign Nearest
+                        </Button>
+                      </div>
+                      {appointmentForm.assignedServiceCenter && (
+                        <p className="text-xs text-gray-500">
+                          Selected center: {appointmentForm.assignedServiceCenter}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Customer Type */}
+                  {canAccessCustomerType && (
                     <FormSelect
                       label="Customer Type"
                       value={appointmentForm.customerType || ""}
@@ -1993,8 +2135,68 @@ export default function CustomerFind() {
                     />
                   )}
 
-                  {/* Service Details Section (Call Center, Service Advisor) */}
-                  {(isCallCenter || isServiceAdvisor) && (
+                  {selectedVehicle && canAccessVehicleInfo && (
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <Car className="text-indigo-600" size={20} />
+                        Vehicle Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormInput
+                          label="Vehicle Brand"
+                          value={selectedVehicle.vehicleMake}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                        <FormInput
+                          label="Vehicle Model"
+                          value={selectedVehicle.vehicleModel}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                        <FormInput
+                          label="Registration Number"
+                          value={selectedVehicle.registration || ""}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                        <FormInput
+                          label="VIN / Chassis"
+                          value={selectedVehicle.vin}
+                          onChange={() => {}}
+                          readOnly
+                          className="font-mono"
+                        />
+                        <FormInput
+                          label="Owner Name"
+                          value={selectedVehicle.customerName}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                        <FormInput
+                          label="Year of Manufacture"
+                          value={selectedVehicle.vehicleYear?.toString() || ""}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                        <FormInput
+                          label="Engine Number"
+                          value={appointmentForm.engineNumber || ""}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, engineNumber: e.target.value })}
+                          placeholder="Enter engine number"
+                        />
+                        <FormInput
+                          label="Insurance Expiry"
+                          type="date"
+                          value={appointmentForm.insuranceExpiry || ""}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, insuranceExpiry: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Service Details Section */}
+                  {canAccessServiceDetails && (
                     <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                         <FileText className="text-purple-600" size={20} />
@@ -2026,23 +2228,24 @@ export default function CustomerFind() {
                             className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
                           />
                         </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormInput
                             label="Estimated Service Time"
                             value={appointmentForm.estimatedServiceTime || ""}
                             onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedServiceTime: e.target.value })}
                             placeholder="e.g., 2 hours"
                           />
-                          <FormInput
-                            label="Estimated Cost"
-                            type="number"
-                            value={appointmentForm.estimatedCost || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedCost: e.target.value })}
-                            placeholder="Enter estimated cost"
-                          />
+                          {canAccessEstimatedCost && (
+                            <FormInput
+                              label="Estimated Cost"
+                              type="number"
+                              value={appointmentForm.estimatedCost || ""}
+                              onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedCost: e.target.value })}
+                              placeholder="Enter estimated cost"
+                            />
+                          )}
                         </div>
-                        {/* Odometer Reading - Only for Service Advisor */}
-                        {isServiceAdvisor && (
+                        {canAccessOdometer && (
                           <FormInput
                             label="Odometer Reading"
                             type="number"
@@ -2055,145 +2258,149 @@ export default function CustomerFind() {
                     </div>
                   )}
 
-                  {/* Documentation Section (Call Center, Service Advisor) */}
-                  {(isCallCenter || isServiceAdvisor) && (
+                  {/* Documentation Section */}
+                  {(hasDocUploadAccess || hasDropoffMediaAccess) && (
                     <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                         <Upload className="text-amber-600" size={20} />
                         Documentation
                       </h3>
                       <div className="space-y-4">
-                        {/* Customer ID Proof */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Customer ID Proof <span className="text-xs font-normal text-gray-500">(Optional)</span>
-                          </label>
-                          <input
-                            type="file"
-                            multiple
-                            accept="image/*,.pdf"
-                            onChange={(e) => {
-                              const files = Array.from(e.target.files || []);
-                              const urls = files.map((file) => URL.createObjectURL(file));
-                              setAppointmentForm({
-                                ...appointmentForm,
-                                customerIdProof: {
-                                  files,
-                                  urls,
-                                },
-                              });
-                            }}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
-                          />
-                          {appointmentForm.customerIdProof?.files && appointmentForm.customerIdProof.files.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {appointmentForm.customerIdProof.files.map((file, index) => (
-                                <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                  {file.name}
-                                </span>
-                              ))}
+                        {hasDocUploadAccess && (
+                          <>
+                            {/* Customer ID Proof */}
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Customer ID Proof <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                              </label>
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*,.pdf"
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  const urls = files.map((file) => URL.createObjectURL(file));
+                                  setAppointmentForm({
+                                    ...appointmentForm,
+                                    customerIdProof: {
+                                      files,
+                                      urls,
+                                    },
+                                  });
+                                }}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
+                              />
+                              {appointmentForm.customerIdProof?.files && appointmentForm.customerIdProof.files.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {appointmentForm.customerIdProof.files.map((file, index) => (
+                                    <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                                      {file.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
 
-                        {/* Vehicle RC Copy */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Vehicle RC Copy <span className="text-xs font-normal text-gray-500">(Optional)</span>
-                          </label>
-                          <input
-                            type="file"
-                            multiple
-                            accept="image/*,.pdf"
-                            onChange={(e) => {
-                              const files = Array.from(e.target.files || []);
-                              const urls = files.map((file) => URL.createObjectURL(file));
-                              setAppointmentForm({
-                                ...appointmentForm,
-                                vehicleRCCopy: {
-                                  files,
-                                  urls,
-                                },
-                              });
-                            }}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
-                          />
-                          {appointmentForm.vehicleRCCopy?.files && appointmentForm.vehicleRCCopy.files.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {appointmentForm.vehicleRCCopy.files.map((file, index) => (
-                                <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                  {file.name}
-                                </span>
-                              ))}
+                            {/* Vehicle RC Copy */}
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Vehicle RC Copy <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                              </label>
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*,.pdf"
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  const urls = files.map((file) => URL.createObjectURL(file));
+                                  setAppointmentForm({
+                                    ...appointmentForm,
+                                    vehicleRCCopy: {
+                                      files,
+                                      urls,
+                                    },
+                                  });
+                                }}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
+                              />
+                              {appointmentForm.vehicleRCCopy?.files && appointmentForm.vehicleRCCopy.files.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {appointmentForm.vehicleRCCopy.files.map((file, index) => (
+                                    <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                                      {file.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
 
-                        {/* Warranty Card / Service Book */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Warranty Card / Service Book
-                          </label>
-                          <input
-                            type="file"
-                            multiple
-                            accept="image/*,.pdf"
-                            onChange={(e) => {
-                              const files = Array.from(e.target.files || []);
-                              const urls = files.map((file) => URL.createObjectURL(file));
-                              setAppointmentForm({
-                                ...appointmentForm,
-                                warrantyCardServiceBook: {
-                                  files,
-                                  urls,
-                                },
-                              });
-                            }}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
-                          />
-                          {appointmentForm.warrantyCardServiceBook?.files && appointmentForm.warrantyCardServiceBook.files.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {appointmentForm.warrantyCardServiceBook.files.map((file, index) => (
-                                <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                  {file.name}
-                                </span>
-                              ))}
+                            {/* Warranty Card / Service Book */}
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Warranty Card / Service Book
+                              </label>
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*,.pdf"
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  const urls = files.map((file) => URL.createObjectURL(file));
+                                  setAppointmentForm({
+                                    ...appointmentForm,
+                                    warrantyCardServiceBook: {
+                                      files,
+                                      urls,
+                                    },
+                                  });
+                                }}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
+                              />
+                              {appointmentForm.warrantyCardServiceBook?.files && appointmentForm.warrantyCardServiceBook.files.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {appointmentForm.warrantyCardServiceBook.files.map((file, index) => (
+                                    <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                                      {file.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-
-                        {/* Photos/Videos of Vehicle at Drop-off */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Photos/Videos of Vehicle at Drop-off
-                          </label>
-                          <input
-                            type="file"
-                            multiple
-                            accept="image/*,video/*"
-                            onChange={(e) => {
-                              const files = Array.from(e.target.files || []);
-                              const urls = files.map((file) => URL.createObjectURL(file));
-                              setAppointmentForm({
-                                ...appointmentForm,
-                                photosVideos: {
-                                  files,
-                                  urls,
-                                },
-                              });
-                            }}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
-                          />
-                          {appointmentForm.photosVideos?.files && appointmentForm.photosVideos.files.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {appointmentForm.photosVideos.files.map((file, index) => (
-                                <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                  {file.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                          </>
+                        )}
+                        {hasDropoffMediaAccess && (
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Photos/Videos of Vehicle at Drop-off
+                            </label>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*,video/*"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                const urls = files.map((file) => URL.createObjectURL(file));
+                                setAppointmentForm({
+                                  ...appointmentForm,
+                                  photosVideos: {
+                                    files,
+                                    urls,
+                                  },
+                                });
+                              }}
+                              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
+                            />
+                            {appointmentForm.photosVideos?.files && appointmentForm.photosVideos.files.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {appointmentForm.photosVideos.files.map((file, index) => (
+                                  <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                                    {file.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2220,15 +2427,33 @@ export default function CustomerFind() {
                   </div>
 
                   {/* Operational Details Section */}
-                  {(isCallCenter || isServiceAdvisor) && (
+                  {canAccessOperationalDetails && (
                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                         <Clock className="text-blue-600" size={20} />
                         Operational Details
                       </h3>
                       <div className="space-y-4">
-                        {/* Estimated Delivery Date (Service Advisor) */}
-                        {isServiceAdvisor && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormInput
+                            label="Date"
+                            required
+                            type="date"
+                            value={appointmentForm.date}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, date: e.target.value })}
+                            // @ts-ignore
+                            min={new Date().toISOString().split("T")[0]}
+                          />
+                          <FormInput
+                            label="Time"
+                            required
+                            type="time"
+                            value={appointmentForm.time}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, time: e.target.value })}
+                          />
+                        </div>
+
+                        {(isServiceAdvisor || isServiceManager) && (
                           <FormInput
                             label="Estimated Delivery Date"
                             type="date"
@@ -2237,8 +2462,7 @@ export default function CustomerFind() {
                           />
                         )}
 
-                        {/* Assigned Service Advisor (Call Center, Service Advisor) */}
-                        {(isCallCenter || isServiceAdvisor) && (
+                        {(isServiceAdvisor || isServiceManager) && (
                           <FormInput
                             label="Assigned Service Advisor"
                             value={appointmentForm.assignedServiceAdvisor || ""}
@@ -2247,8 +2471,7 @@ export default function CustomerFind() {
                           />
                         )}
 
-                        {/* Assigned Technician (Service Advisor) */}
-                        {isServiceAdvisor && (
+                        {canAssignTechnician && (
                           <FormInput
                             label="Assigned Technician"
                             value={appointmentForm.assignedTechnician || ""}
@@ -2258,86 +2481,84 @@ export default function CustomerFind() {
                         )}
 
                         {/* Pickup / Drop Required */}
-                        {(isCallCenter || isServiceAdvisor) && (
-                          <div className="space-y-3">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={appointmentForm.pickupDropRequired || false}
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  setAppointmentForm({
-                                    ...appointmentForm,
-                                    pickupDropRequired: checked,
-                                    ...(checked
-                                      ? {}
-                                      : {
-                                          pickupAddress: undefined,
-                                          dropAddress: undefined,
-                                        }),
-                                  });
-                                  if (!checked) {
-                                    setPickupAddressDifferent(false);
-                                  }
-                                }}
-                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                              />
-                              <span className="text-sm font-medium text-gray-700">Pickup / Drop Required</span>
-                            </label>
+                        <div className="space-y-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={appointmentForm.pickupDropRequired || false}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setAppointmentForm({
+                                  ...appointmentForm,
+                                  pickupDropRequired: checked,
+                                  ...(checked
+                                    ? {}
+                                    : {
+                                        pickupAddress: undefined,
+                                        dropAddress: undefined,
+                                      }),
+                                });
+                                if (!checked) {
+                                  setPickupAddressDifferent(false);
+                                }
+                              }}
+                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">Pickup / Drop Required</span>
+                          </label>
 
-                            {/* If pickup/drop is required, ask only when address is different */}
-                            {appointmentForm.pickupDropRequired && (
-                              <div className="space-y-3">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={pickupAddressDifferent}
-                                    onChange={(e) => {
-                                      const checked = e.target.checked;
-                                      setPickupAddressDifferent(checked);
-                                      if (!checked) {
-                                        setAppointmentForm({
-                                          ...appointmentForm,
-                                          pickupAddress: undefined,
-                                          dropAddress: undefined,
-                                        });
-                                      }
-                                    }}
-                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          {/* If pickup/drop is required, ask only when address is different */}
+                          {appointmentForm.pickupDropRequired && (
+                            <div className="space-y-3">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={pickupAddressDifferent}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setPickupAddressDifferent(checked);
+                                    if (!checked) {
+                                      setAppointmentForm({
+                                        ...appointmentForm,
+                                        pickupAddress: undefined,
+                                        dropAddress: undefined,
+                                      });
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                />
+                                <span className="text-sm text-gray-700">
+                                  Pickup / Drop address is different from customer address
+                                </span>
+                              </label>
+
+                              {pickupAddressDifferent && canAccessPickupAddress && (
+                                <>
+                                  <FormInput
+                                    label="Pickup Address"
+                                    value={appointmentForm.pickupAddress || ""}
+                                    onChange={(e) =>
+                                      setAppointmentForm({ ...appointmentForm, pickupAddress: e.target.value })
+                                    }
+                                    placeholder="Enter pickup address"
                                   />
-                                  <span className="text-sm text-gray-700">
-                                    Pickup / Drop address is different from customer address
-                                  </span>
-                                </label>
 
-                                {pickupAddressDifferent && (
-                                  <>
-                                    <FormInput
-                                      label="Pickup Address"
-                                      value={appointmentForm.pickupAddress || ""}
-                                      onChange={(e) =>
-                                        setAppointmentForm({ ...appointmentForm, pickupAddress: e.target.value })
-                                      }
-                                      placeholder="Enter pickup address"
-                                    />
-
-                                    <FormInput
-                                      label="Drop Address"
-                                      value={appointmentForm.dropAddress || ""}
-                                      onChange={(e) =>
-                                        setAppointmentForm({ ...appointmentForm, dropAddress: e.target.value })
-                                      }
-                                      placeholder="Enter drop address"
-                                    />
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                                  <FormInput
+                                    label="Drop Address"
+                                    value={appointmentForm.dropAddress || ""}
+                                    onChange={(e) =>
+                                      setAppointmentForm({ ...appointmentForm, dropAddress: e.target.value })
+                                    }
+                                    placeholder="Enter drop address"
+                                  />
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
                         {/* Preferred Communication Mode */}
-                        {(isCallCenter || isServiceAdvisor) && (
+                        {canAccessPreferredCommunication && (
                           <FormSelect
                             label="Preferred Communication Mode"
                             value={appointmentForm.preferredCommunicationMode || ""}
@@ -2355,74 +2576,55 @@ export default function CustomerFind() {
                     </div>
                   )}
 
-                  {/* Post-Service Survey Section */}
-                  {(isCallCenter || isServiceAdvisor) && (
-                    <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
+                  {canAccessBillingSection && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <CheckCircle className="text-teal-600" size={20} />
-                        Post-Service Survey
+                        <FileText className="text-indigo-600" size={20} />
+                        Billing & Payment
                       </h3>
                       <div className="space-y-4">
-                        {/* Feedback Rating */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Feedback Rating
-                          </label>
-                          <div className="flex items-center gap-2">
-                            {[1, 2, 3, 4, 5].map((rating) => (
-                              <button
-                                key={rating}
-                                type="button"
-                                onClick={() => setAppointmentForm({ ...appointmentForm, feedbackRating: rating })}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-                                  appointmentForm.feedbackRating === rating
-                                    ? "bg-teal-600 text-white scale-110"
-                                    : "bg-gray-200 text-gray-600 hover:bg-teal-100 hover:text-teal-700"
-                                }`}
-                              >
-                                {rating}
-                              </button>
-                            ))}
-                            {appointmentForm.feedbackRating && (
-                              <span className="text-sm text-gray-600 ml-2">
-                                {appointmentForm.feedbackRating === 5
-                                  ? "Excellent"
-                                  : appointmentForm.feedbackRating === 4
-                                  ? "Very Good"
-                                  : appointmentForm.feedbackRating === 3
-                                  ? "Good"
-                                  : appointmentForm.feedbackRating === 2
-                                  ? "Fair"
-                                  : "Poor"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Next Service Due Date */}
-                        <FormInput
-                          label="Next Service Due Date"
-                          type="date"
-                          value={appointmentForm.nextServiceDueDate || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, nextServiceDueDate: e.target.value })}
-                        />
-
-                        {/* AMC / Subscription Status */}
                         <FormSelect
-                          label="AMC / Subscription Status"
-                          value={appointmentForm.amcSubscriptionStatus || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, amcSubscriptionStatus: e.target.value })}
-                          placeholder="Select AMC/Subscription status"
+                          label="Payment Mode"
+                          value={appointmentForm.paymentMethod || ""}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, paymentMethod: e.target.value as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | undefined })}
+                          placeholder="Select payment method"
                           options={[
-                            { value: "Active", label: "Active" },
-                            { value: "Expired", label: "Expired" },
-                            { value: "Not Applicable", label: "Not Applicable" },
-                            { value: "Pending Renewal", label: "Pending Renewal" },
+                            { value: "Cash", label: "Cash" },
+                            { value: "Card", label: "Card" },
+                            { value: "UPI", label: "UPI" },
+                            { value: "Online", label: "Online" },
+                            { value: "Cheque", label: "Cheque" },
                           ]}
                         />
+                        {canAccessBusinessName && (
+                          <FormInput
+                            label="Business Name for Invoice"
+                            value={appointmentForm.businessNameForInvoice || ""}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, businessNameForInvoice: e.target.value })}
+                            placeholder="Enter business/institution name"
+                          />
+                        )}
+                        {canViewCostEstimation && (
+                          <FormInput
+                            label="Cost Estimation"
+                            value={appointmentForm.estimatedCost ? `₹${appointmentForm.estimatedCost}` : ""}
+                            onChange={() => {}}
+                            readOnly
+                          />
+                        )}
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!appointmentForm.gstRequirement}
+                            onChange={(e) => setAppointmentForm({ ...appointmentForm, gstRequirement: e.target.checked })}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <span>GST Required</span>
+                        </label>
                       </div>
                     </div>
                   )}
+
                 </div>
 
                 {/* Action Buttons */}
@@ -2464,14 +2666,18 @@ export default function CustomerFind() {
                         duration: `${appointmentForm.duration} hours`,
                         status: "Confirmed",
                         customerType: appointmentForm.customerType,
+                      alternateMobile: appointmentForm.alternateMobile,
                         customerComplaintIssue: appointmentForm.customerComplaintIssue,
                         previousServiceHistory: appointmentForm.previousServiceHistory,
                         estimatedServiceTime: appointmentForm.estimatedServiceTime,
                         estimatedCost: appointmentForm.estimatedCost,
                         odometerReading: appointmentForm.odometerReading,
+                      engineNumber: appointmentForm.engineNumber,
+                      insuranceExpiry: appointmentForm.insuranceExpiry,
                         estimatedDeliveryDate: appointmentForm.estimatedDeliveryDate,
                         assignedServiceAdvisor: appointmentForm.assignedServiceAdvisor,
                         assignedTechnician: appointmentForm.assignedTechnician,
+                        assignedServiceCenter: appointmentForm.assignedServiceCenter,
                         pickupDropRequired: appointmentForm.pickupDropRequired,
                         pickupAddress: appointmentForm.pickupAddress,
                         dropAddress: appointmentForm.dropAddress,
@@ -2479,6 +2685,7 @@ export default function CustomerFind() {
                         paymentMethod: appointmentForm.paymentMethod,
                         gstRequirement: appointmentForm.gstRequirement,
                         businessNameForInvoice: appointmentForm.businessNameForInvoice,
+                      serviceStatus: appointmentForm.serviceStatus,
                         feedbackRating: appointmentForm.feedbackRating,
                         nextServiceDueDate: appointmentForm.nextServiceDueDate,
                         amcSubscriptionStatus: appointmentForm.amcSubscriptionStatus,
