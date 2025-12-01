@@ -115,6 +115,10 @@ class CustomerRepository {
       .padStart(4, "0");
     const customerNumber = `CUST-${year}-${random}`;
 
+    const cleanedAlternateMobile = data.alternateMobile
+      ? data.alternateMobile.replace(/[\s-+]/g, "").replace(/^91/, "")
+      : undefined;
+
     // Create new customer
     const newCustomer: CustomerWithVehicles = {
       id: Math.max(...this.customers.map((c) => Number(c.id)), 0) + 1,
@@ -124,6 +128,16 @@ class CustomerRepository {
       whatsappNumber: cleanedWhatsapp,
       email: data.email || undefined,
       address: data.address || undefined,
+      cityState: data.cityState || undefined,
+      pincode: data.pincode || undefined,
+      alternateMobile: cleanedAlternateMobile,
+      customerType: data.customerType,
+      serviceType: data.serviceType,
+      addressType: data.addressType,
+      workAddress: data.workAddress || undefined,
+      pickupDropRequired: data.pickupDropRequired,
+      pickupAddress: data.pickupDropRequired ? data.pickupAddress : undefined,
+      dropAddress: data.pickupDropRequired ? data.dropAddress : undefined,
       createdAt: new Date().toISOString().split("T")[0],
       totalVehicles: 0,
       totalSpent: "₹0",

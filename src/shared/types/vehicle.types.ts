@@ -5,6 +5,7 @@
 export type SearchType = "phone" | "registration" | "vin";
 export type CustomerSearchType = "phone" | "name" | "customerNumber" | "email" | "vin" | "vehicleNumber" | "auto";
 export type ServiceType = "walk-in" | "home-service";
+export type CustomerType = "B2C" | "B2B";
 
 export type VehicleStatus = "Available" | "Active Job Card";
 
@@ -19,6 +20,14 @@ export interface Customer {
   address?: string;
   cityState?: string;
   pincode?: string;
+  alternateMobile?: string;
+  customerType?: CustomerType;
+  serviceType?: ServiceType;
+  addressType?: "home" | "work";
+  workAddress?: string;
+  pickupDropRequired?: boolean;
+  pickupAddress?: string;
+  dropAddress?: string;
   createdAt: string;
   totalVehicles?: number;
   totalSpent?: string;
@@ -91,8 +100,6 @@ export interface NewVehicleForm {
   vehicleColor?: string;
   registration?: string;
 }
-
-export type CustomerType = "B2C" | "B2B";
 
 export interface NewCustomerForm {
   name: string;

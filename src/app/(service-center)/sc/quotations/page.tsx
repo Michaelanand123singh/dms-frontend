@@ -236,7 +236,205 @@ function QuotationsContent() {
     };
   }, [form.items, form.discount]);
 
-  const totals = calculateTotals();
+const totals = calculateTotals();
+
+const validateQuotationForm = () => {
+  if (!form.customerId) {
+    alert("Please select a customer");
+    return false;
+  }
+
+  if (form.items.length === 0) {
+    alert("Please add at least one item");
+    return false;
+  }
+
+  if (form.hasInsurance && !form.insurerId) {
+    alert("Please select an insurer");
+    return false;
+  }
+
+  return true;
+};
+
+const buildQuotationFromForm = (): Quotation => {
+  const updatedTotals = calculateTotals();
+  const quotationDate = new Date(form.quotationDate);
+  const validUntil = new Date(quotationDate);
+  validUntil.setDate(validUntil.getDate() + form.validUntilDays);
+  const year = new Date().getFullYear();
+  const month = String(new Date().getMonth() + 1).padStart(2, "0");
+  const count = quotations.length + 1;
+  const quotationNumber = `QT-SC001-${year}${month}-${String(count).padStart(4, "0")}`;
+
+  const customer = selectedCustomer ?? createEmptyCustomer();
+  const selectedInsurer = insurers.find((i) => i.id === form.insurerId);
+  const selectedTemplate = noteTemplates.find((t) => t.id === form.noteTemplateId);
+  const vehicle = customer.vehicles?.find((v) => v.id.toString() === form.vehicleId);
+
+  return {
+    id: `qt-${Date.now()}`,
+    quotationNumber,
+    serviceCenterId: "sc-001",
+    customerId: form.customerId,
+    vehicleId: form.vehicleId,
+    serviceAdvisorId: userInfo?.id || "user-001",
+    documentType: form.documentType,
+    quotationDate: form.quotationDate,
+    validUntil: validUntil.toISOString().split("T")[0],
+    hasInsurance: form.hasInsurance,
+    insurerId: form.insurerId,
+    subtotal: updatedTotals.subtotal,
+    discount: updatedTotals.discount,
+    discountPercent: updatedTotals.discountPercent,
+    preGstAmount: updatedTotals.preGstAmount,
+    cgstAmount: updatedTotals.cgst,
+    sgstAmount: updatedTotals.sgst,
+    igstAmount: updatedTotals.igst,
+    totalAmount: updatedTotals.totalAmount,
+    notes: form.notes || selectedTemplate?.content || "",
+    batterySerialNumber: form.batterySerialNumber,
+    customNotes: form.customNotes,
+    noteTemplateId: form.noteTemplateId,
+    status: "draft",
+    passedToManager: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    items: form.items.map((item, index) => ({
+      id: `item-${Date.now()}-${index}`,
+      ...item,
+    })),
+    customer: {
+      id: form.customerId,
+      firstName: customer.name?.split(" ")[0] || "Customer",
+      lastName: customer.name?.split(" ").slice(1).join(" ") || "",
+      phone: customer.phone || "",
+      email: customer.email || "",
+      address: customer.address || "",
+      city: customer.cityState?.split(",")[0] || "",
+      state: customer.cityState?.split(",")[1]?.trim() || "",
+      pincode: customer.pincode || "",
+    },
+    vehicle: form.vehicleId
+      ? {
+          id: form.vehicleId,
+          make: vehicle?.vehicleMake || "",
+          model: vehicle?.vehicleModel || "",
+          registration: vehicle?.registration || "",
+          vin: vehicle?.vin || "",
+        }
+      : undefined,
+    insurer: selectedInsurer,
+  };
+};
+
+const persistQuotation = (quotation: Quotation) => {
+  const updatedQuotations = [quotation, ...quotations];
+  setQuotations(updatedQuotations);
+  safeStorage.setItem("quotations", updatedQuotations);
+};
+
+const sendQuotationToCustomerById = async (
+  quotationId: string,
+  options?: { manageLoading?: boolean }
+) => {
+  const quotation = quotations.find((q) => q.id === quotationId);
+  if (!quotation) return;
+
+  const { manageLoading = true } = options ?? {};
+
+  try {
+    if (manageLoading) {
+      setLoading(true);
+    }
+
+    const updatedQuotations = quotations.map((q) =>
+      q.id === quotationId
+        ? {
+            ...q,
+            status: "sent_to_customer" as const,
+            sentToCustomer: true,
+            sentToCustomerAt: new Date().toISOString(),
+            whatsappSent: true,
+            whatsappSentAt: new Date().toISOString(),
+          }
+        : q
+    );
+
+    setQuotations(updatedQuotations);
+    safeStorage.setItem("quotations", updatedQuotations);
+
+    const rawWhatsapp =
+      (quotation.customer as any)?.whatsappNumber || quotation.customer?.phone || "";
+    const customerWhatsapp = rawWhatsapp.replace(/\D/g, "");
+
+    const printQuotation = () => {
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        alert("Please allow popups to generate PDF");
+        return;
+      }
+
+      const quotationHTML = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Quotation ${quotation.quotationNumber}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              .header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 20px; }
+              .quotation-number { font-size: 24px; font-weight: bold; }
+              .details { margin: 20px 0; }
+              .items { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              .total { text-align: right; font-weight: bold; font-size: 18px; margin-top: 20px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="quotation-number">Quotation ${quotation.quotationNumber}</div>
+              <div>Date: ${new Date(quotation.quotationDate).toLocaleDateString("en-IN")}</div>
+            </div>
+            <div class="details">
+              <p><strong>Customer:</strong> ${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}</p>
+              <p><strong>Total:</strong> ₹${quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div class="total">Total Amount in Words: ₹${quotation.totalAmount.toLocaleString("en-IN")}</div>
+          </body>
+        </html>
+      `;
+
+      printWindow.document.write(quotationHTML);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    };
+
+    printQuotation();
+
+    const approvalLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=approve`;
+    const rejectionLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=reject`;
+
+    const message = encodeURIComponent(
+      `Hi ${quotation.customer?.firstName || ""},\n\nHere is your quotation ${quotation.quotationNumber} for ₹${quotation.totalAmount.toLocaleString("en-IN")}.\n\nApprove: ${approvalLink}\nReject: ${rejectionLink}`
+    );
+    const whatsappUrl = `https://wa.me/${customerWhatsapp}?text=${message}`;
+
+    setTimeout(() => {
+      window.open(whatsappUrl, "_blank");
+      alert("Quotation PDF generated and sent to customer via WhatsApp!\n\nCustomer can approve or reject via the links provided.");
+    }, 1000);
+  } catch (error) {
+    console.error("Error sending quotation:", error);
+    alert("Failed to send quotation via WhatsApp. Please try again.");
+  } finally {
+    if (manageLoading) {
+      setLoading(false);
+    }
+  }
+};
+
 
   // Add item
   const addItem = () => {
@@ -293,113 +491,53 @@ function QuotationsContent() {
     }
   };
 
-  // Submit quotation
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!form.customerId) {
-      alert("Please select a customer");
-      return;
-    }
+// Submit quotation
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (form.items.length === 0) {
-      alert("Please add at least one item");
-      return;
-    }
+  if (!validateQuotationForm()) {
+    return;
+  }
 
-    if (form.hasInsurance && !form.insurerId) {
-      alert("Please select an insurer");
-      return;
-    }
+  try {
+    setLoading(true);
+    const newQuotation = buildQuotationFromForm();
+    persistQuotation(newQuotation);
+    setFilter("draft");
 
-    try {
-      setLoading(true);
-      
-      // Calculate valid until date
-      const quotationDate = new Date(form.quotationDate);
-      const validUntil = new Date(quotationDate);
-      validUntil.setDate(validUntil.getDate() + form.validUntilDays);
+    alert("Quotation created successfully!");
+    setShowCreateModal(false);
+    resetForm();
+  } catch (error) {
+    console.error("Error creating quotation:", error);
+    alert("Failed to create quotation. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
-      // Generate quotation number
-      const year = new Date().getFullYear();
-      const month = String(new Date().getMonth() + 1).padStart(2, '0');
-      const count = quotations.length + 1;
-      const quotationNumber = `QT-SC001-${year}${month}-${String(count).padStart(4, '0')}`;
+const handleCreateAndSendToCustomer = async () => {
+  if (!validateQuotationForm()) {
+    return;
+  }
 
-      // Get customer and vehicle info
-      const customer = selectedCustomer ?? createEmptyCustomer();
-      const selectedInsurer = insurers.find((i) => i.id === form.insurerId);
-      const selectedTemplate = noteTemplates.find((t) => t.id === form.noteTemplateId);
+  try {
+    setLoading(true);
+    const newQuotation = buildQuotationFromForm();
+    persistQuotation(newQuotation);
+    setFilter("sent_to_customer");
 
-      // Create new quotation
-      const newQuotation: Quotation = {
-        id: `qt-${Date.now()}`,
-        quotationNumber,
-        serviceCenterId: "sc-001",
-        customerId: form.customerId,
-        vehicleId: form.vehicleId,
-        serviceAdvisorId: userInfo?.id || "user-001",
-        documentType: form.documentType,
-        quotationDate: form.quotationDate,
-        validUntil: validUntil.toISOString().split("T")[0],
-        hasInsurance: form.hasInsurance,
-        insurerId: form.insurerId,
-        subtotal: totals.subtotal,
-        discount: totals.discount,
-        discountPercent: totals.discountPercent,
-        preGstAmount: totals.preGstAmount,
-        cgstAmount: totals.cgst,
-        sgstAmount: totals.sgst,
-        igstAmount: totals.igst,
-        totalAmount: totals.totalAmount,
-        notes: form.notes || selectedTemplate?.content || "",
-        batterySerialNumber: form.batterySerialNumber,
-        customNotes: form.customNotes,
-        noteTemplateId: form.noteTemplateId,
-        status: "draft",
-        passedToManager: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        items: form.items.map((item, index) => ({
-          id: `item-${Date.now()}-${index}`,
-          ...item,
-        })),
-        customer: {
-          id: form.customerId,
-          firstName: customer.name?.split(" ")[0] || "Customer",
-          lastName: customer.name?.split(" ").slice(1).join(" ") || "",
-          phone: customer.phone || "",
-          email: customer.email || "",
-          address: customer.address || "",
-          city: customer.cityState?.split(",")[0] || "",
-          state: customer.cityState?.split(",")[1]?.trim() || "",
-          pincode: customer.pincode || "",
-        },
-        vehicle: form.vehicleId ? {
-          id: form.vehicleId,
-          make: customer.vehicles?.find((v) => v.id.toString() === form.vehicleId)?.vehicleMake || "",
-          model: customer.vehicles?.find((v) => v.id.toString() === form.vehicleId)?.vehicleModel || "",
-          registration: customer.vehicles?.find((v) => v.id.toString() === form.vehicleId)?.registration || "",
-          vin: customer.vehicles?.find((v) => v.id.toString() === form.vehicleId)?.vin || "",
-        } : undefined,
-        insurer: selectedInsurer,
-      };
+    await sendQuotationToCustomerById(newQuotation.id, { manageLoading: false });
 
-      // Save to localStorage
-      const updatedQuotations = [newQuotation, ...quotations];
-      setQuotations(updatedQuotations);
-      safeStorage.setItem("quotations", updatedQuotations);
-
-      alert("Quotation created successfully!");
-      setShowCreateModal(false);
-      resetForm();
-    } catch (error) {
-      console.error("Error creating quotation:", error);
-      alert("Failed to create quotation. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    setShowCreateModal(false);
+    resetForm();
+  } catch (error) {
+    console.error("Error creating and sending quotation:", error);
+    alert("Failed to create and send quotation. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Send to Customer via WhatsApp
   const handleSendToCustomer = async (quotationId: string) => {
@@ -915,7 +1053,7 @@ function QuotationsContent() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
-            </div>
+        </div>
             <div className="flex gap-2">
               {(["all", "draft", "sent_to_customer", "customer_approved", "customer_rejected", "sent_to_manager", "manager_approved", "manager_rejected"] as QuotationFilterType[]).map((f) => (
                 <button
@@ -932,7 +1070,7 @@ function QuotationsContent() {
                     : f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ")}
                 </button>
               ))}
-            </div>
+      </div>
           </div>
         </div>
 
@@ -1054,6 +1192,7 @@ function QuotationsContent() {
           updateItem={updateItem}
           handleNoteTemplateChange={handleNoteTemplateChange}
           handleSubmit={handleSubmit}
+          handleCreateAndSendToCustomer={handleCreateAndSendToCustomer}
           onClose={() => {
             setShowCreateModal(false);
             resetForm();
@@ -1113,6 +1252,7 @@ function CreateQuotationModal({
   updateItem,
   handleNoteTemplateChange,
   handleSubmit,
+  handleCreateAndSendToCustomer,
   onClose,
   loading,
 }: any) {
@@ -1218,7 +1358,7 @@ function CreateQuotationModal({
                 <option value="">Select Vehicle</option>
                 {selectedCustomer.vehicles.map((vehicle: any) => (
                   <option key={vehicle.id} value={vehicle.id.toString()}>
-                    {vehicle.vehicleMake} {vehicle.vehicleModel} - {vehicle.registrationNumber}
+                    {vehicle.vehicleMake} {vehicle.vehicleModel} - {vehicle.registration}
                   </option>
                 ))}
               </select>
@@ -1462,7 +1602,7 @@ function CreateQuotationModal({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}
@@ -1479,6 +1619,14 @@ function CreateQuotationModal({
               className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
             >
               Pass to Manager
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleCreateAndSendToCustomer}
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
+            >
+              {loading ? "Sending..." : "Create & Send to Customer"}
             </button>
             <button
               type="submit"
@@ -1933,10 +2081,10 @@ function ViewQuotationModal({
             Close
           </button>
           
-          {/* Service Advisor Actions */}
-          {isServiceAdvisor && onSendToCustomer && onCustomerApproval && onCustomerRejection && onSendToManager && (
+          {/* Service Advisor Actions (shown for all roles for now so feature is visible) */}
+          {(
             <>
-              {quotation.status === "draft" && (
+              {quotation.status === "draft" && onSendToCustomer && (
                 <button
                   onClick={() => onSendToCustomer(quotation.id)}
                   className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
@@ -1945,7 +2093,7 @@ function ViewQuotationModal({
                   Send to Customer (WhatsApp)
                 </button>
               )}
-              {quotation.status === "sent_to_customer" && (
+              {quotation.status === "sent_to_customer" && onCustomerApproval && onCustomerRejection && (
                 <>
                   <button
                     onClick={() => onCustomerRejection(quotation.id)}
@@ -1963,7 +2111,7 @@ function ViewQuotationModal({
                   </button>
                 </>
               )}
-              {quotation.status === "customer_approved" && (
+              {quotation.status === "customer_approved" && onSendToManager && (
                 <button
                   onClick={() => onSendToManager(quotation.id)}
                   className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium inline-flex items-center gap-2"
