@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2 } from "lucide-react";
@@ -28,6 +28,7 @@ interface Appointment {
   estimatedServiceTime?: string;
   estimatedCost?: string;
   odometerReading?: string;
+  isMajorIssue?: boolean;
   // Documentation (stored as simple metadata in call center flow)
   documentationFiles?: {
     customerIdProof?: number;
@@ -70,6 +71,7 @@ interface AppointmentForm {
   estimatedServiceTime?: string;
   estimatedCost?: string;
   odometerReading?: string;
+  isMajorIssue?: boolean;
   // Documentation
   customerIdProof?: DocumentationFiles;
   vehicleRCCopy?: DocumentationFiles;
@@ -149,6 +151,7 @@ interface ServiceIntakeForm {
   estimatedServiceTime: string;
   estimatedCost: string;
   odometerReading: string;
+  isMajorIssue: boolean;
   
   // Operational Details (Job Card)
   estimatedDeliveryDate: string;
@@ -186,6 +189,7 @@ const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   estimatedServiceTime: undefined,
   estimatedCost: undefined,
   odometerReading: undefined,
+  isMajorIssue: undefined,
   // Documentation
   customerIdProof: undefined,
   vehicleRCCopy: undefined,
@@ -252,6 +256,7 @@ const INITIAL_SERVICE_INTAKE_FORM: ServiceIntakeForm = {
   estimatedServiceTime: "",
   estimatedCost: "",
   odometerReading: "",
+  isMajorIssue: false,
   
   // Operational Details (Job Card)
   estimatedDeliveryDate: "",
@@ -308,6 +313,10 @@ const validateAppointmentForm = (form: AppointmentForm, isCallCenter: boolean = 
   }
   if (isCallCenter && !form.serviceCenterId) {
     return "Please select a service center to assign this appointment.";
+  }
+  // If major issue is checked, customer complaint is required
+  if (form.isMajorIssue && !form.customerComplaintIssue) {
+    return "Customer Complaint/Issue Description is required for major issues.";
   }
   return null;
 };
@@ -930,15 +939,20 @@ export default function Appointments() {
               ...apt,
               ...appointmentForm,
               duration: "2 hours",
+              status: appointmentForm.isMajorIssue ? "Sent to Manager" : apt.status,
               serviceCenterId: appointmentForm.serviceCenterId,
               serviceCenterName: selectedServiceCenter?.name,
+              // If major issue, mark estimated service time
+              estimatedServiceTime: appointmentForm.isMajorIssue ? "Major Issue - Requires Manager Review" : appointmentForm.estimatedServiceTime,
             }
           : apt
       );
       setAppointments(updatedAppointments);
       safeStorage.setItem("appointments", updatedAppointments);
       
-      const successMessage = selectedServiceCenter
+      const successMessage = appointmentForm.isMajorIssue
+        ? "Appointment with major issue has been sent to Service Manager."
+        : selectedServiceCenter
         ? `Appointment updated and assigned to ${selectedServiceCenter.name}!`
         : "Appointment updated successfully!";
       showToast(successMessage, "success");
@@ -952,15 +966,19 @@ export default function Appointments() {
         id: getNextAppointmentId(appointments),
         ...appointmentForm,
         duration: "2 hours",
-        status: "Confirmed",
+        status: appointmentForm.isMajorIssue ? "Sent to Manager" : "Confirmed",
         serviceCenterId: appointmentForm.serviceCenterId,
         serviceCenterName: selectedServiceCenter?.name,
+        // If major issue, mark estimated service time
+        estimatedServiceTime: appointmentForm.isMajorIssue ? "Major Issue - Requires Manager Review" : appointmentForm.estimatedServiceTime,
       };
       const updatedAppointments = [...appointments, newAppointment];
       setAppointments(updatedAppointments);
       safeStorage.setItem("appointments", updatedAppointments);
       
-      const successMessage = selectedServiceCenter
+      const successMessage = appointmentForm.isMajorIssue
+        ? "Appointment with major issue has been sent to Service Manager."
+        : selectedServiceCenter
         ? `Appointment scheduled successfully and assigned to ${selectedServiceCenter.name}!`
         : "Appointment scheduled successfully!";
       showToast(successMessage, "success");
@@ -1130,6 +1148,42 @@ export default function Appointments() {
   // Router for navigation
   const router = useRouter();
 
+  // Service Intake Handlers - Send to Service Manager (for Major Issues)
+  const handleSendToServiceManager = useCallback(() => {
+    if (!selectedAppointment) return;
+
+    // Basic validation for major issue
+    if (!serviceIntakeForm.serviceType || !serviceIntakeForm.customerComplaintIssue) {
+      showToast("Please fill in Service Type and Customer Complaint/Issue Description.", "error");
+      return;
+    }
+
+    // Update appointment with major issue flag and send to service manager
+    const updatedAppointments = appointments.map((apt) =>
+      apt.id === selectedAppointment.id
+        ? { 
+            ...apt, 
+            status: "Sent to Manager",
+            customerComplaintIssue: serviceIntakeForm.customerComplaintIssue,
+            serviceType: serviceIntakeForm.serviceType,
+            previousServiceHistory: serviceIntakeForm.previousServiceHistory,
+            // Mark as major issue in appointment
+            estimatedServiceTime: "Major Issue - Requires Manager Review",
+          }
+        : apt
+    );
+
+    setAppointments(updatedAppointments);
+    safeStorage.setItem("appointments", updatedAppointments);
+    
+    // Reset form and close modal
+    setServiceIntakeForm(INITIAL_SERVICE_INTAKE_FORM);
+    setCustomerArrivalStatus(null);
+    closeDetailModal();
+    
+    showToast("Appointment with major issue has been sent to Service Manager.", "success");
+  }, [selectedAppointment, serviceIntakeForm, appointments, closeDetailModal, showToast]);
+
   // Service Intake Handlers - Convert to Estimation/Quotation
   const handleConvertToQuotation = useCallback(() => {
     if (!selectedAppointment) return;
@@ -1185,7 +1239,7 @@ export default function Appointments() {
     
     // Close the appointment detail modal
     closeDetailModal();
-  }, [selectedAppointment, serviceIntakeForm, appointments, router, closeDetailModal]);
+  }, [selectedAppointment, serviceIntakeForm, appointments, router, closeDetailModal, showToast]);
 
   // ==================== Effects ====================
   // Watch for customer search results to populate vehicle details
@@ -1453,7 +1507,29 @@ export default function Appointments() {
               options={SERVICE_TYPES.map((type) => ({ value: type, label: type }))}
             />
 
-            {(isCallCenter || isServiceAdvisor) && (
+            {/* Major Issue Checkbox */}
+            <div className="bg-red-50 p-4 rounded-lg border-2 border-red-200">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!appointmentForm.isMajorIssue}
+                  onChange={(e) => setAppointmentForm({ ...appointmentForm, isMajorIssue: e.target.checked })}
+                  className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                />
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="text-red-600" size={20} />
+                  <span className="text-base font-bold text-red-700">Major Issue - Send to Service Manager Directly</span>
+                </div>
+              </label>
+              {appointmentForm.isMajorIssue && (
+                <p className="text-sm text-red-600 mt-2 ml-8">
+                  Appointment will be sent directly to Service Manager. Only Service Type and Customer Complaint are required.
+                </p>
+              )}
+            </div>
+
+            {/* Service Center - Hidden for Service Advisor when major issue, always visible for Call Center */}
+            {(isCallCenter || (isServiceAdvisor && !appointmentForm.isMajorIssue)) && (
               <div className="space-y-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <FormSelect
@@ -1528,49 +1604,54 @@ export default function Appointments() {
                       required={isCallCenter}
                     />
                   </div>
-                    <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Previous Service History
-                    </label>
-                    <textarea
-                      value={appointmentForm.previousServiceHistory || ""}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, previousServiceHistory: e.target.value })}
-                      rows={3}
-                      placeholder="Enter previous service history..."
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
-                    />
-                    </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormInput
-                      label="Estimated Service Time"
-                      value={appointmentForm.estimatedServiceTime || ""}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedServiceTime: e.target.value })}
-                      placeholder="e.g., 2 hours"
-                    />
-                    <FormInput
-                      label="Estimated Cost"
-                      type="number"
-                      value={appointmentForm.estimatedCost || ""}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedCost: e.target.value })}
-                      placeholder="Enter estimated cost"
-                    />
-                  </div>
-                  {/* Odometer Reading - Only for Service Advisor, not Call Center */}
-                  {isServiceAdvisor && (
-                    <FormInput
-                      label="Odometer Reading"
-                      type="number"
-                      value={appointmentForm.odometerReading || ""}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, odometerReading: e.target.value })}
-                      placeholder="Enter odometer reading"
-                    />
+                  {/* Additional fields - Hidden when major issue */}
+                  {!appointmentForm.isMajorIssue && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Previous Service History
+                        </label>
+                        <textarea
+                          value={appointmentForm.previousServiceHistory || ""}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, previousServiceHistory: e.target.value })}
+                          rows={3}
+                          placeholder="Enter previous service history..."
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormInput
+                          label="Estimated Service Time"
+                          value={appointmentForm.estimatedServiceTime || ""}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedServiceTime: e.target.value })}
+                          placeholder="e.g., 2 hours"
+                        />
+                        <FormInput
+                          label="Estimated Cost"
+                          type="number"
+                          value={appointmentForm.estimatedCost || ""}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedCost: e.target.value })}
+                          placeholder="Enter estimated cost"
+                        />
+                      </div>
+                      {/* Odometer Reading - Only for Service Advisor, not Call Center */}
+                      {isServiceAdvisor && (
+                        <FormInput
+                          label="Odometer Reading"
+                          type="number"
+                          value={appointmentForm.odometerReading || ""}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, odometerReading: e.target.value })}
+                          placeholder="Enter odometer reading"
+                        />
+                      )}
+                    </>
                   )}
                 </div>
-                    </div>
-                  )}
+              </div>
+            )}
 
-            {/* Documentation Section (Call Center, Service Advisor, Service Manager) */}
-            {(isCallCenter || isServiceAdvisor) && (
+            {/* Documentation Section (Call Center, Service Advisor, Service Manager) - Hidden when major issue */}
+            {(isCallCenter || isServiceAdvisor) && !appointmentForm.isMajorIssue && (
               <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <Upload className="text-amber-600" size={20} />
@@ -1761,8 +1842,8 @@ export default function Appointments() {
               </div>
             </div>
 
-          {/* Operational Details Section */}
-          {(isCallCenter || isServiceAdvisor) && (
+          {/* Operational Details Section - Hidden when major issue */}
+          {(isCallCenter || isServiceAdvisor) && !appointmentForm.isMajorIssue && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <Clock className="text-blue-600" size={20} />
@@ -1897,8 +1978,8 @@ export default function Appointments() {
             </div>
           )}
 
-          {/* Post-Service Survey Section (Call Center, Service Advisor, Service Manager, Service Technician) */}
-          {canAccessBillingSection && (
+          {/* Post-Service Survey Section (Call Center, Service Advisor, Service Manager, Service Technician) - Hidden when major issue */}
+          {canAccessBillingSection && !appointmentForm.isMajorIssue && (
             <div className="bg-white p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <FileText className="text-indigo-600" size={20} />
@@ -1957,12 +2038,22 @@ export default function Appointments() {
             <button onClick={closeAppointmentModal} className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition">
               Cancel
             </button>
-            <button
-              onClick={handleSubmitAppointment}
-              className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
-            >
-              Schedule Appointment
-            </button>
+            {appointmentForm.isMajorIssue ? (
+              <button
+                onClick={handleSubmitAppointment}
+                className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
+              >
+                <AlertTriangle size={18} />
+                Send to Manager
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmitAppointment}
+                className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+              >
+                Schedule Appointment
+              </button>
+            )}
           </div>
         </div>
       </Modal>
@@ -2112,7 +2203,29 @@ export default function Appointments() {
               <div className="space-y-6 border-t border-gray-200 pt-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Service Intake Form</h3>
                 
-                {/* Documentation Section */}
+                {/* Major Issue Checkbox - At the top */}
+                <div className="bg-red-50 p-4 rounded-lg border-2 border-red-200">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={serviceIntakeForm.isMajorIssue}
+                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, isMajorIssue: e.target.checked })}
+                      className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="text-red-600" size={20} />
+                      <span className="text-base font-bold text-red-700">Major Issue - Send to Service Manager Directly</span>
+                    </div>
+                  </label>
+                  {serviceIntakeForm.isMajorIssue && (
+                    <p className="text-sm text-red-600 mt-2 ml-8">
+                      All other fields will be hidden. Only Service Type and Customer Complaint are required.
+                    </p>
+                  )}
+                </div>
+                
+                {/* Documentation Section - Hidden when major issue */}
+                {!serviceIntakeForm.isMajorIssue && (
                 <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-xl border border-indigo-200">
                   <h4 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-indigo-600 rounded"></span>
@@ -2304,8 +2417,10 @@ export default function Appointments() {
                     </div>
                   </div>
                 </div>
+                )}
 
-                {/* Vehicle Information Section */}
+                {/* Vehicle Information Section - Hidden when major issue */}
+                {!serviceIntakeForm.isMajorIssue && (
                 <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
                   <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-green-600 rounded"></span>
@@ -2400,6 +2515,7 @@ export default function Appointments() {
                     />
                   </div>
                 </div>
+                )}
 
                 {/* Service Details Section */}
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200">
@@ -2428,42 +2544,48 @@ export default function Appointments() {
                         className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Previous Service History
-                      </label>
-                      <textarea
-                        value={serviceIntakeForm.previousServiceHistory}
-                        onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, previousServiceHistory: e.target.value })}
-                        rows={3}
-                        placeholder="Enter previous service history..."
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
-                      />
-                    </div>
-                    <FormInput
-                      label="Estimated Service Time"
-                      value={serviceIntakeForm.estimatedServiceTime}
-                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, estimatedServiceTime: e.target.value })}
-                      placeholder="e.g., 2 hours"
-                    />
-                    <FormInput
-                      label="Estimated Cost"
-                      value={serviceIntakeForm.estimatedCost}
-                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, estimatedCost: e.target.value })}
-                      placeholder="Enter estimated cost"
-                      type="number"
-                    />
-                    <FormInput
-                      label="Odometer Reading"
-                      value={serviceIntakeForm.odometerReading}
-                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, odometerReading: e.target.value })}
-                      placeholder="Enter odometer reading"
-                      type="number"
-                    />
+                    {/* Additional fields - Hidden when major issue */}
+                    {!serviceIntakeForm.isMajorIssue && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Previous Service History
+                          </label>
+                          <textarea
+                            value={serviceIntakeForm.previousServiceHistory}
+                            onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, previousServiceHistory: e.target.value })}
+                            rows={3}
+                            placeholder="Enter previous service history..."
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
+                          />
+                        </div>
+                        <FormInput
+                          label="Estimated Service Time"
+                          value={serviceIntakeForm.estimatedServiceTime}
+                          onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, estimatedServiceTime: e.target.value })}
+                          placeholder="e.g., 2 hours"
+                        />
+                        <FormInput
+                          label="Estimated Cost"
+                          value={serviceIntakeForm.estimatedCost}
+                          onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, estimatedCost: e.target.value })}
+                          placeholder="Enter estimated cost"
+                          type="number"
+                        />
+                        <FormInput
+                          label="Odometer Reading"
+                          value={serviceIntakeForm.odometerReading}
+                          onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, odometerReading: e.target.value })}
+                          placeholder="Enter odometer reading"
+                          type="number"
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* Operational Details Section (Job Card) */}
+                {/* Operational Details Section (Job Card) - Hidden when major issue */}
+                {!serviceIntakeForm.isMajorIssue && (
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200">
                   <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-blue-600 rounded"></span>
@@ -2544,8 +2666,10 @@ export default function Appointments() {
                     </div>
                   </div>
                 </div>
+                )}
 
-                {/* Billing & Payment Section */}
+                {/* Billing & Payment Section - Hidden when major issue */}
+                {!serviceIntakeForm.isMajorIssue && (
                 <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
                   <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-green-600 rounded"></span>
@@ -2593,8 +2717,9 @@ export default function Appointments() {
                     )}
                   </div>
                 </div>
+                )}
 
-                {/* Convert to Estimation/Quotation Button */}
+                {/* Convert to Estimation/Quotation Button or Send to Service Manager Button */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => {
@@ -2605,13 +2730,23 @@ export default function Appointments() {
                   >
                     Cancel
                   </button>
-                  <button
-                    onClick={handleConvertToQuotation}
-                    className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
-                  >
-                    <FileText size={18} />
-                    Convert into Estimation/Quotation
-                  </button>
+                  {serviceIntakeForm.isMajorIssue ? (
+                    <button
+                      onClick={handleSendToServiceManager}
+                      className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
+                    >
+                      <AlertTriangle size={18} />
+                      Send to Service Manager
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleConvertToQuotation}
+                      className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
+                    >
+                      <FileText size={18} />
+                      Convert into Estimation/Quotation
+                    </button>
+                  )}
                 </div>
               </div>
             )}
