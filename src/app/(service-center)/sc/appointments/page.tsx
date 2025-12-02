@@ -6,6 +6,7 @@ import { useCustomerSearch } from "../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
 import { useRouter } from "next/navigation";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
+import type { JobCard } from "@/shared/types/job-card.types";
 
 // ==================== Types ====================
 interface Appointment {
@@ -882,6 +883,68 @@ export default function Appointments() {
       setAppointmentForm((prev) => ({ ...prev, serviceCenterId: nearestId }));
     }
   }, [selectedCustomer]);
+
+  // Convert Appointment to Job Card
+  const convertAppointmentToJobCard = useCallback((appointment: Appointment): JobCard => {
+    const serviceCenterCode = "SC001"; // In production, get from user context or serviceCenterName
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    
+    // Get next sequence number
+    const existingJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    const lastJobCard = existingJobCards
+      .filter((jc) => jc.jobCardNumber?.startsWith(`${serviceCenterCode}-${year}-${month}`))
+      .sort((a, b) => {
+        const aSeq = parseInt(a.jobCardNumber?.split("-")[3] || "0");
+        const bSeq = parseInt(b.jobCardNumber?.split("-")[3] || "0");
+        return bSeq - aSeq;
+      })[0];
+    
+    const nextSequence = lastJobCard
+      ? parseInt(lastJobCard.jobCardNumber?.split("-")[3] || "0") + 1
+      : 1;
+    
+    const jobCardNumber = `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
+    
+    // Extract vehicle details from appointment vehicle string (format: "Make Model (Year)")
+    const vehicleParts = appointment.vehicle.match(/^(.+?)\s+(.+?)\s+\((\d+)\)$/);
+    const vehicleMake = vehicleParts ? vehicleParts[1] : appointment.vehicle.split(" ")[0] || "";
+    const vehicleModel = vehicleParts ? vehicleParts[2] : appointment.vehicle.split(" ").slice(1, -1).join(" ") || "";
+    
+    // Create job card from appointment
+    const newJobCard: JobCard = {
+      id: `JC-${Date.now()}`,
+      jobCardNumber,
+      serviceCenterId: appointment.serviceCenterId?.toString() || "sc-001",
+      serviceCenterCode,
+      customerId: `customer-${appointment.id}`, // Temporary ID, in production use actual customer ID
+      customerName: appointment.customerName,
+      vehicleId: undefined, // Will be set when vehicle is found
+      vehicle: appointment.vehicle,
+      registration: "", // Will be populated from vehicle search if available
+      vehicleMake,
+      vehicleModel,
+      customerType: appointment.customerType,
+      serviceType: appointment.serviceType,
+      description: appointment.customerComplaintIssue || `Service: ${appointment.serviceType}`,
+      status: "Created",
+      priority: appointment.isMajorIssue ? "High" : "Normal",
+      assignedEngineer: appointment.assignedTechnician || null,
+      estimatedCost: appointment.estimatedCost ? `₹${appointment.estimatedCost}` : "₹0",
+      estimatedTime: appointment.estimatedServiceTime || "To be determined",
+      createdAt: new Date().toISOString(),
+      parts: [],
+      location: "Station",
+      quotationId: undefined, // No quotation yet
+    };
+    
+    // Save job card
+    const updatedJobCards = [...existingJobCards, newJobCard];
+    safeStorage.setItem("jobCards", updatedJobCards);
+    
+    return newJobCard;
+  }, []);
 
   const handleViewVehicleDetails = useCallback(() => {
     if (!selectedAppointment) return;
@@ -2160,15 +2223,40 @@ export default function Appointments() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => {
-                      setCustomerArrivalStatus("arrived");
-                      // Pre-fill form with appointment data
-                      if (selectedAppointment) {
+                      if (!selectedAppointment) return;
+                      
+                      // Automatically create job card when customer arrives
+                      try {
+                        const jobCard = convertAppointmentToJobCard(selectedAppointment);
+                        
+                        // Update appointment status
+                        const updatedAppointments = appointments.map((apt) =>
+                          apt.id === selectedAppointment.id
+                            ? { ...apt, status: "In Progress" }
+                            : apt
+                        );
+                        setAppointments(updatedAppointments);
+                        safeStorage.setItem("appointments", updatedAppointments);
+                        
+                        // Show success message
+                        showToast(
+                          `Job Card Created: ${jobCard.jobCardNumber}. Customer arrival recorded.`,
+                          "success"
+                        );
+                        
+                        // Pre-fill form with appointment data
                         setServiceIntakeForm({
                           ...INITIAL_SERVICE_INTAKE_FORM,
                           serviceType: selectedAppointment.serviceType,
                           vehicleBrand: selectedAppointment.vehicle.split(" ")[0] || "",
                           vehicleModel: selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
                         });
+                        
+                        // Set arrival status
+                        setCustomerArrivalStatus("arrived");
+                      } catch (error) {
+                        console.error("Error creating job card:", error);
+                        showToast("Failed to create job card. Please try again.", "error");
                       }
                     }}
                     className={`flex-1 px-4 py-3 rounded-lg font-medium transition ${

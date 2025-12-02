@@ -470,12 +470,6 @@ export default function CustomerFind() {
     return defaultCenter;
   }, [selectedCustomer]);
 
-  const handleAssignNearestCenter = useCallback(() => {
-    const nearest = getNearestServiceCenter();
-    if (nearest) {
-      setAppointmentForm((prev) => ({ ...prev, assignedServiceCenter: nearest }));
-    }
-  }, [getNearestServiceCenter]);
   const [whatsappSameAsMobile, setWhatsappSameAsMobile] = useState<boolean>(false);
   const [pickupAddressDifferent, setPickupAddressDifferent] = useState<boolean>(false);
   
@@ -504,6 +498,13 @@ export default function CustomerFind() {
     ...initialAppointmentForm,
     date: new Date().toISOString().split("T")[0],
   }));
+
+  const handleAssignNearestCenter = useCallback(() => {
+    const nearest = getNearestServiceCenter();
+    if (nearest) {
+      setAppointmentForm((prev) => ({ ...prev, assignedServiceCenter: nearest }));
+    }
+  }, [getNearestServiceCenter, setAppointmentForm]);
 
 
   // Auto-detect search type based on input
@@ -623,7 +624,7 @@ export default function CustomerFind() {
       time: "",
       duration: "2",
     });
-  }, []);
+  }, [setAppointmentForm]);
 
   // Modal close handlers
   const closeCustomerForm = useCallback(() => {
@@ -658,7 +659,7 @@ export default function CustomerFind() {
     });
     setShowScheduleAppointment(false);
     setValidationError("");
-  }, []);
+  }, [setAppointmentForm]);
 
   // Handle direct create customer button
   const handleDirectCreateCustomer = useCallback((): void => {
