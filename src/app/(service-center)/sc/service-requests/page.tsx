@@ -25,6 +25,7 @@ import {
 import type { ServiceRequest, RequestStatus, Urgency, ServiceLocation } from "@/shared/types";
 import { API_CONFIG, API_ENDPOINTS } from "@/config/api.config";
 import { defaultServiceRequests } from "@/__mocks__/data/service-requests.mock";
+import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 
 type FilterType = "all" | "pending" | "approved" | "rejected";
 
@@ -59,16 +60,7 @@ const REJECTION_REASONS: RejectionReason[] = [
   { id: "other", label: "Other" },
 ];
 
-const SERVICE_TYPES = [
-  "Routine Maintenance",
-  "Repair",
-  "Inspection",
-  "Warranty",
-  "AC Service",
-  "Battery Replacement",
-  "Tire Service",
-  "Other",
-];
+const SERVICE_TYPES = SERVICE_TYPE_OPTIONS;
 
 export default function ServiceRequests() {
   const [filter, setFilter] = useState<FilterType>("all");

@@ -10,6 +10,7 @@ export const ROUTES = {
   VEHICLE_SEARCH: "/sc/vehicle-search",
   SERVICE_REQUESTS: "/sc/service-requests",
   JOB_CARDS: "/sc/job-cards",
+  ADVISOR_JOB_CARDS: "/sc/advisor-job-cards",
   WORKSHOP: "/sc/workshop",
   INVENTORY: "/sc/inventory",
   OTC_ORDERS: "/sc/otc-orders",

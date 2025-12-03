@@ -1,6 +1,7 @@
-"use client";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { useState, useEffect } from "react";
+ "use client";
+ import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+ import { useState, useEffect, useMemo } from "react";
+ import { useRouter } from "next/navigation";
 import {
   Plus,
   PlusCircle,
@@ -26,17 +27,17 @@ import {
   Send,
 } from "lucide-react";
 import type { JobCard, JobCardStatus, Priority, KanbanColumn, ServiceLocation } from "@/shared/types";
-import { 
-  defaultJobCards, 
-  engineers as engineersList, 
-  availableParts as availablePartsList, 
-  SERVICE_TYPES as JOB_CARD_SERVICE_TYPES,
-  type Engineer, 
-  type Part 
+import {
+  defaultJobCards,
+  engineers as engineersList,
+  availableParts as availablePartsList,
+  type Engineer,
+  type Part,
 } from "@/__mocks__/data/job-cards.mock";
+import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 
 type ViewType = "kanban" | "list";
-type FilterType = "all" | "created" | "assigned" | "in_progress" | "completed";
+type FilterType = "all" | "created" | "assigned" | "in_progress" | "completed" | "draft";
 
 interface CreateJobCardForm {
   vehicleId: string;
@@ -56,10 +57,11 @@ interface CreateJobCardForm {
   assignedEngineerId: string;
 }
 
-const SERVICE_TYPES = JOB_CARD_SERVICE_TYPES;
+const SERVICE_TYPES = SERVICE_TYPE_OPTIONS;
 
 export default function JobCards() {
-  const [view, setView] = useState<ViewType>("kanban");
+  const router = useRouter();
+  const [view, setView] = useState<ViewType>("list");
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
@@ -386,6 +388,7 @@ export default function JobCards() {
 
   const filteredJobs = jobCards.filter((job) => {
     // Status filter
+  if (filter === "draft" && !(job.draftIntake && job.status === "Created")) return false;
     if (filter === "created" && job.status !== "Created") return false;
     if (filter === "assigned" && job.status !== "Assigned") return false;
     if (filter === "in_progress" && job.status !== "In Progress") return false;
@@ -406,6 +409,22 @@ export default function JobCards() {
     return true;
   });
 
+  const draftCount = useMemo(
+    () => jobCards.filter((card) => card.draftIntake && card.status === "Created").length,
+    [jobCards]
+  );
+
+  const filterLabelMap: Record<FilterType, string> = {
+    all: "All",
+    created: "Created",
+    assigned: "Assigned",
+    in_progress: "In Progress",
+    completed: "Completed",
+    draft: "Drafts",
+  };
+
+  const filterOptions: FilterType[] = ["all", "created", "assigned", "in_progress", "completed", "draft"];
+
   const kanbanColumns: KanbanColumn[] = [
     { id: "created", title: "Created", status: "Created" },
     { id: "assigned", title: "Assigned", status: "Assigned" },
@@ -416,6 +435,14 @@ export default function JobCards() {
 
   const getJobsByStatus = (status: JobCardStatus): JobCard[] => {
     return filteredJobs.filter((job) => job.status === status);
+  };
+
+  const handleEditDraft = (job: JobCard) => {
+    if (!job.sourceAppointmentId) {
+      router.push(`/sc/job-cards/${job.id}`);
+      return;
+    }
+    router.push(`/sc/appointments?draft=${job.sourceAppointmentId}&jobCard=${job.id}`);
   };
 
   const getNextStatus = (currentStatus: JobCardStatus): JobCardStatus[] => {
@@ -472,6 +499,20 @@ export default function JobCards() {
           </div>
         </div>
 
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setFilter("draft")}
+            className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition ${
+              filter === "draft"
+                ? "border-yellow-400 bg-yellow-400 text-white"
+                : "border-gray-200 bg-white text-gray-600 hover:border-yellow-400"
+            }`}
+          >
+            Drafts ({draftCount})
+          </button>
+        </div>
+
         {/* Filters */}
         <div className="bg-white rounded-xl md:rounded-2xl shadow-md p-4 md:p-6 mb-4 md:mb-6">
           <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
@@ -497,7 +538,7 @@ export default function JobCards() {
             
             {/* Desktop Filters */}
             <div className="hidden md:flex flex-wrap gap-2">
-              {(["all", "created", "assigned", "in_progress", "completed"] as FilterType[]).map((f) => (
+              {filterOptions.map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
@@ -507,7 +548,7 @@ export default function JobCards() {
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
-                  {f.charAt(0).toUpperCase() + f.slice(1).replace("_", " ")}
+                  {filterLabelMap[f]}
                 </button>
               ))}
             </div>
@@ -516,7 +557,7 @@ export default function JobCards() {
           {/* Mobile Filters Dropdown */}
           {showMobileFilters && (
             <div className="mt-4 md:hidden grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(["all", "created", "assigned", "in_progress", "completed"] as FilterType[]).map((f) => (
+              {filterOptions.map((f) => (
                 <button
                   key={f}
                   onClick={() => {
@@ -529,7 +570,7 @@ export default function JobCards() {
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
-                  {f.charAt(0).toUpperCase() + f.slice(1).replace("_", " ")}
+                  {filterLabelMap[f]}
                 </button>
               ))}
             </div>
@@ -696,6 +737,15 @@ export default function JobCards() {
                         <Eye size={14} />
                         View
                       </button>
+                      {job.draftIntake && job.sourceAppointmentId && (
+                        <button
+                          onClick={() => handleEditDraft(job)}
+                          className="flex-1 border border-yellow-400 text-yellow-700 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:bg-yellow-100 transition inline-flex items-center gap-1 md:gap-2 justify-center"
+                        >
+                          <Edit size={14} />
+                          Edit Draft
+                        </button>
+                      )}
                     </div>
                     {job.status === "Created" && (
                       <button

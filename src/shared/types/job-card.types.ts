@@ -48,6 +48,10 @@ export interface JobCard {
   // Warranty information
   warrantyStatus?: string;
   warrantyDetails?: string;
+  sourceAppointmentId?: number;
+  isTemporary?: boolean;
+  customerArrivalTimestamp?: string;
+  draftIntake?: Record<string, any>;
 }
 
 export interface KanbanColumn {

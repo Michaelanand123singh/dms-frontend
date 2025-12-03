@@ -1,0 +1,16 @@
+"use client";
+
+export const SERVICE_TYPE_OPTIONS = [
+  "-SELECT-",
+  "FREE SERVICE - 1",
+  "FREE SERVICE - 2",
+  "RUNNING REPAIR",
+  "PMS",
+  "TRANSIT DAMAGE",
+  "CAMPAIGN SERVICE",
+  "ACCIDENTAL REPAIR",
+  "WARRANTY REPAIRS",
+  "PDI",
+];
+
+

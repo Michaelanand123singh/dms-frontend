@@ -1,10 +1,10 @@
- "use client";
+"use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2 } from "lucide-react";
 import { useCustomerSearch } from "../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
 
@@ -274,10 +274,11 @@ const INITIAL_SERVICE_INTAKE_FORM: ServiceIntakeForm = {
   businessNameForInvoice: "",
 };
 
-import { defaultAppointments, serviceTypes, type ServiceType } from "@/__mocks__/data/appointments.mock";
+import { defaultAppointments } from "@/__mocks__/data/appointments.mock";
 import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
+import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 
-const SERVICE_TYPES = serviceTypes;
+const SERVICE_TYPES = SERVICE_TYPE_OPTIONS;
 
 const STATUS_CONFIG: Record<AppointmentStatus, { bg: string; text: string }> = {
   Confirmed: { bg: "bg-green-100", text: "text-green-800" },
@@ -605,7 +606,7 @@ const findNearestServiceCenter = (customerAddress: string | undefined): number |
 };
 
 // ==================== Main Component ====================
-export default function Appointments() {
+function AppointmentsContent() {
   const { userInfo, userRole } = useRole();
   const serviceCenterName = userInfo?.serviceCenter;
   const isCallCenter = userRole === "call_center";
@@ -631,6 +632,8 @@ export default function Appointments() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [pickupAddressDifferent, setPickupAddressDifferent] = useState<boolean>(false);
+  const [detailCustomer, setDetailCustomer] = useState<CustomerWithVehicles | null>(null);
+  const [currentJobCardId, setCurrentJobCardId] = useState<string | null>(null);
   
   // Service Center States (for call center)
   const [availableServiceCenters] = useState(() => {
@@ -686,6 +689,21 @@ export default function Appointments() {
   const customerSearchLoading = customerSearch.loading;
   const searchCustomer = customerSearch.search;
   const clearCustomerSearch = customerSearch.clear;
+  useEffect(() => {
+    if (!selectedAppointment) return;
+    searchCustomer(selectedAppointment.phone, "phone");
+  }, [selectedAppointment, searchCustomer]);
+
+  useEffect(() => {
+    if (!selectedAppointment) {
+      setDetailCustomer(null);
+      return;
+    }
+    const matchedCustomer = customerSearchResults.find(
+      (customer) => customer.phone === selectedAppointment.phone
+    );
+    setDetailCustomer(matchedCustomer ?? null);
+  }, [customerSearchResults, selectedAppointment]);
 
   // ==================== Helper Functions ====================
   const showToast = useCallback((message: string, type: ToastType = "success") => {
@@ -693,7 +711,7 @@ export default function Appointments() {
     setTimeout(() => {
       setToast({ show: false, message: "", type: "success" });
     }, TOAST_DURATION);
-  }, []);
+  }, [clearCustomerSearch]);
 
   const resetAppointmentForm = useCallback(() => {
     // Clean up object URLs before resetting form
@@ -729,6 +747,7 @@ export default function Appointments() {
   const closeDetailModal = useCallback(() => {
     setShowDetailModal(false);
     setSelectedAppointment(null);
+    setDetailCustomer(null);
     // Clean up object URLs before resetting form
     setServiceIntakeForm((prev) => {
       // Revoke all object URLs to prevent memory leaks
@@ -739,7 +758,9 @@ export default function Appointments() {
       return INITIAL_SERVICE_INTAKE_FORM;
     });
     setCustomerArrivalStatus(null);
-  }, []);
+    clearCustomerSearch();
+    setCurrentJobCardId(null);
+  }, [clearCustomerSearch]);
 
   const closeVehicleDetailsModal = useCallback(() => {
     setShowVehicleDetails(false);
@@ -750,6 +771,7 @@ export default function Appointments() {
   // ==================== Event Handlers ====================
   const handleAppointmentClick = useCallback((appointment: Appointment) => {
     setSelectedAppointment(appointment);
+    setDetailCustomer(null);
     setShowDetailModal(true);
     setIsEditing(false);
     // Reset service intake form when opening appointment details
@@ -937,14 +959,64 @@ export default function Appointments() {
       parts: [],
       location: "Station",
       quotationId: undefined, // No quotation yet
+      sourceAppointmentId: appointment.id,
+      isTemporary: true,
+      customerArrivalTimestamp: new Date().toISOString(),
     };
     
     // Save job card
     const updatedJobCards = [...existingJobCards, newJobCard];
     safeStorage.setItem("jobCards", updatedJobCards);
+    setCurrentJobCardId(newJobCard.id);
     
     return newJobCard;
   }, []);
+
+  const updateStoredJobCard = useCallback(
+    (jobId: string, updater: (card: JobCard) => JobCard) => {
+      const stored = safeStorage.getItem<JobCard[]>("jobCards", []);
+      const updated = stored.map((card) => (card.id === jobId ? updater(card) : card));
+      safeStorage.setItem("jobCards", updated);
+      return updated.find((card) => card.id === jobId) ?? null;
+    },
+    []
+  );
+
+  const handleSaveDraft = useCallback(() => {
+    if (!currentJobCardId) {
+      showToast("Please arrive a customer before saving a draft.", "error");
+      return;
+    }
+    const intakeSnapshot = {
+      ...serviceIntakeForm,
+      customerIdProof: {
+        files: [],
+        urls: serviceIntakeForm.customerIdProof.urls,
+      },
+      vehicleRCCopy: {
+        files: [],
+        urls: serviceIntakeForm.vehicleRCCopy.urls,
+      },
+      warrantyCardServiceBook: {
+        files: [],
+        urls: serviceIntakeForm.warrantyCardServiceBook.urls,
+      },
+      photosVideos: {
+        files: [],
+        urls: serviceIntakeForm.photosVideos.urls,
+      },
+    };
+
+    const updated = updateStoredJobCard(currentJobCardId, (card) => ({
+      ...card,
+      status: "Created",
+      draftIntake: intakeSnapshot,
+    }));
+    if (updated) {
+      setCurrentJobCardId(updated.id);
+    }
+    showToast("Job card saved as draft.", "success");
+  }, [currentJobCardId, showToast, updateStoredJobCard]);
 
   const handleViewVehicleDetails = useCallback(() => {
     if (!selectedAppointment) return;
@@ -1210,6 +1282,7 @@ export default function Appointments() {
 
   // Router for navigation
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Service Intake Handlers - Send to Service Manager (for Major Issues)
   const handleSendToServiceManager = useCallback(() => {
@@ -1296,13 +1369,46 @@ export default function Appointments() {
     );
     setAppointments(updatedAppointments);
     safeStorage.setItem("appointments", updatedAppointments);
+
+    if (currentJobCardId) {
+      updateStoredJobCard(currentJobCardId, (card) => ({
+        ...card,
+        status: "In Progress",
+      }));
+    }
+
+    updateLeadForAppointment(selectedAppointment);
     
     // Navigate to quotations page
     router.push("/sc/quotations?fromAppointment=true");
     
     // Close the appointment detail modal
     closeDetailModal();
-  }, [selectedAppointment, serviceIntakeForm, appointments, router, closeDetailModal, showToast]);
+  }, [selectedAppointment, serviceIntakeForm, appointments, router, closeDetailModal, showToast, currentJobCardId, updateStoredJobCard]);
+
+  const updateLeadForAppointment = useCallback(
+    (appointment: Appointment) => {
+      const storedLeads = safeStorage.getItem<any>("leads", []);
+      if (!storedLeads.length) return;
+      const updatedLeads = storedLeads.map((lead: any) => {
+        if (
+          (lead.phone && lead.phone === appointment.phone) ||
+          (lead.customerName && lead.customerName === appointment.customerName)
+        ) {
+          return {
+            ...lead,
+            status: "converted",
+            convertedTo: "quotation",
+            convertedId: currentJobCardId,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return lead;
+      });
+      safeStorage.setItem("leads", updatedLeads);
+    },
+    [currentJobCardId]
+  );
 
   // ==================== Effects ====================
   // Watch for customer search results to populate vehicle details
@@ -1327,6 +1433,36 @@ export default function Appointments() {
     }
     clearCustomerSearch();
   }, [customerSearchResults, selectedAppointment, showVehicleDetails, clearCustomerSearch]);
+
+  useEffect(() => {
+    const draftAppointmentId = searchParams.get("draft");
+    const jobCardId = searchParams.get("jobCard");
+    if (!draftAppointmentId) return;
+    const appointmentId = Number(draftAppointmentId);
+    if (Number.isNaN(appointmentId)) return;
+
+    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    const jobCard = storedJobCards.find(
+      (card) =>
+        (jobCardId ? card.id === jobCardId : card.sourceAppointmentId === appointmentId) &&
+        card.draftIntake
+    );
+    if (!jobCard) return;
+
+    const appointment = appointments.find((apt) => apt.id === appointmentId);
+    if (!appointment) return;
+
+    setSelectedAppointment(appointment);
+    setServiceIntakeForm((prev) => ({
+      ...prev,
+      ...jobCard.draftIntake,
+    }));
+    setCustomerArrivalStatus("arrived");
+    setCurrentJobCardId(jobCard.id);
+    setShowDetailModal(true);
+
+    router.replace("/sc/appointments");
+  }, [appointments, router, searchParams]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -2136,24 +2272,62 @@ export default function Appointments() {
                 <User size={20} />
                 Customer Information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Customer Name</p>
-                  <p className="font-medium text-gray-800">{selectedAppointment.customerName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Phone Number</p>
-                  <p className="font-medium text-gray-800 flex items-center gap-2">
-                    <Phone size={14} />
-                    {selectedAppointment.phone}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Vehicle</p>
-                  <p className="font-medium text-gray-800 flex items-center gap-2">
-                    <Car size={14} />
-                    {selectedAppointment.vehicle}
-                  </p>
+              <div className="space-y-5">
+                {detailCustomer ? (
+                  <CustomerInfoCard customer={detailCustomer} title="Customer Details" />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Customer Name</p>
+                      <p className="font-medium text-gray-800">{selectedAppointment.customerName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Phone Number</p>
+                      <p className="font-medium text-gray-800 flex items-center gap-2">
+                        <Phone size={14} />
+                        {selectedAppointment.phone}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Vehicle</p>
+                    <p className="font-medium text-gray-800 flex items-center gap-2">
+                      <Car size={14} />
+                      {selectedAppointment.vehicle}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Customer Type</p>
+                    <p className="font-medium text-gray-800">
+                      {selectedAppointment.customerType ?? "Not captured"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Preferred Communication</p>
+                    <p className="font-medium text-gray-800">
+                      {selectedAppointment.preferredCommunicationMode ?? "Not captured"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Pickup / Drop Required</p>
+                    <p className="font-medium text-gray-800">
+                      {selectedAppointment.pickupDropRequired ? "Yes" : "No"}
+                    </p>
+                  </div>
+                  {selectedAppointment.pickupAddress && (
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Pickup Address</p>
+                      <p className="font-medium text-gray-800">{selectedAppointment.pickupAddress}</p>
+                    </div>
+                  )}
+                  {selectedAppointment.dropAddress && (
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Drop Address</p>
+                      <p className="font-medium text-gray-800">{selectedAppointment.dropAddress}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2237,7 +2411,7 @@ export default function Appointments() {
                         );
                         setAppointments(updatedAppointments);
                         safeStorage.setItem("appointments", updatedAppointments);
-                        
+
                         // Show success message
                         showToast(
                           `Job Card Created: ${jobCard.jobCardNumber}. Customer arrival recorded.`,
@@ -2251,9 +2425,11 @@ export default function Appointments() {
                           vehicleBrand: selectedAppointment.vehicle.split(" ")[0] || "",
                           vehicleModel: selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
                         });
-                        
+
                         // Set arrival status
                         setCustomerArrivalStatus("arrived");
+                        // Ensure detail modal stays open so advisor can fill intake
+                        setShowDetailModal(true);
                       } catch (error) {
                         console.error("Error creating job card:", error);
                         showToast("Failed to create job card. Please try again.", "error");
@@ -2818,6 +2994,17 @@ export default function Appointments() {
                   >
                     Cancel
                   </button>
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={!currentJobCardId}
+                    className={`flex-1 rounded-lg px-4 py-3 font-medium transition ${
+                      currentJobCardId
+                        ? "bg-yellow-100 text-yellow-700 border border-yellow-200 hover:bg-yellow-200"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    Save as Draft
+                  </button>
                   {serviceIntakeForm.isMajorIssue ? (
                     <button
                       onClick={handleSendToServiceManager}
@@ -3303,5 +3490,13 @@ export default function Appointments() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function AppointmentsPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading appointments...</div>}>
+      <AppointmentsContent />
+    </Suspense>
   );
 }
