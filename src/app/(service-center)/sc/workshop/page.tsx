@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Wrench,
   Clock,
@@ -12,111 +12,131 @@ import {
   Filter,
   X,
   Search,
+  User,
+  Car,
+  Package,
 } from "lucide-react";
-import type { Engineer, WorkshopStats, ActiveJob, EngineerStatus, Workload, Priority } from "@/shared/types";
+import type { Engineer, WorkshopStats, EngineerStatus, Workload, Priority, JobCard, JobCardStatus } from "@/shared/types";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { defaultJobCards } from "@/__mocks__/data/job-cards.mock";
+import { defaultEngineers } from "@/__mocks__/data/workshop.mock";
+import {
+  filterByServiceCenter,
+  getServiceCenterContext,
+  shouldFilterByServiceCenter,
+} from "@/shared/lib/serviceCenter";
 
 export default function Workshop() {
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [selectedJobForAction, setSelectedJobForAction] = useState<ActiveJob | null>(null);
+  const [selectedJobForAction, setSelectedJobForAction] = useState<JobCard | null>(null);
   const [selectedEngineerForAssign, setSelectedEngineerForAssign] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
+  const [showDetails, setShowDetails] = useState<boolean>(false);
 
-  // Mock data
-  const engineers: Engineer[] = [
-    {
-      id: 1,
-      name: "Engineer 1",
-      status: "Busy",
-      currentJobs: 2,
-      completedToday: 3,
-      utilization: 85,
-      skills: ["Engine", "AC", "General"],
-      workload: "High",
-    },
-    {
-      id: 2,
-      name: "Engineer 2",
-      status: "Available",
-      currentJobs: 1,
-      completedToday: 2,
-      utilization: 65,
-      skills: ["Brakes", "Suspension"],
-      workload: "Medium",
-    },
-    {
-      id: 3,
-      name: "Engineer 3",
-      status: "Available",
-      currentJobs: 0,
-      completedToday: 1,
-      utilization: 45,
-      skills: ["General", "Oil Change"],
-      workload: "Low",
-    },
-  ];
-
-  const workshopStats: WorkshopStats = {
-    totalBays: 6,
-    occupiedBays: 4,
-    availableBays: 2,
-    activeJobs: 8,
-    completedToday: 12,
-    averageServiceTime: "2.5 hours",
-    utilizationRate: 78,
-  };
-
-  const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([
-    {
-      id: "JC-2025-001",
-      customer: "Rajesh Kumar",
-      vehicle: "Honda City",
-      serviceType: "Routine Maintenance",
-      engineer: "Engineer 1",
-      startTime: "10:00 AM",
-      estimatedCompletion: "12:00 PM",
-      status: "In Progress",
-      priority: "Normal",
-    },
-    {
-      id: "JC-2025-002",
-      customer: "Priya Sharma",
-      vehicle: "Maruti Swift",
-      serviceType: "Repair",
-      engineer: "Engineer 2",
-      startTime: "11:00 AM",
-      estimatedCompletion: "2:00 PM",
-      status: "In Progress",
-      priority: "High",
-    },
-  ]);
-
-  // Filter active jobs based on filters
-  const filteredActiveJobs = activeJobs.filter((job) => {
-    const matchesStatus = filterStatus === "all" || job.status.toLowerCase() === filterStatus.toLowerCase();
-    const matchesPriority = filterPriority === "all" || job.priority.toLowerCase() === filterPriority.toLowerCase();
-    const matchesSearch = searchQuery === "" || 
-      job.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.vehicle.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesPriority && matchesSearch;
+  // Fetch all job cards from localStorage/defaultJobCards
+  const [jobCards, setJobCards] = useState<JobCard[]>(() => {
+    if (typeof window !== "undefined") {
+      const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+      if (storedJobCards.length > 0) {
+        return storedJobCards;
+      }
+    }
+    return defaultJobCards;
   });
+
+  const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
+  const visibleJobCards = useMemo(
+    () => filterByServiceCenter(jobCards, serviceCenterContext),
+    [jobCards, serviceCenterContext]
+  );
+
+  // Load job cards from localStorage on mount
+  useEffect(() => {
+    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    if (storedJobCards.length > 0) {
+      try {
+        if (Array.isArray(storedJobCards) && storedJobCards.length > 0) {
+          setJobCards((prev) => {
+            const existingIds = new Set(prev.map((j) => j.id));
+            const newCards = storedJobCards.filter((j) => !existingIds.has(j.id));
+            return [...newCards, ...prev];
+          });
+        }
+      } catch (error) {
+        console.error("Error loading job cards from localStorage:", error);
+      }
+    }
+  }, []);
+
+  // Filter to show only active job cards (Assigned, In Progress, Parts Pending)
+  const activeJobCards = useMemo(() => {
+    return visibleJobCards.filter((job) => 
+      job.status === "Assigned" || 
+      job.status === "In Progress" || 
+      job.status === "Parts Pending"
+    );
+  }, [visibleJobCards]);
+
+  // Engineers from mock data
+  const engineers = defaultEngineers;
+
+  // Filter active jobs based on filters and search
+  const filteredActiveJobs = useMemo(() => {
+    return activeJobCards.filter((job) => {
+      const matchesStatus = filterStatus === "all" || job.status.toLowerCase() === filterStatus.toLowerCase();
+      const matchesPriority = filterPriority === "all" || job.priority.toLowerCase() === filterPriority.toLowerCase();
+      const matchesSearch = searchQuery === "" || 
+        job.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.jobCardNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.vehicle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.registration.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.serviceType.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesStatus && matchesPriority && matchesSearch;
+    });
+  }, [activeJobCards, filterStatus, filterPriority, searchQuery]);
+
+  // Update workshop stats based on actual job cards
+  const workshopStats: WorkshopStats = useMemo(() => {
+    const totalBays = 6;
+    const activeCount = activeJobCards.length;
+    const occupiedBays = Math.min(activeCount, totalBays);
+    const completedToday = visibleJobCards.filter(
+      (job) => job.status === "Completed" && 
+      job.completedAt && 
+      new Date(job.completedAt).toDateString() === new Date().toDateString()
+    ).length;
+    
+    return {
+      totalBays,
+      occupiedBays,
+      availableBays: totalBays - occupiedBays,
+      activeJobs: activeCount,
+      completedToday,
+      averageServiceTime: "2.5 hours",
+      utilizationRate: Math.round((occupiedBays / totalBays) * 100),
+    };
+  }, [activeJobCards, visibleJobCards]);
 
   const handleAssignEngineer = () => {
     if (!selectedJobForAction || !selectedEngineerForAssign) {
       alert("Please select a job and engineer");
       return;
     }
-    const updatedJobs = activeJobs.map((job) =>
+    const engineerName = engineers.find((e) => e.id.toString() === selectedEngineerForAssign)?.name || null;
+    const updatedJobs = jobCards.map((job) =>
       job.id === selectedJobForAction.id
-        ? { ...job, engineer: engineers.find((e) => e.id.toString() === selectedEngineerForAssign)?.name || job.engineer }
+        ? { ...job, assignedEngineer: engineerName, status: "Assigned" as JobCardStatus }
         : job
     );
-    setActiveJobs(updatedJobs);
+    setJobCards(updatedJobs);
+    safeStorage.setItem("jobCards", updatedJobs);
     setShowAssignModal(false);
     setSelectedJobForAction(null);
     setSelectedEngineerForAssign("");
@@ -128,18 +148,46 @@ export default function Workshop() {
       alert("Please select a job to complete");
       return;
     }
-    const updatedJobs = activeJobs.filter((job) => job.id !== selectedJobForAction.id);
-    setActiveJobs(updatedJobs);
+    const updatedJobs = jobCards.map((job) =>
+      job.id === selectedJobForAction.id
+        ? { ...job, status: "Completed" as JobCardStatus, completedAt: new Date().toLocaleString() }
+        : job
+    );
+    setJobCards(updatedJobs);
+    safeStorage.setItem("jobCards", updatedJobs);
     setShowCompleteModal(false);
     setSelectedJobForAction(null);
     alert("Job marked as completed!");
   };
 
-  const getStatusColor = (status: EngineerStatus): string => {
+  const getStatusColor = (status: JobCardStatus): string => {
+    const colors: Record<JobCardStatus, string> = {
+      Created: "bg-gray-100 text-gray-700 border-gray-300",
+      Assigned: "bg-blue-100 text-blue-700 border-blue-300",
+      "In Progress": "bg-yellow-100 text-yellow-700 border-yellow-300",
+      "Parts Pending": "bg-orange-100 text-orange-700 border-orange-300",
+      Completed: "bg-green-100 text-green-700 border-green-300",
+      Invoiced: "bg-purple-100 text-purple-700 border-purple-300",
+    };
+    return colors[status] || colors.Created;
+  };
+
+  const getPriorityColor = (priority: Priority): string => {
+    const colors: Record<Priority, string> = {
+      Low: "bg-gray-500",
+      Normal: "bg-blue-500",
+      High: "bg-orange-500",
+      Critical: "bg-red-500",
+    };
+    return colors[priority] || colors.Normal;
+  };
+
+  const getEngineerStatusColor = (status: EngineerStatus): string => {
     return status === "Available"
       ? "bg-green-100 text-green-700"
       : "bg-red-100 text-red-700";
   };
+
 
   const getWorkloadColor = (workload: Workload): string => {
     const colors: Record<Workload, string> = {
@@ -219,57 +267,107 @@ export default function Workshop() {
           <div className="lg:col-span-2 space-y-6">
             {/* Active Jobs */}
             <div className="bg-white rounded-2xl shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <Wrench className="text-blue-600" size={24} />
-                Active Jobs
-              </h2>
-              <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                  <Wrench className="text-blue-600" size={24} />
+                  Active Jobs
+                </h2>
+                <span className="text-sm text-gray-500">
+                  {filteredActiveJobs.length} {filteredActiveJobs.length === 1 ? "job" : "jobs"}
+                </span>
+              </div>
+              
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by job ID, customer, vehicle, or service type..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 max-h-[600px] overflow-y-auto">
                 {filteredActiveJobs.length > 0 ? (
                   filteredActiveJobs.map((job) => (
                     <div
                       key={job.id}
-                      className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition"
+                      className="border border-gray-200 rounded-xl p-4 hover:shadow-lg hover:border-blue-300 transition-all duration-200 cursor-pointer group"
+                      onClick={() => {
+                        setSelectedJob(job);
+                        setShowDetails(true);
+                      }}
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <p className="font-semibold text-gray-800">{job.id}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-semibold">
+                              {job.id}
+                            </span>
+                            {job.jobCardNumber && (
+                              <span className="text-xs text-gray-500">{job.jobCardNumber}</span>
+                            )}
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                                job.status
+                              )}`}
+                            >
+                              {job.status}
+                            </span>
+                            <span
+                              className={`w-2 h-2 rounded-full ${getPriorityColor(job.priority)}`}
+                              title={job.priority}
+                            ></span>
+                          </div>
+                          <p className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                            {job.customerName}
+                          </p>
                           <p className="text-sm text-gray-600 mt-1">
-                            {job.customer} • {job.vehicle}
+                            {job.vehicle} • {job.registration}
                           </p>
                         </div>
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            job.priority === "High"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`}
-                        >
-                          {job.priority}
-                        </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600">Service Type</p>
-                          <p className="font-medium text-gray-800">{job.serviceType}</p>
+                      <div className="grid grid-cols-2 gap-4 text-sm mt-3 pt-3 border-t border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <Wrench size={14} className="text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-700 truncate">{job.serviceType}</span>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Engineer</p>
-                          <p className="font-medium text-gray-800">{job.engineer}</p>
+                        {job.assignedEngineer && (
+                          <div className="flex items-center gap-2">
+                            <User size={14} className="text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-700 truncate">{job.assignedEngineer}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Clock size={14} className="text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-700">{job.estimatedTime}</span>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Started</p>
-                          <p className="font-medium text-gray-800">{job.startTime}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Est. Completion</p>
-                          <p className="font-medium text-gray-800">{job.estimatedCompletion}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-600">Cost:</span>
+                          <span className="font-medium text-gray-800">{job.estimatedCost}</span>
                         </div>
                       </div>
+                      {job.parts && job.parts.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-1 text-xs text-gray-600">
+                            <Package size={12} className="text-gray-400" />
+                            <span>{job.parts.length} {job.parts.length === 1 ? "part" : "parts"}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No active jobs found matching the filters.</p>
+                  <div className="text-center py-12 text-gray-500">
+                    <Wrench className="mx-auto text-gray-300 mb-3" size={48} />
+                    <p className="font-medium">No active jobs found</p>
+                    <p className="text-sm mt-1">
+                      {searchQuery ? "Try adjusting your search criteria" : "No jobs are currently active"}
+                    </p>
                   </div>
                 )}
               </div>
@@ -299,7 +397,7 @@ export default function Workshop() {
                         </div>
                       </div>
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${getEngineerStatusColor(
                           engineer.status
                         )}`}
                       >
@@ -393,7 +491,7 @@ export default function Workshop() {
               <div className="space-y-3">
                 <button
                   onClick={() => {
-                    if (activeJobs.length === 0) {
+                    if (activeJobCards.length === 0) {
                       alert("No active jobs available");
                       return;
                     }
@@ -406,7 +504,7 @@ export default function Workshop() {
                 </button>
                 <button
                   onClick={() => {
-                    if (activeJobs.length === 0) {
+                    if (activeJobCards.length === 0) {
                       alert("No active jobs available");
                       return;
                     }
@@ -479,15 +577,15 @@ export default function Workshop() {
                 <select
                   value={selectedJobForAction?.id || ""}
                   onChange={(e) => {
-                    const job = activeJobs.find((j) => j.id === e.target.value);
+                    const job = activeJobCards.find((j) => j.id === e.target.value);
                     setSelectedJobForAction(job || null);
                   }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="">-- Select Job --</option>
-                  {activeJobs.map((job) => (
+                  {activeJobCards.map((job) => (
                     <option key={job.id} value={job.id}>
-                      {job.id} - {job.customer} ({job.vehicle})
+                      {job.id} - {job.customerName} ({job.vehicle})
                     </option>
                   ))}
                 </select>
@@ -554,22 +652,22 @@ export default function Workshop() {
                 <select
                   value={selectedJobForAction?.id || ""}
                   onChange={(e) => {
-                    const job = activeJobs.find((j) => j.id === e.target.value);
+                    const job = activeJobCards.find((j) => j.id === e.target.value);
                     setSelectedJobForAction(job || null);
                   }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
                 >
                   <option value="">-- Select Job --</option>
-                  {activeJobs.map((job) => (
+                  {activeJobCards.map((job) => (
                     <option key={job.id} value={job.id}>
-                      {job.id} - {job.customer} ({job.vehicle})
+                      {job.id} - {job.customerName} ({job.vehicle})
                     </option>
                   ))}
                 </select>
               </div>
               {selectedJobForAction && (
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 mb-1">Customer: <span className="font-medium">{selectedJobForAction.customer}</span></p>
+                  <p className="text-sm text-gray-600 mb-1">Customer: <span className="font-medium">{selectedJobForAction.customerName}</span></p>
                   <p className="text-sm text-gray-600 mb-1">Vehicle: <span className="font-medium">{selectedJobForAction.vehicle}</span></p>
                   <p className="text-sm text-gray-600">Service: <span className="font-medium">{selectedJobForAction.serviceType}</span></p>
                 </div>
@@ -668,6 +766,155 @@ export default function Workshop() {
                   className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition"
                 >
                   Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Job Card Details Modal */}
+      {showDetails && selectedJob && (
+        <div className="fixed inset-0 bg-black bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-[100] p-2 sm:p-4">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-2xl mx-2 max-h-[90vh] overflow-y-auto p-4 md:p-6 z-[101]">
+            <div className="flex items-center justify-between mb-4 md:mb-6">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800">Job Card Details</h2>
+              <button
+                onClick={() => setShowDetails(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4 md:space-y-6">
+              {/* Status and Priority */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="bg-blue-100 text-blue-700 px-3 py-1 md:px-4 md:py-2 rounded-lg font-semibold text-sm md:text-base">
+                  {selectedJob.id}
+                </span>
+                {selectedJob.jobCardNumber && (
+                  <span className="text-xs md:text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-lg">
+                    {selectedJob.jobCardNumber}
+                  </span>
+                )}
+                <span
+                  className={`px-3 py-1 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium border ${getStatusColor(
+                    selectedJob.status
+                  )}`}
+                >
+                  {selectedJob.status}
+                </span>
+                <span
+                  className={`px-3 py-1 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium text-white ${getPriorityColor(
+                    selectedJob.priority
+                  )}`}
+                >
+                  {selectedJob.priority} Priority
+                </span>
+              </div>
+
+              {/* Customer & Vehicle Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <div className="bg-blue-50 p-3 md:p-4 rounded-xl">
+                  <h3 className="font-semibold text-blue-800 mb-1 md:mb-2 text-sm md:text-base">Customer Information</h3>
+                  <p className="text-xs md:text-sm text-gray-700 break-words">{selectedJob.customerName}</p>
+                </div>
+                <div className="bg-green-50 p-3 md:p-4 rounded-xl">
+                  <h3 className="font-semibold text-green-800 mb-1 md:mb-2 text-sm md:text-base">Vehicle Information</h3>
+                  <p className="text-xs md:text-sm text-gray-700 break-words">{selectedJob.vehicle}</p>
+                  <p className="text-xs text-gray-600 mt-1 break-words">{selectedJob.registration}</p>
+                </div>
+              </div>
+
+              {/* Service Details */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Service Details</h3>
+                <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                  <p className="text-xs md:text-sm text-gray-700 mb-1 md:mb-2 break-words">
+                    <strong>Type:</strong> {selectedJob.serviceType}
+                  </p>
+                  <p className="text-xs md:text-sm text-gray-700 break-words">
+                    <strong>Description:</strong> {selectedJob.description}
+                  </p>
+                  <p className="text-xs md:text-sm text-gray-700 mt-2 break-words">
+                    <strong>Location:</strong> {selectedJob.location}
+                  </p>
+                </div>
+              </div>
+
+              {/* Parts & Estimates */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Required Parts</h3>
+                  <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                    {selectedJob.parts && selectedJob.parts.length > 0 ? (
+                      <ul className="space-y-1">
+                        {selectedJob.parts.map((part, idx) => (
+                          <li key={idx} className="text-xs md:text-sm text-gray-700 flex items-center gap-1 md:gap-2 break-words">
+                            <Package size={12} className="text-gray-400 flex-shrink-0" />
+                            {part}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs md:text-sm text-gray-500">No parts required</p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Estimates</h3>
+                  <div className="bg-gray-50 p-3 md:p-4 rounded-lg space-y-1 md:space-y-2">
+                    <p className="text-xs md:text-sm text-gray-700 break-words">
+                      <strong>Cost:</strong> {selectedJob.estimatedCost}
+                    </p>
+                    <p className="text-xs md:text-sm text-gray-700 break-words">
+                      <strong>Time:</strong> {selectedJob.estimatedTime}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Engineer Assignment */}
+              {selectedJob.assignedEngineer && (
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Assigned Engineer</h3>
+                  <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                    <p className="text-xs md:text-sm text-gray-700 flex items-center gap-1 md:gap-2 break-words">
+                      <User size={14} className="text-gray-400 flex-shrink-0" />
+                      {selectedJob.assignedEngineer}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {selectedJob.createdAt && (
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Created At</h3>
+                    <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                      <p className="text-xs md:text-sm text-gray-700 break-words">{selectedJob.createdAt}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedJob.startTime && (
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-1 md:mb-2 text-sm md:text-base">Start Time</h3>
+                    <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                      <p className="text-xs md:text-sm text-gray-700 break-words">{selectedJob.startTime}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row gap-2 md:gap-3 pt-3 md:pt-4 border-t">
+                <button
+                  onClick={() => setShowDetails(false)}
+                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 md:px-6 md:py-3 rounded-lg font-medium hover:bg-gray-200 transition text-sm md:text-base"
+                >
+                  Close
                 </button>
               </div>
             </div>

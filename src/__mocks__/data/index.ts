@@ -16,6 +16,7 @@ export * from "./complaints.mock";
 export * from "./invoices.mock";
 export * from "./approvals.mock";
 export * from "./job-cards.mock";
+export * from "./workshop.mock";
 export * from "./users.mock";
 export * from "./dashboard.mock";
 
