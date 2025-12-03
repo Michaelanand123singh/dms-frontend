@@ -234,14 +234,7 @@ function InvoicesContent() {
   };
 
   return (
-    <Suspense
-      fallback={
-        <div className="bg-[#f9f9fb] min-h-screen flex items-center justify-center">
-          <p className="text-gray-500">Loading invoices...</p>
-        </div>
-      }
-    >
-      <div className="bg-[#f9f9fb] min-h-screen">
+    <div className="bg-[#f9f9fb] min-h-screen">
       <div className="pt-6 pb-10">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
@@ -907,7 +900,6 @@ function InvoicesContent() {
   );
 }
 
-// Export with Suspense wrapper for useSearchParams
 export default function Invoices() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading invoices...</div>}>

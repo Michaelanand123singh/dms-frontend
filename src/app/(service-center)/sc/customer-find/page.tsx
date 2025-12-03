@@ -28,10 +28,7 @@ import Link from "next/link";
 import { useRole } from "@/shared/hooks";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { canCreateCustomer } from "@/shared/constants/roles";
-import {
-  useCustomerSearch,
-  useCreateCustomer,
-} from "../../../../hooks/api";
+import { useCustomerSearch, useCreateCustomer } from "../../../../hooks/api";
 import type {
   CustomerSearchType,
   CustomerWithVehicles,
@@ -49,6 +46,11 @@ import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
 import { mockCustomers } from "@/__mocks__/data/customers.mock";
 import { serviceTypes } from "@/__mocks__/data/appointments.mock";
 import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
+import { FormInput, FormSelect, Modal } from "../components/shared/FormElements";
+import { CustomerInfoCard, InfoCard, ErrorAlert } from "../components/shared/InfoComponents";
+import { formatVehicleString } from "../components/shared/vehicle-utils";
+import { AppointmentModal } from "../components/appointment/AppointmentModal";
+import type { Appointment, AppointmentForm } from "../components/appointment/types";
 
 // Initial form states (constants for reuse)
 const initialCustomerForm: NewCustomerForm = {
@@ -162,145 +164,8 @@ const validateVIN = (vin: string): boolean => {
   return vin.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 };
 
-// Reusable form input component
-const FormInput = ({ 
-  label, 
-  required, 
-  value, 
-  onChange, 
-  placeholder, 
-  type = "text", 
-  maxLength,
-  readOnly,
-  className = "",
-  ...props 
-}: {
-  label: string;
-  required?: boolean;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  placeholder?: string;
-  type?: string;
-  maxLength?: number;
-  readOnly?: boolean;
-  className?: string;
-  [key: string]: any;
-}) => (
-  <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-2">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      readOnly={readOnly}
-      className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 ${
-        readOnly ? "bg-gray-100 cursor-not-allowed" : "bg-gray-50/50 focus:bg-white"
-      } ${className}`}
-      {...props}
-    />
-  </div>
-);
 
-// Reusable form select component
-const FormSelect = ({
-  label,
-  required,
-  value,
-  onChange,
-  options,
-  placeholder,
-  className = "",
-  ...props
-}: {
-  label: string;
-  required?: boolean;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-  className?: string;
-  [key: string]: any;
-}) => (
-  <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-2">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
-    <select
-      value={value}
-      onChange={onChange}
-      className={`w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 ${className}`}
-      {...props}
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  </div>
-);
 
-// Reusable modal wrapper
-const Modal = ({ 
-  title, 
-  onClose, 
-  children, 
-  subtitle,
-  maxWidth = "max-w-4xl"
-}: { 
-  title: string; 
-  onClose: () => void; 
-  children: React.ReactNode;
-  subtitle?: string;
-  maxWidth?: string;
-}) => (
-  <div 
-    className="fixed inset-0 backdrop-blur-md bg-black/10 flex items-start justify-center z-9999 p-4 pt-8"
-    style={{ animation: 'fadeIn 0.2s ease-out' }}
-    onClick={(e) => {
-      // Close modal when clicking on backdrop
-      if (e.target === e.currentTarget) {
-        onClose();
-      }
-    }}
-  >
-    <div 
-      className={`bg-white rounded-2xl shadow-xl ${maxWidth} w-full max-h-[90vh] overflow-y-auto`}
-      style={{ animation: 'slideDownFromTop 0.3s ease-out' }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl z-10">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors p-2 rounded-lg flex items-center gap-2 font-medium"
-            title="Close and go back to search"
-          >
-            <X size={18} strokeWidth={2} />
-            <span className="text-sm hidden sm:inline">Back</span>
-          </button>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-          {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
-          title="Close"
-        >
-          <X size={24} strokeWidth={2} />
-        </button>
-      </div>
-      <div className="p-6">{children}</div>
-    </div>
-  </div>
-);
 
 // Reusable button component
 const Button = ({ 
@@ -349,56 +214,6 @@ const Button = ({
   );
 };
 
-// Customer Info Display Component
-const CustomerInfoCard = ({ customer, title = "Customer Information" }: { customer: CustomerWithVehicles; title?: string }) => (
-  <div className="bg-indigo-50 rounded-lg p-4">
-    <h3 className="text-sm font-semibold text-indigo-900 mb-3">{title}</h3>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-      <div>
-        <p className="text-indigo-600 font-medium">Name</p>
-        <p className="text-gray-800 font-semibold">{customer.name}</p>
-      </div>
-      <div>
-        <p className="text-indigo-600 font-medium">Phone</p>
-        <p className="text-gray-800 font-semibold">{customer.phone}</p>
-      </div>
-      {customer.email && (
-        <div>
-          <p className="text-indigo-600 font-medium">Email</p>
-          <p className="text-gray-800 font-semibold">{customer.email}</p>
-        </div>
-      )}
-
-      {customer.address && (
-        <div>
-          <p className="text-indigo-600 font-medium">Address</p>
-          <p className="text-gray-800 font-semibold">{customer.address}</p>
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-// Error Display Component
-const ErrorAlert = ({ message }: { message: string }) => (
-  <div className="bg-red-50 rounded-lg p-4 flex items-center gap-2">
-    <AlertCircle className="text-red-600" size={20} strokeWidth={2} />
-    <p className="text-red-600 text-sm">{message}</p>
-  </div>
-);
-
-// Info Card Component (for customer details display)
-const InfoCard = ({ icon: Icon, label, value }: { icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>; label: string; value: string | React.ReactNode }) => (
-  <div className="flex items-center gap-3 p-4 bg-gray-50/50 rounded-lg hover:bg-gray-50 transition-colors">
-    <div className="p-2 rounded-lg bg-indigo-100">
-      <Icon className="text-indigo-600" size={18} strokeWidth={2} />
-    </div>
-    <div>
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className="text-sm font-semibold text-gray-900 mt-0.5">{value}</p>
-    </div>
-  </div>
-);
 
 export default function CustomerFind() {
   const { userRole, userInfo } = useRole();
@@ -2956,7 +2771,7 @@ export default function CustomerFind() {
         )}
 
         {showServiceCenterSelector && (
-          <div className="fixed inset-0 z-[1100] bg-black/40 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[12000] bg-black/40 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Choose Service Center</h3>
