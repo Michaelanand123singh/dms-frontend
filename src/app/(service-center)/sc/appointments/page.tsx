@@ -6,6 +6,16 @@ import { useCustomerSearch } from "../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  canCreateAppointment,
+  canEditCustomerInfo,
+  canEditVehicleInfo,
+  canEditServiceDetails,
+  canEditDocumentation,
+  canEditOperationalDetails,
+  canEditBillingPayment,
+  canEditPostService,
+} from "@/shared/constants/roles";
+import {
   filterByServiceCenter,
   getServiceCenterContext,
   shouldFilterByServiceCenter,
@@ -181,13 +191,13 @@ type CustomerArrivalStatus = "arrived" | "not_arrived" | null;
 
 // ==================== Constants ====================
 const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
-  customerName: "",
-  vehicle: "",
-  phone: "",
-  serviceType: "",
-  date: new Date().toISOString().split("T")[0],
-  time: "",
-  duration: "2",
+    customerName: "",
+    vehicle: "",
+    phone: "",
+    serviceType: "",
+    date: new Date().toISOString().split("T")[0],
+    time: "",
+    duration: "2",
   serviceCenterId: undefined,
   serviceCenterName: undefined,
   customerType: undefined,
@@ -623,6 +633,16 @@ function AppointmentsContent() {
   const canViewCostEstimation = isServiceAdvisor || isServiceManager || isInventoryManager;
   const canAccessBillingSection = isServiceAdvisor || isServiceManager || isInventoryManager;
   const canAccessBusinessName = canAccessBillingSection;
+  
+  // Permission checks for appointments - SC Manager restrictions
+  const canCreateNewAppointment = canCreateAppointment(userRole);
+  const canEditCustomerInformation = canEditCustomerInfo(userRole);
+  const canEditVehicleInformation = canEditVehicleInfo(userRole);
+  const canEditServiceDetailsSection = canEditServiceDetails(userRole);
+  const canEditDocumentationSection = canEditDocumentation(userRole);
+  const canEditOperationalDetailsSection = canEditOperationalDetails(userRole);
+  const canEditBillingPaymentSection = canEditBillingPayment(userRole);
+  const canEditPostServiceSection = canEditPostService(userRole);
 
   // State Management
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
@@ -1114,7 +1134,7 @@ function AppointmentsContent() {
           ? {
               ...apt,
               ...appointmentForm,
-              duration: "2 hours",
+      duration: "2 hours",
               status: appointmentForm.isMajorIssue ? "Sent to Manager" : apt.status,
               serviceCenterId: appointmentForm.serviceCenterId,
               serviceCenterName: selectedServiceCenter?.name,
@@ -1164,9 +1184,14 @@ function AppointmentsContent() {
   }, [appointmentForm, isEditing, selectedAppointment, appointments, serviceCenterName, availableServiceCenters, isCallCenter, showToast, closeAppointmentModal]);
 
   const handleOpenNewAppointment = useCallback(() => {
+    // Check permission before allowing appointment creation
+    if (!canCreateNewAppointment) {
+      showToast("You do not have permission to create new appointments.", "error");
+      return;
+    }
     setShowAppointmentModal(true);
     resetAppointmentForm();
-  }, [resetAppointmentForm]);
+  }, [canCreateNewAppointment, resetAppointmentForm, showToast]);
 
   // Complaint handlers
   const resetComplaintForm = useCallback(() => {
@@ -1418,8 +1443,6 @@ function AppointmentsContent() {
       }));
     }
 
-    updateLeadForAppointment(selectedAppointment);
-    
     // Navigate to quotations page
     router.push("/sc/quotations?fromAppointment=true");
     
@@ -1547,8 +1570,8 @@ function AppointmentsContent() {
           </div>
           <div className="flex gap-3">
             {isCallCenter && (
-              <button
-                onClick={() => {
+          <button
+            onClick={() => {
                   setShowComplaintModal(true);
                   resetComplaintForm();
                 }}
@@ -1558,13 +1581,15 @@ function AppointmentsContent() {
                 Create Complaint
               </button>
             )}
-          <button
-            onClick={handleOpenNewAppointment}
-            className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
-          >
-            <PlusCircle size={20} />
-            New Appointment
-          </button>
+          {canCreateNewAppointment && (
+            <button
+              onClick={handleOpenNewAppointment}
+              className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
+            >
+              <PlusCircle size={20} />
+              New Appointment
+            </button>
+          )}
           </div>
         </div>
 
@@ -1586,17 +1611,17 @@ function AppointmentsContent() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <Clock size={16} className="text-blue-600" />
-                      <span className="font-semibold text-sm">{apt.time}</span>
-                    </div>
+                  <Clock size={16} className="text-blue-600" />
+                  <span className="font-semibold text-sm">{apt.time}</span>
+                </div>
                     <StatusBadge status={apt.status} />
                   </div>
                   <p className="font-medium text-gray-800 text-sm mb-1">{apt.customerName}</p>
                   <div className="flex items-center gap-1 mb-1">
                     <Car size={12} className="text-gray-400" />
-                    <p className="text-xs text-gray-600">{apt.vehicle}</p>
+                <p className="text-xs text-gray-600">{apt.vehicle}</p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{apt.serviceType}</p>
+                <p className="text-xs text-gray-500 mt-1">{apt.serviceType}</p>
                   <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">
                     <Phone size={12} className="text-gray-400" />
                     <p className="text-xs text-gray-500">{apt.phone}</p>
@@ -1607,9 +1632,9 @@ function AppointmentsContent() {
                       <p className="text-xs text-indigo-600 font-medium">{apt.serviceCenterName}</p>
                     </div>
                   )}
-                </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
           )}
         </div>
       </div>
@@ -1631,16 +1656,28 @@ function AppointmentsContent() {
                   label="Customer Name"
                   required
                     value={customerSearchQuery}
-                    onChange={(e) => handleCustomerSearchChange(e.target.value)}
-                    placeholder="Start typing customer name..."
+                    onChange={(e) => {
+                      if (isEditing && !canEditCustomerInformation) return;
+                      handleCustomerSearchChange(e.target.value);
+                    }}
+                    placeholder={isEditing && !canEditCustomerInformation ? "Customer information cannot be edited" : "Start typing customer name..."}
+                    disabled={isEditing && !canEditCustomerInformation}
+                    readOnly={isEditing && !canEditCustomerInformation}
                   />
                   {showCustomerDropdown && customerSearchResults.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {typedCustomerSearchResults.map((customer) => (
                         <div
                           key={customer.id}
-                          onClick={() => handleCustomerSelect(customer)}
-                        className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                          onClick={() => {
+                            if (isEditing && !canEditCustomerInformation) return;
+                            handleCustomerSelect(customer);
+                          }}
+                        className={`p-3 border-b border-gray-100 last:border-b-0 transition-colors ${
+                          isEditing && !canEditCustomerInformation 
+                            ? "cursor-not-allowed opacity-50" 
+                            : "hover:bg-indigo-50 cursor-pointer"
+                        }`}
                         >
                           <div className="flex items-center gap-3">
                           <div className="p-1.5 rounded-lg bg-indigo-100">
@@ -1709,8 +1746,12 @@ function AppointmentsContent() {
                   label="Vehicle"
                     required
                     value={appointmentForm.vehicle}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, vehicle: e.target.value })}
-                  placeholder="Select vehicle"
+                    onChange={(e) => {
+                      if (isEditing && !canEditVehicleInformation) return;
+                      setAppointmentForm({ ...appointmentForm, vehicle: e.target.value });
+                    }}
+                  placeholder={isEditing && !canEditVehicleInformation ? "Vehicle information cannot be edited" : "Select vehicle"}
+                  disabled={isEditing && !canEditVehicleInformation}
                   options={selectedCustomer.vehicles.map((v) => ({
                     value: formatVehicleString(v),
                     label: `${formatVehicleString(v)}${v.registration ? ` - ${v.registration}` : ""}`,
@@ -1723,6 +1764,7 @@ function AppointmentsContent() {
                   value={appointmentForm.vehicle}
                   onChange={() => {}}
                   readOnly
+                  disabled={isEditing && !canEditVehicleInformation}
                 />
               )}
               {selectedCustomer && appointmentForm.vehicle && (() => {
@@ -1774,7 +1816,7 @@ function AppointmentsContent() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="flex-1">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Service Center</label>
-                    <button
+              <button
                       type="button"
                       onClick={() => setShowServiceCenterSelector(true)}
                       className="w-full text-left px-4 py-3 rounded-lg border border-gray-300 bg-white hover:border-indigo-500 transition"
@@ -1824,8 +1866,8 @@ function AppointmentsContent() {
               />
             )}
 
-            {/* Service Details Section (Call Center, Service Advisor) */}
-            {(isCallCenter || isServiceAdvisor) && (
+            {/* Service Details Section (Call Center, Service Advisor, SC Manager when editing) */}
+            {(isCallCenter || isServiceAdvisor || (isEditing && canEditServiceDetailsSection)) && (
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <FileText className="text-purple-600" size={20} />
@@ -1838,11 +1880,18 @@ function AppointmentsContent() {
                     </label>
                     <textarea
                       value={appointmentForm.customerComplaintIssue || ""}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, customerComplaintIssue: e.target.value })}
+                      onChange={(e) => {
+                        if (isEditing && !canEditServiceDetailsSection) return;
+                        setAppointmentForm({ ...appointmentForm, customerComplaintIssue: e.target.value });
+                      }}
                       rows={3}
                       placeholder="Describe the customer complaint or issue..."
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
+                      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none ${
+                        isEditing && !canEditServiceDetailsSection ? "cursor-not-allowed opacity-50" : ""
+                      }`}
                       required={isCallCenter}
+                      disabled={isEditing && !canEditServiceDetailsSection}
+                      readOnly={isEditing && !canEditServiceDetailsSection}
                     />
                   </div>
                   {/* Additional fields - Hidden when major issue */}
@@ -1854,35 +1903,57 @@ function AppointmentsContent() {
                         </label>
                         <textarea
                           value={appointmentForm.previousServiceHistory || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, previousServiceHistory: e.target.value })}
+                          onChange={(e) => {
+                            if (isEditing && !canEditServiceDetailsSection) return;
+                            setAppointmentForm({ ...appointmentForm, previousServiceHistory: e.target.value });
+                          }}
                           rows={3}
                           placeholder="Enter previous service history..."
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
+                          className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none ${
+                            isEditing && !canEditServiceDetailsSection ? "cursor-not-allowed opacity-50" : ""
+                          }`}
+                          disabled={isEditing && !canEditServiceDetailsSection}
+                          readOnly={isEditing && !canEditServiceDetailsSection}
                         />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormInput
                           label="Estimated Service Time"
                           value={appointmentForm.estimatedServiceTime || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedServiceTime: e.target.value })}
+                          onChange={(e) => {
+                            if (isEditing && !canEditServiceDetailsSection) return;
+                            setAppointmentForm({ ...appointmentForm, estimatedServiceTime: e.target.value });
+                          }}
                           placeholder="e.g., 2 hours"
+                          disabled={isEditing && !canEditServiceDetailsSection}
+                          readOnly={isEditing && !canEditServiceDetailsSection}
                         />
                         <FormInput
                           label="Estimated Cost"
                           type="number"
                           value={appointmentForm.estimatedCost || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedCost: e.target.value })}
+                          onChange={(e) => {
+                            if (isEditing && !canEditServiceDetailsSection) return;
+                            setAppointmentForm({ ...appointmentForm, estimatedCost: e.target.value });
+                          }}
                           placeholder="Enter estimated cost"
+                          disabled={isEditing && !canEditServiceDetailsSection}
+                          readOnly={isEditing && !canEditServiceDetailsSection}
                         />
                       </div>
-                      {/* Odometer Reading - Only for Service Advisor, not Call Center */}
-                      {isServiceAdvisor && (
+                      {/* Odometer Reading - Service Advisor and SC Manager when editing */}
+                      {(isServiceAdvisor || (isEditing && canEditServiceDetailsSection)) && (
                         <FormInput
                           label="Odometer Reading"
                           type="number"
                           value={appointmentForm.odometerReading || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, odometerReading: e.target.value })}
+                          onChange={(e) => {
+                            if (isEditing && !canEditServiceDetailsSection) return;
+                            setAppointmentForm({ ...appointmentForm, odometerReading: e.target.value });
+                          }}
                           placeholder="Enter odometer reading"
+                          disabled={isEditing && !canEditServiceDetailsSection}
+                          readOnly={isEditing && !canEditServiceDetailsSection}
                         />
                       )}
                     </>
@@ -1891,8 +1962,8 @@ function AppointmentsContent() {
               </div>
             )}
 
-            {/* Documentation Section (Call Center, Service Advisor, Service Manager) - Hidden when major issue */}
-            {(isCallCenter || isServiceAdvisor) && !appointmentForm.isMajorIssue && (
+            {/* Documentation Section (Call Center, Service Advisor, SC Manager when editing) - Hidden when major issue */}
+            {(isCallCenter || isServiceAdvisor || (isEditing && canEditDocumentationSection)) && !appointmentForm.isMajorIssue && (
               <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <Upload className="text-amber-600" size={20} />
@@ -1909,17 +1980,21 @@ function AppointmentsContent() {
                       multiple
                       accept="image/*,.pdf"
                       onChange={(e) => {
+                        if (isEditing && !canEditDocumentationSection) return;
                         const files = Array.from(e.target.files || []);
                         const urls = files.map((file) => URL.createObjectURL(file));
-                        setAppointmentForm({
+                  setAppointmentForm({
                           ...appointmentForm,
                           customerIdProof: {
                             files,
                             urls,
                           },
-                        });
-                      }}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
+                  });
+                }}
+                      disabled={isEditing && !canEditDocumentationSection}
+                      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white ${
+                        isEditing && !canEditDocumentationSection ? "cursor-not-allowed opacity-50" : ""
+                      }`}
                     />
                     {appointmentForm.customerIdProof?.files && appointmentForm.customerIdProof.files.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -1942,6 +2017,7 @@ function AppointmentsContent() {
                       multiple
                       accept="image/*,.pdf"
                       onChange={(e) => {
+                        if (isEditing && !canEditDocumentationSection) return;
                         const files = Array.from(e.target.files || []);
                         const urls = files.map((file) => URL.createObjectURL(file));
                         setAppointmentForm({
@@ -1952,7 +2028,10 @@ function AppointmentsContent() {
                           },
                         });
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
+                      disabled={isEditing && !canEditDocumentationSection}
+                      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white ${
+                        isEditing && !canEditDocumentationSection ? "cursor-not-allowed opacity-50" : ""
+                      }`}
                     />
                     {appointmentForm.vehicleRCCopy?.files && appointmentForm.vehicleRCCopy.files.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -1975,6 +2054,7 @@ function AppointmentsContent() {
                       multiple
                       accept="image/*,.pdf"
                       onChange={(e) => {
+                        if (isEditing && !canEditDocumentationSection) return;
                         const files = Array.from(e.target.files || []);
                         const urls = files.map((file) => URL.createObjectURL(file));
                         setAppointmentForm({
@@ -1985,7 +2065,10 @@ function AppointmentsContent() {
                           },
                         });
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
+                      disabled={isEditing && !canEditDocumentationSection}
+                      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white ${
+                        isEditing && !canEditDocumentationSection ? "cursor-not-allowed opacity-50" : ""
+                      }`}
                     />
                     {appointmentForm.warrantyCardServiceBook?.files && appointmentForm.warrantyCardServiceBook.files.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -2008,6 +2091,7 @@ function AppointmentsContent() {
                       multiple
                       accept="image/*,video/*"
                       onChange={(e) => {
+                        if (isEditing && !canEditDocumentationSection) return;
                         const files = Array.from(e.target.files || []);
                         const urls = files.map((file) => URL.createObjectURL(file));
                         setAppointmentForm({
@@ -2018,7 +2102,10 @@ function AppointmentsContent() {
                           },
                         });
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
+                      disabled={isEditing && !canEditDocumentationSection}
+                      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white ${
+                        isEditing && !canEditDocumentationSection ? "cursor-not-allowed opacity-50" : ""
+                      }`}
                     />
                     {appointmentForm.photosVideos?.files && appointmentForm.photosVideos.files.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -2084,51 +2171,67 @@ function AppointmentsContent() {
             </div>
 
           {/* Operational Details Section - Hidden when major issue */}
-          {(isCallCenter || isServiceAdvisor) && !appointmentForm.isMajorIssue && (
+          {(isCallCenter || isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && !appointmentForm.isMajorIssue && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <Clock className="text-blue-600" size={20} />
                 Operational Details
               </h3>
               <div className="space-y-4">
-                {/* Estimated Delivery Date (Service Advisor & Service Manager) */}
-                {isServiceAdvisor && (
+                {/* Estimated Delivery Date (Service Advisor & SC Manager when editing) */}
+                {(isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && (
                   <FormInput
                     label="Estimated Delivery Date"
                     type="date"
                     value={appointmentForm.estimatedDeliveryDate || ""}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedDeliveryDate: e.target.value })}
+                    onChange={(e) => {
+                      if (isEditing && !canEditOperationalDetailsSection) return;
+                      setAppointmentForm({ ...appointmentForm, estimatedDeliveryDate: e.target.value });
+                    }}
+                    disabled={isEditing && !canEditOperationalDetailsSection}
+                    readOnly={isEditing && !canEditOperationalDetailsSection}
                   />
                 )}
 
-                {/* Assigned Service Advisor (Call Center, Service Advisor, Service Manager) */}
-                {(isCallCenter || isServiceAdvisor) && (
+                {/* Assigned Service Advisor (Call Center, Service Advisor, SC Manager when editing) */}
+                {(isCallCenter || isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && (
                   <FormInput
                     label="Assigned Service Advisor"
                     value={appointmentForm.assignedServiceAdvisor || ""}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, assignedServiceAdvisor: e.target.value })}
+                    onChange={(e) => {
+                      if (isEditing && !canEditOperationalDetailsSection) return;
+                      setAppointmentForm({ ...appointmentForm, assignedServiceAdvisor: e.target.value });
+                    }}
                     placeholder="Enter service advisor name"
+                    disabled={isEditing && !canEditOperationalDetailsSection}
+                    readOnly={isEditing && !canEditOperationalDetailsSection}
                   />
                 )}
 
-                {/* Assigned Technician (Service Advisor & Service Manager) */}
-                {isServiceAdvisor && (
+                {/* Assigned Technician (Service Advisor & SC Manager when editing) */}
+                {(isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && (
                   <FormInput
                     label="Assigned Technician"
                     value={appointmentForm.assignedTechnician || ""}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, assignedTechnician: e.target.value })}
+                    onChange={(e) => {
+                      if (isEditing && !canEditOperationalDetailsSection) return;
+                      setAppointmentForm({ ...appointmentForm, assignedTechnician: e.target.value });
+                    }}
                     placeholder="Enter technician name"
+                    disabled={isEditing && !canEditOperationalDetailsSection}
+                    readOnly={isEditing && !canEditOperationalDetailsSection}
                   />
                 )}
 
                         {/* Pickup / Drop Required */}
-                        {(isCallCenter || isServiceAdvisor) && (
+                        {(isCallCenter || isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && (
                           <div className="space-y-3">
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={appointmentForm.pickupDropRequired || false}
                                 onChange={(e) => {
+                                  if (isEditing && !canEditOperationalDetailsSection) return;
                                   const checked = e.target.checked;
                                   setAppointmentForm({
                                     ...appointmentForm,
@@ -2144,7 +2247,10 @@ function AppointmentsContent() {
                                     setPickupAddressDifferent(false);
                                   }
                                 }}
-                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                disabled={isEditing && !canEditOperationalDetailsSection}
+                                className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 ${
+                                  isEditing && !canEditOperationalDetailsSection ? "cursor-not-allowed opacity-50" : ""
+                                }`}
                               />
                               <span className="text-sm font-medium text-gray-700">Pickup / Drop Required</span>
                             </label>
@@ -2157,6 +2263,7 @@ function AppointmentsContent() {
                                     type="checkbox"
                                     checked={pickupAddressDifferent}
                                     onChange={(e) => {
+                                      if (isEditing && !canEditOperationalDetailsSection) return;
                                       const checked = e.target.checked;
                                       setPickupAddressDifferent(checked);
                                       if (!checked) {
@@ -2167,7 +2274,10 @@ function AppointmentsContent() {
                                         });
                                       }
                                     }}
-                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                    disabled={isEditing && !canEditOperationalDetailsSection}
+                                    className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 ${
+                                      isEditing && !canEditOperationalDetailsSection ? "cursor-not-allowed opacity-50" : ""
+                                    }`}
                                   />
                                   <span className="text-sm text-gray-700">
                                     Pickup / Drop address is different from customer address
@@ -2179,19 +2289,25 @@ function AppointmentsContent() {
                                     <FormInput
                                       label="Pickup Address"
                                       value={appointmentForm.pickupAddress || ""}
-                                      onChange={(e) =>
-                                        setAppointmentForm({ ...appointmentForm, pickupAddress: e.target.value })
-                                      }
+                                      onChange={(e) => {
+                                        if (isEditing && !canEditOperationalDetailsSection) return;
+                                        setAppointmentForm({ ...appointmentForm, pickupAddress: e.target.value });
+                                      }}
                                       placeholder="Enter pickup address"
+                                      disabled={isEditing && !canEditOperationalDetailsSection}
+                                      readOnly={isEditing && !canEditOperationalDetailsSection}
                                     />
 
                                     <FormInput
                                       label="Drop Address"
                                       value={appointmentForm.dropAddress || ""}
-                                      onChange={(e) =>
-                                        setAppointmentForm({ ...appointmentForm, dropAddress: e.target.value })
-                                      }
+                                      onChange={(e) => {
+                                        if (isEditing && !canEditOperationalDetailsSection) return;
+                                        setAppointmentForm({ ...appointmentForm, dropAddress: e.target.value });
+                                      }}
                                       placeholder="Enter drop address"
+                                      disabled={isEditing && !canEditOperationalDetailsSection}
+                                      readOnly={isEditing && !canEditOperationalDetailsSection}
                                     />
                                   </>
                                 )}
@@ -2201,12 +2317,16 @@ function AppointmentsContent() {
                         )}
 
                 {/* Preferred Communication Mode */}
-                {(isCallCenter || isServiceAdvisor) && (
+                {(isCallCenter || isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && (
                   <FormSelect
                     label="Preferred Communication Mode"
                     value={appointmentForm.preferredCommunicationMode || ""}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, preferredCommunicationMode: e.target.value as "Phone" | "Email" | "SMS" | "WhatsApp" | undefined })}
+                    onChange={(e) => {
+                      if (isEditing && !canEditOperationalDetailsSection) return;
+                      setAppointmentForm({ ...appointmentForm, preferredCommunicationMode: e.target.value as "Phone" | "Email" | "SMS" | "WhatsApp" | undefined });
+                    }}
                     placeholder="Select communication mode"
+                    disabled={isEditing && !canEditOperationalDetailsSection}
                     options={[
                       { value: "Phone", label: "Phone" },
                       { value: "Email", label: "Email" },
@@ -2219,8 +2339,8 @@ function AppointmentsContent() {
             </div>
           )}
 
-          {/* Post-Service Survey Section (Call Center, Service Advisor, Service Manager, Service Technician) - Hidden when major issue */}
-          {canAccessBillingSection && !appointmentForm.isMajorIssue && (
+          {/* Billing & Payment Section - Hidden when major issue */}
+          {(canAccessBillingSection || (isEditing && canEditBillingPaymentSection)) && !appointmentForm.isMajorIssue && (
             <div className="bg-white p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <FileText className="text-indigo-600" size={20} />
@@ -2230,13 +2350,15 @@ function AppointmentsContent() {
                 <FormSelect
                   label="Payment Mode"
                   value={appointmentForm.paymentMethod || ""}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    if (isEditing && !canEditBillingPaymentSection) return;
                     setAppointmentForm({
                       ...appointmentForm,
                       paymentMethod: e.target.value as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | undefined,
-                    })
-                  }
+                    });
+                  }}
                   placeholder="Select payment mode"
+                  disabled={isEditing && !canEditBillingPaymentSection}
                   options={[
                     { value: "Cash", label: "Cash" },
                     { value: "Card", label: "Card" },
@@ -2249,8 +2371,13 @@ function AppointmentsContent() {
                   <FormInput
                     label="Business Name for Invoice"
                     value={appointmentForm.businessNameForInvoice || ""}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, businessNameForInvoice: e.target.value })}
+                    onChange={(e) => {
+                      if (isEditing && !canEditBillingPaymentSection) return;
+                      setAppointmentForm({ ...appointmentForm, businessNameForInvoice: e.target.value });
+                    }}
                     placeholder="Enter business name for invoice"
+                    disabled={isEditing && !canEditBillingPaymentSection}
+                    readOnly={isEditing && !canEditBillingPaymentSection}
                   />
                 )}
                 {canViewCostEstimation && (
@@ -2265,8 +2392,14 @@ function AppointmentsContent() {
                   <input
                     type="checkbox"
                     checked={!!appointmentForm.gstRequirement}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, gstRequirement: e.target.checked })}
-                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    onChange={(e) => {
+                      if (isEditing && !canEditBillingPaymentSection) return;
+                      setAppointmentForm({ ...appointmentForm, gstRequirement: e.target.checked });
+                    }}
+                    disabled={isEditing && !canEditBillingPaymentSection}
+                    className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 ${
+                      isEditing && !canEditBillingPaymentSection ? "cursor-not-allowed opacity-50" : ""
+                    }`}
                   />
                   <span className="text-sm font-medium text-gray-700">GST Requirement</span>
                 </label>
@@ -2295,7 +2428,7 @@ function AppointmentsContent() {
                 Schedule Appointment
               </button>
             )}
-          </div>
+            </div>
         </div>
       </Modal>
 
@@ -3252,15 +3385,15 @@ function AppointmentsContent() {
       {/* Create Complaint Modal (for Call Center) */}
       {isCallCenter && (
         <Modal show={showComplaintModal} onClose={closeComplaintModal} title="Create Complaint">
-          <div className="space-y-4">
-            {/* Customer Information */}
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              {/* Customer Information */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative" ref={complaintCustomerDropdownRef}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Customer Name <span className="text-red-500">*</span>
-                  </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Customer Name <span className="text-red-500">*</span>
+                    </label>
                   <div className="relative">
                     <input
                       type="text"
@@ -3323,27 +3456,27 @@ function AppointmentsContent() {
                       </div>
                     )}
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
                     value={complaintForm.phone}
                     onChange={(e) =>
                       setComplaintForm({ ...complaintForm, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })
                     }
-                    placeholder="9876543210"
-                    maxLength={10}
+                      placeholder="9876543210"
+                      maxLength={10}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vehicle <span className="text-red-500">*</span>
-                  </label>
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vehicle <span className="text-red-500">*</span>
+                    </label>
                   {selectedComplaintCustomer && selectedComplaintCustomer.vehicles && selectedComplaintCustomer.vehicles.length > 0 ? (
                     <div>
                       <select
@@ -3382,8 +3515,8 @@ function AppointmentsContent() {
                       required
                     />
                   )}
+                  </div>
                 </div>
-              </div>
 
               {/* Selected Customer Info Display */}
               {selectedComplaintCustomer && (
@@ -3418,42 +3551,42 @@ function AppointmentsContent() {
                   </div>
                 </div>
               )}
-            </div>
+              </div>
 
             {/* Complaint Details */}
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Complaint Details</h3>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                     Complaint Description <span className="text-red-500">*</span>
-                  </label>
+                    </label>
                   <textarea
                     value={complaintForm.complaint}
                     onChange={(e) => setComplaintForm({ ...complaintForm, complaint: e.target.value })}
                     rows={4}
                     placeholder="Describe the complaint in detail..."
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none resize-none"
-                    required
+                      required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                     Severity <span className="text-red-500">*</span>
-                  </label>
-                  <select
+                    </label>
+                    <select
                     value={complaintForm.severity}
                     onChange={(e) => setComplaintForm({ ...complaintForm, severity: e.target.value as ComplaintForm["severity"] })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
-                    required
-                  >
+                      required
+                    >
                     <option value="Low">Low</option>
                     <option value="Medium">Medium</option>
                     <option value="High">High</option>
                     <option value="Critical">Critical</option>
-                  </select>
-                </div>
-              </div>
+                    </select>
+                  </div>
+                  </div>
             </div>
 
             {/* Service Center Selection (for Call Center) */}
@@ -3509,24 +3642,24 @@ function AppointmentsContent() {
                             </p>
                           );
                         })()}
-                      </div>
-                    </div>
+                </div>
+              </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Submit Buttons */}
-            <div className="flex gap-3 pt-4 border-t border-gray-200">
+              {/* Submit Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
               <button onClick={closeComplaintModal} className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition">
                 Cancel
               </button>
-              <button
+                <button
                 onClick={handleSubmitComplaint}
                 className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
               >
                 Create Complaint
-              </button>
+                </button>
             </div>
           </div>
         </Modal>
@@ -3537,7 +3670,7 @@ function AppointmentsContent() {
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">Choose Service Center</h3>
-            <button
+                <button
               type="button"
               onClick={() => setShowServiceCenterSelector(false)}
               className="text-gray-400 hover:text-gray-600 transition"
@@ -3575,11 +3708,11 @@ function AppointmentsContent() {
               {filteredServiceCenters.length === 0 && (
                 <p className="text-sm text-gray-500 text-center">No service centers match your search.</p>
               )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
     </div>
   );
 }
