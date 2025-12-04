@@ -14,7 +14,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useCustomerSearch } from "../../../../hooks/api";
+import { useCustomerSearch } from "../../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
 import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
@@ -27,6 +27,7 @@ import {
   INITIAL_APPOINTMENT_FORM,
   countAppointmentsForDate,
   findNearestServiceCenter,
+  getMaxAppointmentsPerDay,
   validateAppointmentForm,
 } from "../appointment/types";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
@@ -73,8 +74,7 @@ export const AppointmentModal = ({
   const customerDropdownRef = useRef<HTMLDivElement>(null);
 
   const customerSearch = useCustomerSearch();
-  const customerSearchResults = customerSearch.results as CustomerWithVehicles[];
-  const typedCustomerSearchResults = customerSearchResults;
+  const customerSearchResults: CustomerWithVehicles[] = customerSearch.results;
   const customerSearchLoading = customerSearch.loading;
 
   useEffect(() => {
@@ -159,6 +159,47 @@ export const AppointmentModal = ({
     [customerSearch]
   );
 
+  const renderCustomerSearchResult = useCallback(
+    (customer: CustomerWithVehicles) => (
+      <div
+        key={customer.id}
+        onClick={() => handleCustomerSelect(customer)}
+        className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 rounded-lg bg-indigo-100">
+            <User className="text-indigo-600" size={16} strokeWidth={2} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 truncate">{customer.name}</p>
+            <div className="flex items-center gap-3 text-xs text-gray-600 mt-1">
+              <span className="flex items-center gap-1">
+                <Phone size={12} />
+                {customer.phone}
+              </span>
+              {customer.vehicles && customer.vehicles.length > 0 && (
+                <span className="flex items-center gap-1">
+                  <Car size={12} />
+                  {customer.vehicles.length} vehicle{customer.vehicles.length > 1 ? "s" : ""}
+                </span>
+              )}
+              {customer.lastServiceCenterName && (
+                <span className="flex items-center gap-1">
+                  <Building2 size={12} />
+                  {customer.lastServiceCenterName}
+                </span>
+              )}
+            </div>
+          </div>
+          {selectedCustomer?.id === customer.id && (
+            <CheckCircle className="text-indigo-600 shrink-0" size={18} strokeWidth={2} />
+          )}
+        </div>
+      </div>
+    ),
+    [handleCustomerSelect, selectedCustomer]
+  );
+
   const handleAssignNearestServiceCenter = useCallback(() => {
     if (!selectedCustomer?.address) return;
     const nearestId = findNearestServiceCenter(selectedCustomer.address);
@@ -227,45 +268,9 @@ export const AppointmentModal = ({
                 onChange={(e) => handleCustomerSearchChange(e.target.value)}
                 placeholder="Start typing customer name..."
               />
-              {showCustomerDropdown && typedCustomerSearchResults.length > 0 && (
+              {showCustomerDropdown && customerSearchResults.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {typedCustomerSearchResults.map((customer) => (
-                    <div
-                      key={customer.id}
-                      onClick={() => handleCustomerSelect(customer)}
-                      className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-1.5 rounded-lg bg-indigo-100">
-                          <User className="text-indigo-600" size={16} strokeWidth={2} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">{customer.name}</p>
-                          <div className="flex items-center gap-3 text-xs text-gray-600 mt-1">
-                            <span className="flex items-center gap-1">
-                              <Phone size={12} />
-                              {customer.phone}
-                            </span>
-                            {customer.vehicles && customer.vehicles.length > 0 && (
-                              <span className="flex items-center gap-1">
-                                <Car size={12} />
-                                {customer.vehicles.length} vehicle{customer.vehicles.length > 1 ? "s" : ""}
-                              </span>
-                            )}
-                            {customer.lastServiceCenterName && (
-                              <span className="flex items-center gap-1">
-                                <Building2 size={12} />
-                                {customer.lastServiceCenterName}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {selectedCustomer?.id === customer.id && (
-                          <CheckCircle className="text-indigo-600 shrink-0" size={18} strokeWidth={2} />
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                {customerSearchResults.map((result) => renderCustomerSearchResult(result as CustomerWithVehicles))}
                 </div>
               )}
               {customerSearchLoading && (

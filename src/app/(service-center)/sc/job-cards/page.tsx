@@ -1,6 +1,6 @@
 "use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -28,11 +28,10 @@ import {
 } from "lucide-react";
 import type { JobCard, JobCardStatus, Priority, KanbanColumn, ServiceLocation } from "@/shared/types";
 import {
+  availableParts,
   defaultJobCards,
   engineers as engineersList,
-  availableParts as availablePartsList,
   type Engineer,
-  type Part,
 } from "@/__mocks__/data/job-cards.mock";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 import {
@@ -41,26 +40,8 @@ import {
   shouldFilterByServiceCenter,
 } from "@/shared/lib/serviceCenter";
 
-type ViewType = "kanban" | "list";
-type FilterType = "all" | "created" | "assigned" | "in_progress" | "completed" | "draft";
-
-interface CreateJobCardForm {
-  vehicleId: string;
-  customerId: string;
-  customerName: string;
-  vehicleRegistration: string;
-  vehicleMake: string;
-  vehicleModel: string;
-  serviceType: string;
-  description: string;
-  location: ServiceLocation;
-  homeAddress?: string;
-  estimatedCost: string;
-  estimatedTime: string;
-  priority: Priority;
-  selectedParts: string[];
-  assignedEngineerId: string;
-}
+import type { CreateJobCardForm } from "../components/job-cards/JobCardFormModal";
+import { INITIAL_JOB_CARD_FORM } from "../components/job-cards/JobCardFormModal";
 
 const SERVICE_TYPES = SERVICE_TYPE_OPTIONS;
 const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
@@ -68,6 +49,9 @@ const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
   "2": "SC002",
   "3": "SC003",
 };
+
+type ViewType = "kanban" | "list";
+type FilterType = "all" | "created" | "assigned" | "in_progress" | "completed" | "draft";
 
 export default function JobCards() {
   const router = useRouter();
@@ -104,25 +88,104 @@ export default function JobCards() {
   const shouldFilterJobCards = shouldFilterByServiceCenter(serviceCenterContext);
 
   const [engineers] = useState<Engineer[]>(engineersList);
-  const [availableParts] = useState<Part[]>(availablePartsList);
-
   const [createForm, setCreateForm] = useState<CreateJobCardForm>({
-    vehicleId: "",
-    customerId: "",
-    customerName: "",
-    vehicleRegistration: "",
-    vehicleMake: "",
-    vehicleModel: "",
-    serviceType: "",
-    description: "",
-    location: "Station",
-    homeAddress: "",
-    estimatedCost: "",
-    estimatedTime: "",
-    priority: "Normal",
-    selectedParts: [],
-    assignedEngineerId: "",
+    ...INITIAL_JOB_CARD_FORM,
   });
+
+  const resetCreateForm = () => {
+    setCreateForm({ ...INITIAL_JOB_CARD_FORM });
+  };
+
+  const togglePartSelection = (partName: string) => {
+    setCreateForm((prev) => ({
+      ...prev,
+      selectedParts: prev.selectedParts.includes(partName)
+        ? prev.selectedParts.filter((part) => part !== partName)
+        : [...prev.selectedParts, partName],
+    }));
+  };
+
+  const generateJobCardNumber = (serviceCenterCode: string = "SC001") => {
+    const storedCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const currentMonthCards = storedCards.filter((card) => {
+      if (!card.jobCardNumber) return false;
+      const parts = card.jobCardNumber.split("-");
+      return (
+        parts[0] === serviceCenterCode &&
+        parts[1] === String(year) &&
+        parts[2] === month
+      );
+    });
+    const sequenceNumbers = currentMonthCards
+      .map((card) => {
+        const parts = card.jobCardNumber?.split("-");
+        return parts && parts[3] ? parseInt(parts[3], 10) : 0;
+      })
+      .filter((num) => !isNaN(num));
+    const nextSequence = sequenceNumbers.length > 0 ? Math.max(...sequenceNumbers) + 1 : 1;
+    return `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
+  };
+
+  const handleCreateSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!createForm.customerName || !createForm.serviceType || !createForm.description) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const serviceCenterId = String(serviceCenterContext.serviceCenterId ?? "1");
+      const serviceCenterCode =
+        SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
+      const jobCardNumber = generateJobCardNumber(serviceCenterCode);
+      const newJobCard: JobCard = {
+        id: `JC-${Date.now()}`,
+        jobCardNumber,
+        serviceCenterId,
+        serviceCenterCode,
+        customerId: createForm.customerId || `customer-${Date.now()}`,
+        customerName: createForm.customerName,
+        vehicleId: createForm.vehicleId,
+        vehicle:
+          `${createForm.vehicleMake} ${createForm.vehicleModel}`.trim() ||
+          createForm.vehicleRegistration ||
+          createForm.vehicleModel ||
+          createForm.vehicleMake,
+        registration: createForm.vehicleRegistration,
+        vehicleMake: createForm.vehicleMake,
+        vehicleModel: createForm.vehicleModel,
+        customerType: "B2C",
+        serviceType: createForm.serviceType,
+        description: createForm.description,
+        status: "Created",
+        priority: createForm.priority,
+        assignedEngineer: null,
+        estimatedCost: createForm.estimatedCost
+          ? `₹${parseFloat(createForm.estimatedCost).toLocaleString("en-IN")}`
+          : "₹0",
+        estimatedTime: createForm.estimatedTime,
+        createdAt: new Date().toISOString(),
+        parts: createForm.selectedParts,
+        location: createForm.location,
+        serviceCenterName: serviceCenterContext.serviceCenterName || "Service Center",
+      };
+      const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+      safeStorage.setItem("jobCards", [newJobCard, ...storedJobCards]);
+      setJobCards((prev) => [newJobCard, ...prev]);
+      resetCreateForm();
+      setShowCreateModal(false);
+    } catch (error) {
+      console.error("Error creating job card:", error);
+      alert("Failed to create job card. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   // API Functions
   const fetchJobCards = async () => {
@@ -135,105 +198,6 @@ export default function JobCards() {
       // setJobCards(data);
     } catch (error) {
       console.error("Error fetching job cards:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Generate job card number in format: SC001-YYYY-MM-####
-  const generateJobCardNumber = (serviceCenterCode: string = "SC001"): string => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-
-    // Get all job cards for this service center and month
-    const currentMonthCards = visibleJobCards.filter((card) => {
-      if (!card.jobCardNumber) return false;
-      const parts = card.jobCardNumber.split("-");
-      return parts[0] === serviceCenterCode &&
-        parts[1] === String(year) &&
-        parts[2] === month;
-    });
-
-    // Get the highest sequence number for this month
-    const sequenceNumbers = currentMonthCards
-      .map((card) => {
-        const parts = card.jobCardNumber?.split("-");
-        return parts && parts[3] ? parseInt(parts[3], 10) : 0;
-      })
-      .filter((num) => !isNaN(num));
-
-    const nextSequence = sequenceNumbers.length > 0
-      ? Math.max(...sequenceNumbers) + 1
-      : 1;
-
-    return `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
-  };
-
-  const createJobCard = async (formData: CreateJobCardForm) => {
-    try {
-      setLoading(true);
-      // const response = await fetch(`${API_CONFIG.BASE_URL}/service-center/job-cards`, {
-      //   method: "POST",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //     Authorization: `Bearer ${token}`,
-      //   },
-      //   body: JSON.stringify({
-      //     vehicleId: formData.vehicleId,
-      //     customerId: formData.customerId,
-      //     serviceType: formData.serviceType,
-      //     description: formData.description,
-      //     estimatedCost: parseFloat(formData.estimatedCost.replace(/[₹,]/g, "")),
-      //     priority: formData.priority.toLowerCase(),
-      //   }),
-      // });
-      // const newJobCard = await response.json();
-
-      // Generate job card number
-      const serviceCenterId = String(serviceCenterContext.serviceCenterId ?? "1");
-      const serviceCenterCode =
-        SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
-      const jobCardNumber = generateJobCardNumber(serviceCenterCode);
-
-      // For now, add to local state
-      const newJobCard: JobCard = {
-        id: `JC-${Date.now()}`,
-        jobCardNumber,
-        serviceCenterId,
-        serviceCenterCode,
-        customerId: formData.customerId,
-        customerName: formData.customerName,
-        vehicleId: formData.vehicleId,
-        vehicle: `${formData.vehicleMake} ${formData.vehicleModel}`,
-        registration: formData.vehicleRegistration,
-        vehicleMake: formData.vehicleMake,
-        vehicleModel: formData.vehicleModel,
-        serviceType: formData.serviceType,
-        description: formData.description,
-        status: "Created",
-        priority: formData.priority,
-        assignedEngineer: null,
-        estimatedCost: `₹${parseFloat(formData.estimatedCost || "0").toLocaleString("en-IN")}`,
-        estimatedTime: formData.estimatedTime,
-        createdAt: new Date().toISOString(),
-        parts: formData.selectedParts,
-        location: formData.location,
-        serviceCenterName:
-          serviceCenterContext.serviceCenterName || "Service Center",
-      };
-
-      // Also save to localStorage for persistence
-      const existingJobCards = safeStorage.getItem<unknown[]>("jobCards", []);
-      existingJobCards.push(newJobCard);
-      safeStorage.setItem("jobCards", existingJobCards);
-
-      setJobCards([newJobCard, ...jobCards]);
-      setShowCreateModal(false);
-      resetCreateForm();
-    } catch (error) {
-      console.error("Error creating job card:", error);
-      alert("Failed to create job card. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -310,35 +274,6 @@ export default function JobCards() {
     }
   };
 
-  const resetCreateForm = () => {
-    setCreateForm({
-      vehicleId: "",
-      customerId: "",
-      customerName: "",
-      vehicleRegistration: "",
-      vehicleMake: "",
-      vehicleModel: "",
-      serviceType: "",
-      description: "",
-      location: "Station",
-      homeAddress: "",
-      estimatedCost: "",
-      estimatedTime: "",
-      priority: "Normal",
-      selectedParts: [],
-      assignedEngineerId: "",
-    });
-  };
-
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createForm.customerName || !createForm.serviceType || !createForm.description) {
-      alert("Please fill in all required fields.");
-      return;
-    }
-    createJobCard(createForm);
-  };
-
   const handleAssignEngineer = () => {
     if (!assigningJobId || !selectedEngineer) {
       alert("Please select an engineer.");
@@ -352,15 +287,6 @@ export default function JobCards() {
       return;
     }
     updateStatus(updatingStatusJobId, newStatus);
-  };
-
-  const togglePartSelection = (partName: string) => {
-    setCreateForm({
-      ...createForm,
-      selectedParts: createForm.selectedParts.includes(partName)
-        ? createForm.selectedParts.filter((p) => p !== partName)
-        : [...createForm.selectedParts, partName],
-    });
   };
 
   useEffect(() => {

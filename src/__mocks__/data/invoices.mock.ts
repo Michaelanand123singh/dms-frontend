@@ -155,7 +155,7 @@ export const defaultInvoices: Invoice[] = [
     balance: "₹4,000",
     status: "Unpaid",
     paymentMethod: null,
-    serviceCenterId: "1",
+    serviceCenterId: 1 as string | number,
     serviceCenterName: "Delhi Central Hub",
     items: [
       { name: "Engine Oil", qty: 1, price: "₹2,500" },
@@ -176,7 +176,7 @@ export const defaultInvoices: Invoice[] = [
     balance: "₹0",
     status: "Paid",
     paymentMethod: "UPI",
-    serviceCenterId: "2",
+    serviceCenterId: 2 as string | number,
     serviceCenterName: "Mumbai Metroplex",
     items: [
       { name: "Brake Pads", qty: 1, price: "₹3,200" },
@@ -197,7 +197,7 @@ export const defaultInvoices: Invoice[] = [
     balance: "₹1,770",
     status: "Overdue",
     paymentMethod: null,
-    serviceCenterId: "3",
+    serviceCenterId: 3 as string | number,
     serviceCenterName: "Bangalore Innovation Center",
     items: [
       { name: "Inspection Charges", qty: 1, price: "₹1,500" },
@@ -217,7 +217,7 @@ export const defaultInvoices: Invoice[] = [
     balance: "₹0",
     status: "Paid",
     paymentMethod: "Cash",
-    serviceCenterId: "1",
+    serviceCenterId: 1 as string | number,
     serviceCenterName: "Delhi Central Hub",
     items: [
       { name: "Labor", qty: 1, price: "₹1,500" },
@@ -238,7 +238,7 @@ export const defaultInvoices: Invoice[] = [
     balance: "₹0",
     status: "Paid",
     paymentMethod: "Cash",
-    serviceCenterId: "2",
+    serviceCenterId: 2 as string | number,
     serviceCenterName: "Mumbai Metroplex",
     items: [
       { name: "Labor", qty: 1, price: "₹2,000" },

@@ -26,7 +26,7 @@ export interface Invoice {
   items: InvoiceItem[];
   customerId?: string;
   vehicleId?: string;
-  serviceCenterId?: string;
+  serviceCenterId?: string | number;
   serviceCenterName?: string;
 }
 
