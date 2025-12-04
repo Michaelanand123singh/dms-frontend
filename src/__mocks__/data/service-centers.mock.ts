@@ -20,6 +20,8 @@ export interface ServiceCenterData {
   status: "Active" | "Inactive";
   rating: number;
   staffMembers: ServiceCenterStaff[];
+  serviceCenterId?: string;
+  code?: string;
 }
 
 export const defaultServiceCenters: ServiceCenterData[] = [
@@ -32,6 +34,8 @@ export const defaultServiceCenters: ServiceCenterData[] = [
     revenue: "₹12.4L",
     status: "Active",
     rating: 4.9,
+    serviceCenterId: "sc-001",
+    code: "SC001",
     staffMembers: [
       {
         id: 1,
@@ -65,6 +69,8 @@ export const defaultServiceCenters: ServiceCenterData[] = [
     revenue: "₹18.9L",
     status: "Active",
     rating: 4.8,
+    serviceCenterId: "sc-002",
+    code: "SC002",
     staffMembers: [
       {
         id: 1,
@@ -98,6 +104,8 @@ export const defaultServiceCenters: ServiceCenterData[] = [
     revenue: "₹15.6L",
     status: "Active",
     rating: 4.9,
+    serviceCenterId: "sc-003",
+    code: "SC003",
     staffMembers: [
       {
         id: 1,
@@ -131,10 +139,30 @@ export const serviceCentersList = [
 ];
 
 export const serviceCenterUsers = [
-  { name: "Rajesh Kumar Singh", email: "admin@service.com", role: "Super Admin" },
-  { name: "Delhi Manager", email: "delhi@service.com", role: "SC Manager" },
-  { name: "Finance Manager", email: "finance@service.com", role: "Finance Manager" },
-  { name: "Call Center Team", email: "callcenter@service.com", role: "Call Center" },
+  {
+    name: "Service Center Manager",
+    email: "service-manager@service.com",
+    role: "Service Manager",
+    serviceCenterId: "sc-001",
+  },
+  {
+    name: "Inventory Manager",
+    email: "inventory@service.com",
+    role: "Inventory Manager",
+    serviceCenterId: "sc-001",
+  },
+  {
+    name: "Service Advisor",
+    email: "advisor@service.com",
+    role: "Service Advisor",
+    serviceCenterId: "sc-001",
+  },
+  {
+    name: "Service Technician",
+    email: "technician@service.com",
+    role: "Service Technician",
+    serviceCenterId: "sc-001",
+  },
 ];
 
 export const defaultInventory = [

@@ -3,6 +3,7 @@
  */
 
 import { mockCustomers } from "./customers.mock";
+import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 
 export interface Appointment {
   id: number;
@@ -16,7 +17,7 @@ export interface Appointment {
   status: "Confirmed" | "Pending" | "Cancelled";
   customerExternalId?: string;
   vehicleExternalId?: string;
-  serviceCenterId?: number;
+  serviceCenterId?: string|number;
   serviceCenterName?: string;
 }
 
@@ -39,7 +40,7 @@ export const defaultAppointments: Appointment[] = [
     status: "Confirmed",
     customerExternalId: rajesh.externalId,
     vehicleExternalId: rajesh.vehicles[0].externalId,
-    serviceCenterId: 1,
+    serviceCenterId: "sc-001",
     serviceCenterName: "Delhi Central Hub",
   },
   {
@@ -62,15 +63,6 @@ export const defaultAppointments: Appointment[] = [
 /**
  * Available service types for appointments
  */
-export const serviceTypes = [
-  "Routine Maintenance",
-  "AC Repair",
-  "Oil Change",
-  "Battery Replacement",
-  "Tire Service",
-  "Brake Service",
-  "Other",
-] as const;
-
-export type ServiceType = typeof serviceTypes[number];
+export const appointmentServiceTypes = SERVICE_TYPE_OPTIONS.filter((type) => type !== "-SELECT-");
+export type ServiceType = Exclude<(typeof SERVICE_TYPE_OPTIONS)[number], "-SELECT-">;
 

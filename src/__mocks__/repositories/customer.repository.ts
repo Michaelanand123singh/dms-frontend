@@ -139,8 +139,14 @@ class CustomerRepository {
     const storedUserInfo = safeStorage.getItem<any>("userInfo", null);
 
     // Create new customer
+    const highestIdNumber = this.customers
+      .map((c) => {
+        const numericPart = String(c.id).replace(/\D/g, "");
+        return numericPart ? Number(numericPart) : 0;
+      })
+      .reduce((max, val) => Math.max(max, val), 0);
     const newCustomer: CustomerWithVehicles = {
-      id: Math.max(...this.customers.map((c) => Number(c.id)), 0) + 1,
+      id: `cust-${String(highestIdNumber + 1).padStart(3, "0")}`,
       customerNumber,
       name: data.name,
       phone: cleanedPhone,
@@ -163,9 +169,16 @@ class CustomerRepository {
       vehicles: [],
     };
 
-    newCustomer.serviceCenterId = String(this.loadUserContext().serviceCenterId || newCustomer.serviceCenterId || 1);
-    newCustomer.lastServiceCenterId = newCustomer.serviceCenterId;
-    newCustomer.lastServiceCenterName = storedUserInfo?.serviceCenter ?? undefined;
+    const preferredServiceCenterId =
+      data.serviceCenterId ??
+      this.loadUserContext().serviceCenterId ??
+      newCustomer.serviceCenterId ??
+      1;
+    const normalizedCenterId = String(preferredServiceCenterId);
+    newCustomer.serviceCenterId = normalizedCenterId;
+    newCustomer.lastServiceCenterId = normalizedCenterId;
+    newCustomer.lastServiceCenterName =
+      data.serviceCenterName ?? storedUserInfo?.serviceCenter ?? undefined;
     this.customers.push(newCustomer);
     this.saveToStorage();
 
@@ -190,13 +203,13 @@ class CustomerRepository {
 
   async getRecent(limit: number = 10): Promise<CustomerWithVehicles[]> {
     // Get recent customers from localStorage
-    let recentIds = safeStorage.getItem<number[]>("recentCustomerIds", []);
+    let recentIds = safeStorage.getItem<string[]>("recentCustomerIds", []);
     
     // If no recent customers, initialize with first few customers from mock data
     if (recentIds.length === 0 && this.customers.length > 0) {
       recentIds = this.customers
         .slice(0, Math.min(limit, this.customers.length))
-        .map((c) => Number(c.id));
+        .map((c) => String(c.id));
       safeStorage.setItem("recentCustomerIds", recentIds);
     }
     
@@ -210,13 +223,13 @@ class CustomerRepository {
 
   async addToRecent(id: number | string): Promise<void> {
     const recentIds = safeStorage.getItem<number[]>("recentCustomerIds", []);
-    const numId = Number(id);
+    const stringId = String(id);
     
     // Remove if already exists
-    const filtered = recentIds.filter((rid) => rid !== numId);
+    const filtered = recentIds.filter((rid) => rid !== stringId);
     
     // Add to beginning
-    const updated = [numId, ...filtered].slice(0, 10);
+    const updated = [stringId, ...filtered].slice(0, 10);
     safeStorage.setItem("recentCustomerIds", updated);
   }
 }

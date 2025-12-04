@@ -25,7 +25,7 @@ import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
 
 // ==================== Types ====================
-interface Appointment {
+interface AppointmentRecord {
   id: number;
   customerName: string;
   vehicle: string;
@@ -35,25 +35,23 @@ interface Appointment {
   time: string;
   duration: string;
   status: string;
-  serviceCenterId?: number;
+  customerExternalId?: string;
+  vehicleExternalId?: string;
+  serviceCenterId?: number | string;
   serviceCenterName?: string;
-  // Customer Information
   customerType?: "B2C" | "B2B";
-  // Service Details (captured by call center or service advisor)
   customerComplaintIssue?: string;
   previousServiceHistory?: string;
   estimatedServiceTime?: string;
   estimatedCost?: string;
   odometerReading?: string;
   isMajorIssue?: boolean;
-  // Documentation (stored as simple metadata in call center flow)
   documentationFiles?: {
     customerIdProof?: number;
     vehicleRCCopy?: number;
     warrantyCardServiceBook?: number;
     photosVideos?: number;
   };
-  // Operational Details
   estimatedDeliveryDate?: string;
   assignedServiceAdvisor?: string;
   assignedTechnician?: string;
@@ -61,11 +59,9 @@ interface Appointment {
   pickupAddress?: string;
   dropAddress?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
-  // Billing & Payment
   paymentMethod?: "Cash" | "Card" | "UPI" | "Online" | "Cheque";
   gstRequirement?: boolean;
   businessNameForInvoice?: string;
-  // Post-Service Survey
   feedbackRating?: number;
   nextServiceDueDate?: string;
   amcSubscriptionStatus?: string;
@@ -79,7 +75,7 @@ interface AppointmentForm {
   date: string;
   time: string;
   duration: string;
-  serviceCenterId?: number;
+  serviceCenterId?: number | string;
   serviceCenterName?: string;
   // Customer Information
   customerType?: "B2C" | "B2B";
@@ -341,7 +337,7 @@ const validateAppointmentForm = (form: AppointmentForm, isCallCenter: boolean = 
   return null;
 };
 
-const getNextAppointmentId = (appointments: Appointment[]): number => {
+const getNextAppointmentId = (appointments: AppointmentRecord[]): number => {
   return appointments.length > 0 ? Math.max(...appointments.map((a) => a.id)) + 1 : 1;
 };
 
@@ -376,7 +372,7 @@ const getMaxAppointmentsPerDay = (serviceCenterName: string | null | undefined):
 /**
  * Count appointments for a specific date
  */
-const countAppointmentsForDate = (appointments: Appointment[], date: string): number => {
+const countAppointmentsForDate = (appointments: AppointmentRecord[], date: string): number => {
   return appointments.filter((apt) => apt.date === date).length;
 };
 
@@ -646,16 +642,24 @@ function AppointmentsContent() {
   const canEditPostServiceSection = canEditPostService(userRole);
 
   // State Management
-  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+  const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
+  const shouldFilterAppointments = shouldFilterByServiceCenter(serviceCenterContext);
+
+  const initializeAppointments = () => {
     if (typeof window !== "undefined") {
-      const storedAppointments = safeStorage.getItem<Appointment[]>("appointments", []);
-      return storedAppointments.length > 0 ? storedAppointments : defaultAppointments;
+      const storedAppointments = safeStorage.getItem<AppointmentRecord[]>("appointments", []);
+      const baseAppointments = storedAppointments.length > 0 ? storedAppointments : (defaultAppointments as AppointmentRecord[]);
+      return shouldFilterAppointments
+        ? filterByServiceCenter(baseAppointments, serviceCenterContext)
+        : baseAppointments;
     }
-    return defaultAppointments;
-  });
+    return defaultAppointments as AppointmentRecord[];
+  };
+
+  const [appointments, setAppointments] = useState<AppointmentRecord[]>(initializeAppointments);
 
   const [appointmentForm, setAppointmentForm] = useState<AppointmentForm>(INITIAL_APPOINTMENT_FORM);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentRecord | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -709,12 +713,12 @@ function AppointmentsContent() {
   // Service Intake States (for service advisor)
   const [customerArrivalStatus, setCustomerArrivalStatus] = useState<CustomerArrivalStatus>(null);
   const [serviceIntakeForm, setServiceIntakeForm] = useState<ServiceIntakeForm>(INITIAL_SERVICE_INTAKE_FORM);
-  const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
-  const visibleAppointments = useMemo(
-    () => filterByServiceCenter(appointments, serviceCenterContext),
-    [appointments, serviceCenterContext]
-  );
-  const shouldFilterAppointments = shouldFilterByServiceCenter(serviceCenterContext);
+  const visibleAppointments = useMemo(() => {
+    if (shouldFilterAppointments) {
+      return filterByServiceCenter(appointments, serviceCenterContext);
+    }
+    return appointments;
+  }, [appointments, serviceCenterContext, shouldFilterAppointments]);
 
   // Customer Search States
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>("");
@@ -818,7 +822,7 @@ function AppointmentsContent() {
   }, [clearCustomerSearch]);
 
   // ==================== Event Handlers ====================
-  const handleAppointmentClick = useCallback((appointment: Appointment) => {
+  const handleAppointmentClick = useCallback((appointment: AppointmentRecord) => {
     setSelectedAppointment(appointment);
     setDetailCustomer(null);
     setShowDetailModal(true);
@@ -829,9 +833,15 @@ function AppointmentsContent() {
   }, []);
 
   const handleEditAppointment = useCallback(
-    (appointment: Appointment) => {
+    (appointment: AppointmentRecord) => {
       setSelectedAppointment(appointment);
       setIsEditing(true);
+      const resolvedServiceCenterId =
+        typeof appointment.serviceCenterId === "number"
+          ? appointment.serviceCenterId
+          : appointment.serviceCenterId
+          ? Number(appointment.serviceCenterId)
+          : undefined;
       setAppointmentForm({
         customerName: appointment.customerName,
         vehicle: appointment.vehicle,
@@ -841,7 +851,7 @@ function AppointmentsContent() {
         time: appointment.time,
         // Strip the " hours" suffix if it exists; default to "2"
         duration: appointment.duration ? appointment.duration.replace(" hours", "") : "2",
-        serviceCenterId: appointment.serviceCenterId,
+        serviceCenterId: resolvedServiceCenterId,
         // Customer Information
         customerType: appointment.customerType,
         // Service Details
@@ -965,7 +975,7 @@ function AppointmentsContent() {
   }, [selectedCustomer, availableServiceCenters]);
 
   // Convert Appointment to Job Card
-  const convertAppointmentToJobCard = useCallback((appointment: Appointment): JobCard => {
+  const convertAppointmentToJobCard = useCallback((appointment: AppointmentRecord): JobCard => {
     const serviceCenterCode = "SC001"; // In production, get from user context or serviceCenterName
     const now = new Date();
     const year = now.getFullYear();
@@ -1162,7 +1172,7 @@ function AppointmentsContent() {
         ? availableServiceCenters.find((sc) => sc.id === appointmentForm.serviceCenterId)
         : null;
 
-      const newAppointment: Appointment = {
+      const newAppointment: AppointmentRecord = {
         id: getNextAppointmentId(appointments),
         ...appointmentForm,
         duration: "2 hours",
@@ -1401,11 +1411,28 @@ function AppointmentsContent() {
     }
 
     // Save service intake data to localStorage for quotation page to use
+    const customerIdForQuotation =
+      selectedCustomer?.id?.toString() ||
+      detailCustomer?.id?.toString() ||
+      selectedAppointment.customerExternalId ||
+      undefined;
+    const serviceCenterIdForQuotation =
+      selectedAppointment.serviceCenterId?.toString() ||
+      serviceCenterContext.serviceCenterId ||
+      undefined;
+    const serviceCenterNameForQuotation =
+      selectedAppointment.serviceCenterName ||
+      serviceCenterContext.serviceCenterName ||
+      undefined;
+
     const serviceIntakeData = {
       appointmentId: selectedAppointment.id,
       customerName: selectedAppointment.customerName,
       phone: selectedAppointment.phone,
       vehicle: selectedAppointment.vehicle,
+      customerId: customerIdForQuotation,
+      serviceCenterId: serviceCenterIdForQuotation,
+      serviceCenterName: serviceCenterNameForQuotation,
       serviceIntakeForm: {
         ...serviceIntakeForm,
         // Convert File objects to URLs for storage (in real app, these would be uploaded first)
@@ -1455,7 +1482,7 @@ function AppointmentsContent() {
   }, [selectedAppointment, serviceIntakeForm, appointments, router, closeDetailModal, showToast, currentJobCardId, updateStoredJobCard]);
 
   const updateLeadForAppointment = useCallback(
-    (appointment: Appointment) => {
+    (appointment: AppointmentRecord) => {
       const storedLeads = safeStorage.getItem<any>("leads", []);
       if (!storedLeads.length) return;
       const updatedLeads = storedLeads.map((lead: any) => {

@@ -9,6 +9,8 @@ export interface User {
   role: string;
   assigned: string;
   status: "Active" | "Inactive";
+  serviceCenterIds?: string[];
+  employeeId?: string;
 }
 
 /**
@@ -17,36 +19,43 @@ export interface User {
  */
 export const defaultUsers: User[] = [
   {
-    initials: "RKS",
-    name: "Rajesh Kumar Singh",
-    email: "admin@service.com",
-    role: "Super Admin",
-    assigned: "SC001,SC002,SC003,SC004",
-    status: "Active",
-  },
-  {
-    initials: "DM",
-    name: "Delhi Manager",
-    email: "delhi@service.com",
-    role: "SC Manager",
+    initials: "SM",
+    name: "Service Center Manager",
+    email: "service-manager@service.com",
+    role: "sc_manager",
     assigned: "SC001",
     status: "Active",
+    serviceCenterIds: ["sc-001"],
+    employeeId: "user-001",
   },
   {
-    initials: "FM",
-    name: "Finance Manager",
-    email: "finance@service.com",
-    role: "Finance Manager",
-    assigned: "SC002,SC003",
-    status: "Inactive",
-  },
-  {
-    initials: "CCT",
-    name: "Call Center Team",
-    email: "callcenter@service.com",
-    role: "Call Center",
-    assigned: "SC002",
+    initials: "IM",
+    name: "Inventory Manager",
+    email: "inventory@service.com",
+    role: "inventory_manager",
+    assigned: "Inventory Ops",
     status: "Active",
+    employeeId: "user-002",
+  },
+  {
+    initials: "SA",
+    name: "Service Advisor",
+    email: "advisor@service.com",
+    role: "service_advisor",
+    assigned: "SC001",
+    status: "Active",
+    serviceCenterIds: ["sc-001"],
+    employeeId: "user-003",
+  },
+  {
+    initials: "ST",
+    name: "Service Technician",
+    email: "technician@service.com",
+    role: "service_engineer",
+    assigned: "SC001",
+    status: "Active",
+    serviceCenterIds: ["sc-001"],
+    employeeId: "user-004",
   },
 ];
 

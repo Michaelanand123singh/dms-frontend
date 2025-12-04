@@ -28,6 +28,7 @@ import Link from "next/link";
 import { useRole } from "@/shared/hooks";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { canCreateCustomer } from "@/shared/constants/roles";
+import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
 import { useCustomerSearch, useCreateCustomer } from "../../../../hooks/api";
 import type {
   CustomerSearchType,
@@ -44,7 +45,7 @@ import type {
 import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
 import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
 import { mockCustomers } from "@/__mocks__/data/customers.mock";
-import { serviceTypes } from "@/__mocks__/data/appointments.mock";
+import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import { FormInput, FormSelect, Modal } from "../components/shared/FormElements";
 import { CustomerInfoCard, InfoCard, ErrorAlert } from "../components/shared/InfoComponents";
@@ -223,6 +224,7 @@ export default function CustomerFind() {
   const isTechnician = userRole === "service_engineer";
   const isInventoryManager = userRole === "sc_staff";
   const isAdminRole = userRole === "admin" || userRole === "super_admin";
+  const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
 
   const hasRoleAccess = (roles: UserRole[]): boolean => {
     return isAdminRole || roles.includes(userRole);
@@ -647,10 +649,18 @@ export default function CustomerFind() {
 
     setValidationError("");
 
+    const fallbackCenterId = serviceCenterFilterId ? serviceCenterFilterId.toString() : undefined;
+    const preferredServiceCenterId = serviceCenterContext.serviceCenterId ?? fallbackCenterId;
+    const preferredServiceCenterName =
+      serviceCenterContext.serviceCenterName ??
+      staticServiceCenters.find((center) => center.id === serviceCenterFilterId)?.name;
+
     const customer = await createCustomer({
       ...newCustomerForm,
       phone: cleanPhone(newCustomerForm.phone),
       alternateMobile: newCustomerForm.alternateMobile ? cleanPhone(newCustomerForm.alternateMobile) : undefined,
+      serviceCenterId: preferredServiceCenterId,
+      serviceCenterName: preferredServiceCenterName,
     });
 
     if (customer) {
@@ -662,10 +672,25 @@ export default function CustomerFind() {
       resetCustomerForm();
 
       showToast(`Customer created successfully! Customer Number: ${customer.customerNumber} | Service Type: ${newCustomerForm.serviceType === "walk-in" ? "Walk-in" : "Home Service"}`, "success");
+      safeStorage.setItem("lastCreatedCustomerMeta", {
+        customerId: customer.id?.toString() || "",
+        serviceCenterId: preferredServiceCenterId ?? null,
+        serviceCenterName: preferredServiceCenterName ?? null,
+      });
     } else if (createError) {
       setValidationError(createError);
     }
-  }, [newCustomerForm, createCustomer, createError, showToast, resetCustomerForm, canCreateNewCustomer]);
+  }, [
+    newCustomerForm,
+    createCustomer,
+    createError,
+    showToast,
+    resetCustomerForm,
+    canCreateNewCustomer,
+    serviceCenterFilterId,
+    serviceCenterContext.serviceCenterId,
+    serviceCenterContext.serviceCenterName,
+  ]);
 
   // Get search type label
   const getSearchTypeLabel = (type: CustomerSearchType | null): string => {
@@ -2023,7 +2048,7 @@ export default function CustomerFind() {
                     value={appointmentForm.serviceType}
                     onChange={(e) => setAppointmentForm({ ...appointmentForm, serviceType: e.target.value })}
                     placeholder="Select service type"
-                    options={serviceTypes.map((type) => ({ value: type, label: type }))}
+                    options={SERVICE_TYPE_OPTIONS.map((type) => ({ value: type, label: type }))}
                   />
 
                   {canAssignServiceCenter && (

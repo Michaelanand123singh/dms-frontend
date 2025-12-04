@@ -124,6 +124,8 @@ export interface NewCustomerForm {
   pickupDropRequired?: boolean;
   pickupAddress?: string;
   dropAddress?: string;
+  serviceCenterId?: number | string;
+  serviceCenterName?: string;
 }
 
 export interface CustomerWithVehicles extends Customer {

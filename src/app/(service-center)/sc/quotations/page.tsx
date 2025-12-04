@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import {
   FileText,
   PlusCircle,
@@ -43,6 +43,8 @@ import type {
 } from "@/shared/types";
 import { useCustomerSearch } from "../../../../hooks/api";
 import { defaultQuotations, defaultInsurers, defaultNoteTemplates } from "@/__mocks__/data/quotations.mock";
+import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
+import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
 
 const createEmptyCustomer = (): CustomerWithVehicles => ({
   id: "",
@@ -53,12 +55,40 @@ const createEmptyCustomer = (): CustomerWithVehicles => ({
   vehicles: [],
 });
 
+const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
+  "sc-001": "SC001",
+  "sc-002": "SC002",
+  "sc-003": "SC003",
+};
+
+const normalizeServiceCenterId = (id?: string | number | null): string => {
+  if (!id) return "sc-001";
+  const raw = id.toString();
+  if (raw.startsWith("sc-")) {
+    return raw;
+  }
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "sc-001";
+  return `sc-${digits.padStart(3, "0")}`;
+};
+
+const getServiceCenterCode = (id?: string | number | null): string => {
+  const normalized = normalizeServiceCenterId(id);
+  return SERVICE_CENTER_CODE_MAP[normalized] || "SC001";
+};
+
 function QuotationsContent() {
   const { userInfo, userRole } = useRole();
   const isServiceAdvisor = userRole === "service_advisor";
   const isServiceManager = userRole === "sc_manager";
   const searchParams = useSearchParams();
   const fromAppointment = searchParams.get("fromAppointment") === "true";
+
+  const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
+  const [activeServiceCenterId, setActiveServiceCenterId] = useState<string>(() =>
+    normalizeServiceCenterId(serviceCenterContext.serviceCenterId)
+  );
+  const [activeCustomerId, setActiveCustomerId] = useState<string>("");
   
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [filter, setFilter] = useState<QuotationFilterType>("all");
@@ -146,6 +176,11 @@ function QuotationsContent() {
       const serviceIntakeData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
       
       if (serviceIntakeData) {
+        const normalizedCenterId = normalizeServiceCenterId(
+          serviceIntakeData.serviceCenterId ?? serviceCenterContext.serviceCenterId
+        );
+        setActiveServiceCenterId(normalizedCenterId);
+
         // Find customer by phone or name
         const findCustomer = async () => {
           try {
@@ -159,6 +194,7 @@ function QuotationsContent() {
               
               if (customer) {
                 setSelectedCustomer(customer);
+                setActiveCustomerId(customer.id?.toString() || "");
                 setForm((prev) => ({
                   ...prev,
                   customerId: String(customer.id),
@@ -186,6 +222,13 @@ function QuotationsContent() {
                 setShowCreateModal(true);
                 
                 // Clear the stored data
+                safeStorage.removeItem("pendingQuotationFromAppointment");
+              }
+              else if (serviceIntakeData.customerId) {
+                const decodedCustomerId = String(serviceIntakeData.customerId);
+                setForm((prev) => ({ ...prev, customerId: decodedCustomerId }));
+                setActiveCustomerId(decodedCustomerId);
+                setShowCreateModal(true);
                 safeStorage.removeItem("pendingQuotationFromAppointment");
               }
             }, 500);
@@ -262,21 +305,34 @@ const buildQuotationFromForm = (): Quotation => {
   const quotationDate = new Date(form.quotationDate);
   const validUntil = new Date(quotationDate);
   validUntil.setDate(validUntil.getDate() + form.validUntilDays);
-  const year = new Date().getFullYear();
-  const month = String(new Date().getMonth() + 1).padStart(2, "0");
-  const count = quotations.length + 1;
-  const quotationNumber = `QT-SC001-${year}${month}-${String(count).padStart(4, "0")}`;
+  const year = quotationDate.getFullYear();
+  const month = String(quotationDate.getMonth() + 1).padStart(2, "0");
+  const resolvedServiceCenterId = normalizeServiceCenterId(
+    activeServiceCenterId || serviceCenterContext.serviceCenterId
+  );
+  const resolvedCustomerId = form.customerId || activeCustomerId || "";
+  const serviceCenterCode = getServiceCenterCode(resolvedServiceCenterId);
+  const monthKey = `${year}${month}`;
+  const existingForCenterMonth = quotations.filter((quotation) => {
+    if (quotation.serviceCenterId !== resolvedServiceCenterId) return false;
+    return quotation.quotationDate.startsWith(`${year}-${month}`);
+  });
+  const nextSequence = existingForCenterMonth.length + 1;
+  const quotationNumber = `QT-${serviceCenterCode}-${monthKey}-${String(nextSequence).padStart(4, "0")}`;
 
   const customer = selectedCustomer ?? createEmptyCustomer();
   const selectedInsurer = insurers.find((i) => i.id === form.insurerId);
   const selectedTemplate = noteTemplates.find((t) => t.id === form.noteTemplateId);
   const vehicle = customer.vehicles?.find((v) => v.id.toString() === form.vehicleId);
+  const centerMeta = staticServiceCenters.find(
+    (center) => normalizeServiceCenterId(center.id) === resolvedServiceCenterId
+  );
 
   return {
     id: `qt-${Date.now()}`,
     quotationNumber,
-    serviceCenterId: "sc-001",
-    customerId: form.customerId,
+    serviceCenterId: resolvedServiceCenterId,
+    customerId: resolvedCustomerId,
     vehicleId: form.vehicleId,
     serviceAdvisorId: userInfo?.id || "user-001",
     documentType: form.documentType,
@@ -298,6 +354,8 @@ const buildQuotationFromForm = (): Quotation => {
     noteTemplateId: form.noteTemplateId,
     status: "draft",
     passedToManager: false,
+    passedToManagerAt: undefined,
+    managerId: undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     items: form.items.map((item, index) => ({
@@ -305,7 +363,7 @@ const buildQuotationFromForm = (): Quotation => {
       ...item,
     })),
     customer: {
-      id: form.customerId,
+      id: resolvedCustomerId,
       firstName: customer.name?.split(" ")[0] || "Customer",
       lastName: customer.name?.split(" ").slice(1).join(" ") || "",
       phone: customer.phone || "",
@@ -325,6 +383,21 @@ const buildQuotationFromForm = (): Quotation => {
         }
       : undefined,
     insurer: selectedInsurer,
+    serviceCenter: {
+      id: resolvedServiceCenterId,
+      name:
+        centerMeta?.name ??
+        serviceCenterContext.serviceCenterName ??
+        "Service Center",
+      code: serviceCenterCode,
+      address: centerMeta?.location ?? "",
+      city: centerMeta?.location ?? "",
+      state: "",
+      pincode: "",
+      phone: "",
+      gstNumber: "",
+      panNumber: "",
+    },
   };
 };
 
@@ -670,7 +743,8 @@ const handleCreateAndSendToCustomer = async () => {
 
   // Convert Quotation to Job Card
   const convertQuotationToJobCard = (quotation: Quotation) => {
-    const serviceCenterCode = "SC001"; // In production, get from user context
+  const resolvedServiceCenterId = normalizeServiceCenterId(quotation.serviceCenterId);
+  const serviceCenterCode = getServiceCenterCode(resolvedServiceCenterId);
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -678,7 +752,7 @@ const handleCreateAndSendToCustomer = async () => {
     // Get next sequence number
     const existingJobCards = safeStorage.getItem<any[]>("jobCards", []);
     const lastJobCard = existingJobCards
-      .filter((jc) => jc.jobCardNumber?.startsWith(`${serviceCenterCode}-${year}-${month}`))
+    .filter((jc) => jc.jobCardNumber?.startsWith(`${serviceCenterCode}-${year}-${month}`))
       .sort((a, b) => {
         const aSeq = parseInt(a.jobCardNumber?.split("-")[3] || "0");
         const bSeq = parseInt(b.jobCardNumber?.split("-")[3] || "0");
@@ -695,7 +769,7 @@ const handleCreateAndSendToCustomer = async () => {
     const newJobCard = {
       id: `JC-${Date.now()}`,
       jobCardNumber,
-      serviceCenterId: quotation.serviceCenterId || "sc-001",
+      serviceCenterId: quotation.serviceCenterId || resolvedServiceCenterId,
       serviceCenterCode,
       customerId: quotation.customerId,
       customerName: quotation.customer?.firstName + " " + (quotation.customer?.lastName || "") || "Customer",
@@ -980,6 +1054,7 @@ const handleCreateAndSendToCustomer = async () => {
       noteTemplateId: "",
     });
     setSelectedCustomer(null);
+    setActiveCustomerId("");
     setCustomerSearchQuery("");
     clearCustomerSearch();
   }, [clearCustomerSearch]);
@@ -1180,6 +1255,8 @@ const handleCreateAndSendToCustomer = async () => {
           setForm={setForm}
           selectedCustomer={selectedCustomer}
           setSelectedCustomer={setSelectedCustomer}
+          activeServiceCenterId={activeServiceCenterId}
+          setActiveCustomerId={setActiveCustomerId}
           customerSearchQuery={customerSearchQuery}
           setCustomerSearchQuery={setCustomerSearchQuery}
           customerSearchResults={customerSearchResults}
@@ -1240,6 +1317,8 @@ function CreateQuotationModal({
   setForm,
   selectedCustomer,
   setSelectedCustomer,
+  activeServiceCenterId,
+  setActiveCustomerId,
   customerSearchQuery,
   setCustomerSearchQuery,
   customerSearchResults,
@@ -1326,6 +1405,7 @@ function CreateQuotationModal({
                       onClick={() => {
                         setSelectedCustomer(customer);
                         setForm({ ...form, customerId: customer.id.toString(), vehicleId: customer.vehicles?.[0]?.id?.toString() || "" });
+                      setActiveCustomerId(customer.id.toString());
                         setCustomerSearchQuery("");
                         clearCustomerSearch();
                       }}
