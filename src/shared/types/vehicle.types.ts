@@ -79,6 +79,8 @@ export interface ServiceHistoryItem {
   odometer: string;
   serviceCenterId?: number | string; // Service center where this service was done
   serviceCenterName?: string; // Service center name
+  customerId?: string;
+  vehicleId?: string;
 }
 
 export interface NewVehicleForm {

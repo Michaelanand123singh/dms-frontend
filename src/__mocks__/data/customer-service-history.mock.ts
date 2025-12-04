@@ -5,11 +5,16 @@
 
 import type { ServiceHistoryItem } from "@/shared/types";
 
+type ExtendedServiceHistoryItem = ServiceHistoryItem & {
+  customerId?: string;
+  vehicleId?: string;
+};
+
 /**
  * Get mock service history for a vehicle
  * In a real app, this would be fetched from an API based on vehicle ID
  */
-export const getMockServiceHistory = (vehicleId?: number | string): ServiceHistoryItem[] => {
+export const getMockServiceHistory = (vehicleId?: number | string): ExtendedServiceHistoryItem[] => {
   // Return default mock data - in production, this would be vehicle-specific
   return [
     {
