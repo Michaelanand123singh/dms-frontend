@@ -161,6 +161,17 @@ export interface JobCard {
   customerArrivalTimestamp?: string;
   draftIntake?: Record<string, any>;
   
+  // Service Advisor submission to manager
+  submittedToManager?: boolean;
+  submittedAt?: string;
+  
+  // Invoice workflow
+  invoiceNumber?: string;
+  invoiceCreatedAt?: string;
+  invoiceSentToAdvisor?: boolean;
+  invoiceSentToCustomer?: boolean;
+  invoiceSentAt?: string;
+  
   // NEW STRUCTURED DATA (PART 1, PART 2, PART 2A, PART 3)
   part1?: JobCardPart1; // Customer & Vehicle Information
   part2?: JobCardPart2Item[]; // Parts & Work Items List

@@ -70,9 +70,11 @@ export default function JobCards() {
   const [newStatus, setNewStatus] = useState<JobCardStatus>("Assigned");
   const [selectedEngineer, setSelectedEngineer] = useState<string>("");
   const jobForPanel = Boolean(selectedJob);
-  const { userRole } = useRole();
+  const { userRole, userInfo } = useRole();
+  const isCallCenter = userRole === "call_center";
+  const isServiceAdvisor = userRole === "service_advisor";
   const isServiceManager = userRole === "sc_manager";
-  const isInventoryManager = userRole === "sc_staff";
+  const isInventoryManager = userRole === "inventory_manager" || userRole === "sc_staff";
   const isTechnician = userRole === "service_engineer";
   const [technicianApproved, setTechnicianApproved] = useState<boolean>(false);
   const [partsApproved, setPartsApproved] = useState<boolean>(false);
@@ -93,10 +95,25 @@ export default function JobCards() {
     return defaultJobCards;
   });
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
-  const visibleJobCards = useMemo(
-    () => filterByServiceCenter(jobCards, serviceCenterContext),
-    [jobCards, serviceCenterContext]
-  );
+  
+  // Role-based job card filtering
+  const visibleJobCards = useMemo(() => {
+    let filtered = filterByServiceCenter(jobCards, serviceCenterContext);
+    
+    // Technician only sees job cards assigned to them
+    if (isTechnician && userInfo?.name) {
+      filtered = filtered.filter((job) => job.assignedEngineer === userInfo.name);
+    }
+    
+    // Service Advisor sees job cards they created or are assigned to their service center
+    if (isServiceAdvisor) {
+      // Can see all job cards in their service center
+      // Additional filtering can be added if needed
+    }
+    
+    return filtered;
+  }, [jobCards, serviceCenterContext, isTechnician, isServiceAdvisor, userInfo]);
+  
   const shouldFilterJobCards = shouldFilterByServiceCenter(serviceCenterContext);
 
   const [engineers] = useState<Engineer[]>(engineersList);
@@ -114,6 +131,8 @@ export default function JobCards() {
       alert("Please enter at least one part.");
       return;
     }
+    
+    // Store part request
     setPartRequests((prev) => ({
       ...prev,
       [selectedJob.id]: {
@@ -122,8 +141,22 @@ export default function JobCards() {
         technicianNotified: false,
       },
     }));
+    
+    // Update job card with additional part requests
+    const updatedJobCards = jobCards.map((job) =>
+      job.id === selectedJob.id
+        ? {
+            ...job,
+            partRequests: [...(job.partRequests || []), ...parts],
+            partRequestStatus: "pending" as const,
+          }
+        : job
+    );
+    setJobCards(updatedJobCards);
+    safeStorage.setItem("jobCards", updatedJobCards);
+    
     setPartRequestInput("");
-    alert("Part request submitted.");
+    alert("Additional part request submitted. Manager will be notified for approval.");
   };
 
   const handleTechnicianNotifyManager = () => {
@@ -161,7 +194,7 @@ export default function JobCards() {
       const existing = prev[selectedJob.id];
       if (!existing) return prev;
       return {
-        ...prev,
+      ...prev,
         [selectedJob.id]: {
           ...existing,
           status: "inventory_manager_approved",
@@ -177,7 +210,89 @@ export default function JobCards() {
       ...prev,
       [selectedJob.id]: true,
     }));
-    alert("Work completion notified.");
+    
+    // Update job card status to Completed
+    const updatedJobCards = jobCards.map((job) =>
+      job.id === selectedJob.id
+        ? { ...job, status: "Completed" as JobCardStatus, completedAt: new Date().toLocaleString() }
+        : job
+    );
+    setJobCards(updatedJobCards);
+    safeStorage.setItem("jobCards", updatedJobCards);
+    
+    alert("Work completion notified to manager.");
+  };
+
+  // Service Advisor: Submit job card to manager with required parts
+  const handleSubmitToManager = () => {
+    if (!selectedJob) {
+      alert("Please select a job card to submit.");
+      return;
+    }
+    
+    // Update job card status to indicate it's submitted to manager
+    const updatedJobCards = jobCards.map((job) =>
+      job.id === selectedJob.id
+        ? { ...job, status: "Created" as JobCardStatus, submittedToManager: true, submittedAt: new Date().toLocaleString() }
+        : job
+    );
+    setJobCards(updatedJobCards);
+    safeStorage.setItem("jobCards", updatedJobCards);
+    
+    alert("Job card submitted to manager successfully.");
+  };
+
+  // Service Manager: Create invoice and send to advisor
+  const handleCreateInvoice = () => {
+    if (!selectedJob) {
+      alert("Please select a job card to create invoice.");
+      return;
+    }
+    
+    if (selectedJob.status !== "Completed") {
+      alert("Job card must be completed before creating invoice.");
+      return;
+    }
+    
+    // Update job card with invoice information
+    const invoiceNumber = `INV-${selectedJob.jobCardNumber || selectedJob.id}-${Date.now()}`;
+    const updatedJobCards = jobCards.map((job) =>
+      job.id === selectedJob.id
+        ? {
+            ...job,
+            status: "Invoiced" as JobCardStatus,
+            invoiceNumber,
+            invoiceCreatedAt: new Date().toLocaleString(),
+            invoiceSentToAdvisor: false,
+          }
+        : job
+    );
+    setJobCards(updatedJobCards);
+    safeStorage.setItem("jobCards", updatedJobCards);
+    
+    alert(`Invoice ${invoiceNumber} created and sent to service advisor.`);
+  };
+
+  // Service Advisor: Send invoice to customer
+  const handleSendInvoiceToCustomer = () => {
+    if (!selectedJob || !selectedJob.invoiceNumber) {
+      alert("No invoice found for this job card.");
+      return;
+    }
+    
+    const updatedJobCards = jobCards.map((job) =>
+      job.id === selectedJob.id
+        ? {
+            ...job,
+            invoiceSentToCustomer: true,
+            invoiceSentAt: new Date().toLocaleString(),
+          }
+        : job
+    );
+    setJobCards(updatedJobCards);
+    safeStorage.setItem("jobCards", updatedJobCards);
+    
+    alert("Invoice sent to customer successfully.");
   };
 
   const generateJobCardNumber = (serviceCenterCode: string = "SC001") => {
@@ -205,10 +320,10 @@ export default function JobCards() {
   };
 
   const handleJobCardCreated = (newJobCard: JobCardType) => {
-    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-    safeStorage.setItem("jobCards", [newJobCard, ...storedJobCards]);
-    setJobCards((prev) => [newJobCard, ...prev]);
-    setShowCreateModal(false);
+      const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+      safeStorage.setItem("jobCards", [newJobCard, ...storedJobCards]);
+      setJobCards((prev) => [newJobCard, ...prev]);
+      setShowCreateModal(false);
   };
 
   const handleJobCardError = (message: string) => {
@@ -456,6 +571,44 @@ export default function JobCards() {
     return workflow[currentStatus] || [];
   };
 
+  // Block Call Center access - show only vehicle status view
+  if (isCallCenter) {
+    return (
+      <div className="bg-[#f9f9fb] min-h-screen p-4 sm:p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h1 className="text-2xl font-bold text-blue-600 mb-2">Vehicle Status</h1>
+            <p className="text-gray-500 mb-4">View vehicle service status only</p>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Service Status Overview</h2>
+            <div className="space-y-4">
+              {visibleJobCards.map((job) => (
+                <div key={job.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-gray-800">{job.vehicle}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
+                      {job.status}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <p>Customer: {job.customerName}</p>
+                    <p>Service Type: {job.serviceType}</p>
+                    {job.assignedEngineer && <p>Assigned Engineer: {job.assignedEngineer}</p>}
+                  </div>
+                </div>
+              ))}
+              {visibleJobCards.length === 0 && (
+                <p className="text-gray-500 text-center py-8">No vehicles in service</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#f9f9fb] min-h-screen">
       <div className={`pt-4 pb-6 md:pt-6 md:pb-10 overflow-x-hidden ${view === "kanban" ? "px-0" : "px-4 sm:px-6"}`}>
@@ -463,7 +616,9 @@ export default function JobCards() {
         <div className={`flex flex-col md:flex-row md:items-center md:justify-between mb-6 md:mb-8 gap-4 ${view === "kanban" ? "px-4 sm:px-6" : ""}`}>
           <div className="text-center md:text-left">
             <h1 className="text-2xl sm:text-3xl font-bold text-blue-600 mb-1 md:mb-2">Job Cards</h1>
-            <p className="text-gray-500 text-sm md:text-base">Manage and track service job cards</p>
+            <p className="text-gray-500 text-sm md:text-base">
+              {isTechnician ? "Your Assigned Job Cards" : isServiceAdvisor ? "Create and manage job cards" : "Manage and track service job cards"}
+            </p>
           </div>
           <div className="flex flex-col xs:flex-row gap-3 justify-center md:justify-start">
             <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-300 self-center">
@@ -486,6 +641,8 @@ export default function JobCards() {
                 List
               </button>
             </div>
+            {/* Only Service Advisor can create job cards from this page */}
+            {isServiceAdvisor && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2 justify-center text-sm sm:text-base"
@@ -493,6 +650,7 @@ export default function JobCards() {
               <Plus size={18} />
               <span>Create Job Card</span>
             </button>
+            )}
           </div>
         </div>
 
@@ -571,7 +729,30 @@ export default function JobCards() {
           )}
         </div>
 
+        {/* Service Advisor: Submit to Manager Panel */}
+        {isServiceAdvisor && selectedJob && selectedJob.status === "Created" && !selectedJob.submittedToManager && (
+          <div className="mb-4 bg-gradient-to-r from-blue-50 to-white rounded-xl p-4 shadow-sm border border-blue-100">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-blue-800">Submit Job Card to Manager</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Review the job card details and required parts, then submit to manager for approval and technician assignment.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSubmitToManager}
+                className="px-4 py-2 rounded-lg font-semibold text-sm transition bg-blue-600 text-white shadow-md hover:bg-blue-700"
+              >
+                Submit to Manager
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Service Manager: Manager-Driven Quotation & Monitoring Panel */}
         {isServiceManager && (
+          <>
           <div className="mb-4 bg-gradient-to-r from-indigo-50 to-white rounded-xl p-4 shadow-sm border border-indigo-100">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
@@ -611,6 +792,76 @@ export default function JobCards() {
                 disabled={!(technicianApproved && partsApproved)}
               >
                 Create Manager Quote
+                </button>
+              </div>
+            </div>
+
+            {/* Service Manager: Create Invoice Panel */}
+            {selectedJob && selectedJob.status === "Completed" && !selectedJob.invoiceNumber && (
+              <div className="mb-4 bg-gradient-to-r from-green-50 to-white rounded-xl p-4 shadow-sm border border-green-100">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">Create Final Invoice</p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Job card is completed. Create invoice and send to service advisor for customer delivery.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateInvoice}
+                    className="px-4 py-2 rounded-lg font-semibold text-sm transition bg-green-600 text-white shadow-md hover:bg-green-700"
+                  >
+                    Create Invoice
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Service Manager: Monitor Assigned Job Cards */}
+            <div className="mb-4 bg-gradient-to-r from-purple-50 to-white rounded-xl p-4 shadow-sm border border-purple-100">
+              <div>
+                <p className="text-sm font-semibold text-purple-800 mb-2">Monitor Assigned Job Cards</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-lg border border-purple-200">
+                    <p className="text-purple-600 font-medium">Assigned</p>
+                    <p className="text-2xl font-bold text-purple-800">
+                      {visibleJobCards.filter((j) => j.status === "Assigned").length}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-purple-200">
+                    <p className="text-purple-600 font-medium">In Progress</p>
+                    <p className="text-2xl font-bold text-purple-800">
+                      {visibleJobCards.filter((j) => j.status === "In Progress").length}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-purple-200">
+                    <p className="text-purple-600 font-medium">Parts Pending</p>
+                    <p className="text-2xl font-bold text-purple-800">
+                      {visibleJobCards.filter((j) => j.status === "Parts Pending").length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Service Advisor: Send Invoice to Customer */}
+        {isServiceAdvisor && selectedJob && selectedJob.invoiceNumber && !selectedJob.invoiceSentToCustomer && (
+          <div className="mb-4 bg-gradient-to-r from-yellow-50 to-white rounded-xl p-4 shadow-sm border border-yellow-100">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-yellow-800">Send Invoice to Customer</p>
+                <p className="text-xs text-yellow-600 mt-1">
+                  Invoice {selectedJob.invoiceNumber} is ready. Send to customer at vehicle receiving time.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSendInvoiceToCustomer}
+                className="px-4 py-2 rounded-lg font-semibold text-sm transition bg-yellow-600 text-white shadow-md hover:bg-yellow-700"
+              >
+                Send Invoice to Customer
               </button>
             </div>
           </div>
@@ -635,14 +886,19 @@ export default function JobCards() {
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               {isTechnician && (
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-700">Part Request (comma-separated)</label>
+                  <label className="text-sm font-semibold text-gray-700">
+                    Request Additional Parts (not in job card)
+                  </label>
                   <input
                     type="text"
                     value={partRequestInput}
                     onChange={(e) => setPartRequestInput(e.target.value)}
-                    placeholder="Brake pads, Engine oil"
+                    placeholder="Brake pads, Engine oil, Filter (comma-separated)"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  <p className="text-xs text-gray-500">
+                    Request parts that are not already defined in the job card. These will be sent to manager for approval.
+                  </p>
                   <button
                     type="button"
                     onClick={handlePartRequestSubmit}
@@ -663,6 +919,9 @@ export default function JobCards() {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-3 text-xs">
+              {/* Technician: Notify Manager about part requests */}
+              {isTechnician && (
+                <>
               <button
                 type="button"
                 onClick={handleTechnicianNotifyManager}
@@ -671,7 +930,18 @@ export default function JobCards() {
               >
                 Notify Manager
               </button>
+                  <button
+                    type="button"
+                    onClick={handleWorkCompletionNotification}
+                    className="px-3 py-2 rounded-lg border border-green-300 text-green-700 hover:border-green-400 hover:text-green-800 transition"
+                  >
+                    Notify Work Completion
+                  </button>
+                </>
+              )}
+              {/* Service Manager: Approve parts and query inventory */}
               {isServiceManager && (
+                <>
                 <button
                   type="button"
                   onClick={handleServiceManagerPartApproval}
@@ -680,7 +950,20 @@ export default function JobCards() {
                 >
                   Approve Parts (Manager)
                 </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Query inventory manager about parts
+                      alert("Part request sent to inventory manager for approval.");
+                    }}
+                    className="px-3 py-2 rounded-lg border border-purple-300 text-purple-700 hover:border-purple-400 hover:text-purple-800 transition"
+                    disabled={activeRequest?.status !== "pending" && activeRequest?.status !== "service_manager_approved"}
+                  >
+                    Query Inventory Manager
+                  </button>
+                </>
               )}
+              {/* Inventory Manager: Approve parts */}
               {isInventoryManager && (
                 <button
                   type="button"
@@ -689,15 +972,6 @@ export default function JobCards() {
                   disabled={activeRequest?.status !== "service_manager_approved"}
                 >
                   Approve Parts (Inventory)
-                </button>
-              )}
-              {isTechnician && (
-                <button
-                  type="button"
-                  onClick={handleWorkCompletionNotification}
-                  className="px-3 py-2 rounded-lg border border-green-300 text-green-700 hover:border-green-400 hover:text-green-800 transition"
-                >
-                  Notify Work Completion
                 </button>
               )}
             </div>
@@ -746,8 +1020,7 @@ export default function JobCards() {
                             key={job.id}
                             className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-lg hover:border-blue-300 transition-all duration-200 cursor-pointer group"
                             onClick={() => {
-                              setSelectedJob(job);
-                              setShowDetails(true);
+                              router.push(`/sc/job-cards/${job.id}`);
                             }}
                           >
                             {/* Card Header */}
@@ -901,15 +1174,15 @@ export default function JobCards() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          setSelectedJob(job);
-                          setShowDetails(true);
+                          router.push(`/sc/job-cards/${job.id}`);
                         }}
                         className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:bg-gray-200 transition inline-flex items-center gap-1 md:gap-2 justify-center"
                       >
                         <Eye size={14} />
                         View
                       </button>
-                      {job.draftIntake && job.sourceAppointmentId && (
+                      {/* Service Advisor: Edit Draft */}
+                      {isServiceAdvisor && job.draftIntake && job.sourceAppointmentId && (
                         <button
                           onClick={() => handleEditDraft(job)}
                           className="flex-1 border border-yellow-400 text-yellow-700 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:bg-yellow-100 transition inline-flex items-center gap-1 md:gap-2 justify-center"
@@ -918,8 +1191,21 @@ export default function JobCards() {
                           Edit Draft
                         </button>
                       )}
+                      {/* Service Manager: Edit Job Card */}
+                      {isServiceManager && (
+                        <button
+                          onClick={() => {
+                            router.push(`/sc/job-cards/${job.id}?edit=true`);
+                          }}
+                          className="flex-1 border border-blue-400 text-blue-700 px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:bg-blue-100 transition inline-flex items-center gap-1 md:gap-2 justify-center"
+                        >
+                          <Edit size={14} />
+                          Edit
+                        </button>
+                      )}
                     </div>
-                    {job.status === "Created" && (
+                    {/* Service Manager: Assign Engineer */}
+                    {isServiceManager && job.status === "Created" && (
                       <button
                         onClick={() => {
                           setAssigningJobId(job.id);
@@ -930,7 +1216,21 @@ export default function JobCards() {
                         Assign Engineer
                       </button>
                     )}
-                    {getNextStatus(job.status).length > 0 && (
+                    {/* Service Manager: Update Status */}
+                    {isServiceManager && getNextStatus(job.status).length > 0 && (
+                      <button
+                        onClick={() => {
+                          setUpdatingStatusJobId(job.id);
+                          setNewStatus(getNextStatus(job.status)[0]);
+                          setShowStatusUpdateModal(true);
+                        }}
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:opacity-90 transition w-full"
+                      >
+                        Update Status
+                      </button>
+                    )}
+                    {/* Technician: Update Status (only for assigned job cards) */}
+                    {isTechnician && job.assignedEngineer === userInfo?.name && getNextStatus(job.status).length > 0 && (
                       <button
                         onClick={() => {
                           setUpdatingStatusJobId(job.id);

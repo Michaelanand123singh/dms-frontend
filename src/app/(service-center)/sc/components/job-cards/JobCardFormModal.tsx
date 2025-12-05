@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { PlusCircle, Loader2, X, Plus, Trash2, Edit2 } from "lucide-react";
+import { PlusCircle, Loader2, X, Plus, Trash2, Edit2, Search, UserPlus, Car } from "lucide-react";
 
 import type { JobCard, Priority, ServiceLocation } from "@/shared/types";
 import { availableParts } from "@/__mocks__/data/job-cards.mock";
@@ -12,6 +12,7 @@ import { createPartsRequestFromJobCard } from "@/shared/utils/jobCardPartsReques
 import { populateJobCardPart1, createEmptyJobCardPart1, generateSrNoForPart2Items } from "@/shared/utils/jobCardData.util";
 import { customerService } from "@/services/customers/customer.service";
 import type { JobCardPart2Item } from "@/shared/types/job-card.types";
+import type { CustomerWithVehicles } from "@/shared/types";
 
 export type CreateJobCardForm = {
   // Basic fields
@@ -119,6 +120,14 @@ export default function JobCardFormModal({
   const [creating, setCreating] = useState(false);
   const [previewJobCardNumber, setPreviewJobCardNumber] = useState<string>("");
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
+  
+  // Search functionality
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<CustomerWithVehicles[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -129,12 +138,117 @@ export default function JobCardFormModal({
   }, [open, serviceCenterContext.serviceCenterId]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // Reset search when modal closes
+      setSearchQuery("");
+      setSearchResults([]);
+      setShowSearchResults(false);
+      setSelectedCustomer(null);
+      setSelectedVehicle(null);
+      return;
+    }
     setForm({
       ...INITIAL_JOB_CARD_FORM,
       ...(initialValues ?? {}),
     });
   }, [initialValues, open]);
+
+  // Search customers by name or VIN
+  useEffect(() => {
+    if (!searchQuery.trim() || !open) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    const searchTimeout = setTimeout(async () => {
+      try {
+        setSearching(true);
+        // Try searching by name first
+        let results = await customerService.search(searchQuery, "name");
+        
+        // If no results, try searching by VIN
+        if (results.length === 0) {
+          results = await customerService.search(searchQuery, "vin");
+        }
+        
+        // Also try vehicle number
+        if (results.length === 0) {
+          results = await customerService.search(searchQuery, "vehicleNumber");
+        }
+        
+        setSearchResults(results);
+        setShowSearchResults(results.length > 0);
+      } catch (error) {
+        console.error("Error searching customers:", error);
+        setSearchResults([]);
+        setShowSearchResults(false);
+      } finally {
+        setSearching(false);
+      }
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(searchTimeout);
+  }, [searchQuery, open]);
+
+  // Handle customer/vehicle selection
+  const handleSelectCustomer = (customer: CustomerWithVehicles, vehicle?: any) => {
+    setSelectedCustomer(customer);
+    setSelectedVehicle(vehicle || (customer.vehicles && customer.vehicles.length > 0 ? customer.vehicles[0] : null));
+    
+    // Pre-fill form with customer and vehicle data
+    const vehicleToUse = vehicle || (customer.vehicles && customer.vehicles.length > 0 ? customer.vehicles[0] : null);
+    
+    setForm((prev) => ({
+      ...prev,
+      customerId: customer.id.toString(),
+      customerName: customer.name,
+      fullName: customer.name,
+      mobilePrimary: customer.phone,
+      customerType: customer.customerType || "",
+      customerAddress: customer.address || "",
+      vehicleId: vehicleToUse?.id?.toString() || "",
+      vehicleRegistration: vehicleToUse?.registration || "",
+      vehicleMake: vehicleToUse?.vehicleMake || "",
+      vehicleModel: vehicleToUse?.vehicleModel || "",
+      vehicleBrand: vehicleToUse?.vehicleMake || "",
+      vinChassisNumber: vehicleToUse?.vin || "",
+      registrationNumber: vehicleToUse?.registration || "",
+      variantBatteryCapacity: vehicleToUse?.variant || "",
+      // Additional vehicle details if available
+      ...(vehicleToUse?.warrantyStatus && { warrantyStatus: vehicleToUse.warrantyStatus }),
+    }));
+    
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
+
+  // Handle create new customer/vehicle
+  const handleCreateNew = () => {
+    // Clear search and allow manual entry
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowSearchResults(false);
+    // User can manually fill the form
+    // Optionally, you could navigate to customer-find page:
+    // router.push('/sc/customer-find');
+  };
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.search-container')) {
+        setShowSearchResults(false);
+      }
+    };
+
+    if (showSearchResults) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showSearchResults]);
 
   // Auto-populate form when customer/vehicle data is available
   useEffect(() => {
@@ -502,7 +616,7 @@ export default function JobCardFormModal({
       <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[95vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-6 border-b pb-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Create Job Card</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Create Job Card</h2>
             <p className="text-sm text-gray-500 mt-1">Fill in customer and vehicle information</p>
           </div>
           <button
@@ -518,6 +632,131 @@ export default function JobCardFormModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* SEARCH CUSTOMER/VEHICLE */}
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 search-container">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Search Customer by Name or VIN Number
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <Search size={18} />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchResults(true);
+                }}
+                onFocus={() => {
+                  if (searchResults.length > 0) setShowSearchResults(true);
+                }}
+                placeholder="Enter customer name or VIN number..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              {searching && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <Loader2 size={18} className="animate-spin text-blue-600" />
+                </div>
+              )}
+              
+              {/* Search Results Dropdown */}
+              {showSearchResults && searchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                  {searchResults.map((customer) => (
+                    <div key={customer.id} className="border-b border-gray-100 last:border-b-0">
+                      <div
+                        className="p-3 hover:bg-blue-50 cursor-pointer"
+                        onClick={() => handleSelectCustomer(customer)}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <UserPlus size={16} className="text-blue-600" />
+                          <span className="font-semibold text-gray-800">{customer.name}</span>
+                        </div>
+                        <div className="text-xs text-gray-600 ml-6">
+                          <div>Phone: {customer.phone}</div>
+                          {customer.vehicles && customer.vehicles.length > 0 && (
+                            <div className="mt-1">
+                              <div className="font-medium text-gray-700 mb-1">Vehicles:</div>
+                              {customer.vehicles.map((vehicle) => (
+                                <div
+                                  key={vehicle.id}
+                                  className="flex items-center gap-2 p-2 hover:bg-blue-100 rounded cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectCustomer(customer, vehicle);
+                                  }}
+                                >
+                                  <Car size={14} className="text-gray-500" />
+                                  <span className="text-xs">
+                                    {vehicle.vehicleMake} {vehicle.vehicleModel} - {vehicle.registration} (VIN: {vehicle.vin})
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* No Results - Create New Option */}
+              {showSearchResults && searchQuery.trim() && !searching && searchResults.length === 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 mb-3">No customer or vehicle found</p>
+                    <button
+                      type="button"
+                      onClick={handleCreateNew}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                    >
+                      <UserPlus size={16} />
+                      Create New Customer/Vehicle
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Selected Customer/Vehicle Info */}
+            {selectedCustomer && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">
+                      Selected: {selectedCustomer.name}
+                    </p>
+                    {selectedVehicle && (
+                      <p className="text-xs text-green-700 mt-1">
+                        Vehicle: {selectedVehicle.vehicleMake} {selectedVehicle.vehicleModel} - {selectedVehicle.registration}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCustomer(null);
+                      setSelectedVehicle(null);
+                      setForm((prev) => ({
+                        ...prev,
+                        customerId: "",
+                        customerName: "",
+                        fullName: "",
+                        vehicleId: "",
+                        vehicleRegistration: "",
+                      }));
+                    }}
+                    className="text-green-600 hover:text-green-800"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* PART 1: CUSTOMER & VEHICLE INFORMATION */}
           <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -537,36 +776,36 @@ export default function JobCardFormModal({
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-gray-700 mb-3">Customer & Vehicle Details</h4>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                     Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
+              </label>
+              <input
+                type="text"
                     value={form.fullName || form.customerName}
                     onChange={(e) => setForm({ ...form, fullName: e.target.value, customerName: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    required
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                required
                     placeholder="Enter customer full name"
-                  />
-                </div>
+              />
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                     Mobile Number (Primary) <span className="text-red-500">*</span>
-                  </label>
-                  <input
+              </label>
+              <input
                     type="tel"
                     value={form.mobilePrimary}
                     onChange={(e) => setForm({ ...form, mobilePrimary: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     required
                     placeholder="9876543210"
-                  />
-                </div>
+              />
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                     Customer Type
                   </label>
                   <select
@@ -583,30 +822,30 @@ export default function JobCardFormModal({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Vehicle Brand <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
+              </label>
+              <input
+                type="text"
                     value={form.vehicleBrand || form.vehicleMake}
                     onChange={(e) => setForm({ ...form, vehicleBrand: e.target.value, vehicleMake: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     required
-                    placeholder="Honda"
-                  />
-                </div>
+                placeholder="Honda"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                     Vehicle Model <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.vehicleModel}
-                    onChange={(e) => setForm({ ...form, vehicleModel: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              </label>
+              <input
+                type="text"
+                value={form.vehicleModel}
+                onChange={(e) => setForm({ ...form, vehicleModel: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     required
-                    placeholder="City"
-                  />
-                </div>
+                placeholder="City"
+              />
+            </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1079,101 +1318,101 @@ export default function JobCardFormModal({
           <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Service Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Service Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={form.serviceType}
-                  onChange={(e) => setForm({ ...form, serviceType: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  required
-                >
-                  <option value="">Select Service Type</option>
-                  {SERVICE_TYPE_OPTIONS.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Service Location <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={form.location}
-                  onChange={(e) =>
-                    setForm({ ...form, location: e.target.value as ServiceLocation })
-                  }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  required
-                >
-                  <option value="Station">Station</option>
-                  <option value="Home Service">Home Service</option>
-                </select>
-              </div>
-              {form.location === "Home Service" && (
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Home Address
-                  </label>
-                  <textarea
-                    value={form.homeAddress}
-                    onChange={(e) => setForm({ ...form, homeAddress: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    rows={2}
-                    placeholder="Enter pick-up or service address"
-                  />
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estimated Cost (₹)
-                </label>
-                <input
-                  type="text"
-                  value={form.estimatedCost}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      estimatedCost: e.target.value.replace(/[^0-9]/g, ""),
-                    })
-                  }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="3500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estimated Time
-                </label>
-                <input
-                  type="text"
-                  value={form.estimatedTime}
-                  onChange={(e) => setForm({ ...form, estimatedTime: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="2 hours"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Priority
-                </label>
-                <select
-                  value={form.priority}
-                  onChange={(e) =>
-                    setForm({ ...form, priority: e.target.value as Priority })
-                  }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                >
-                  <option value="Low">Low</option>
-                  <option value="Normal">Normal</option>
-                  <option value="High">High</option>
-                  <option value="Critical">Critical</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Service Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={form.serviceType}
+                onChange={(e) => setForm({ ...form, serviceType: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                required
+              >
+                <option value="">Select Service Type</option>
+                {SERVICE_TYPE_OPTIONS.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Service Location <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={form.location}
+                onChange={(e) =>
+                  setForm({ ...form, location: e.target.value as ServiceLocation })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                required
+              >
+                <option value="Station">Station</option>
+                <option value="Home Service">Home Service</option>
+              </select>
+            </div>
+            {form.location === "Home Service" && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Home Address
+                </label>
+                <textarea
+                  value={form.homeAddress}
+                  onChange={(e) => setForm({ ...form, homeAddress: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  rows={2}
+                  placeholder="Enter pick-up or service address"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Estimated Cost (₹)
+              </label>
+              <input
+                type="text"
+                value={form.estimatedCost}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    estimatedCost: e.target.value.replace(/[^0-9]/g, ""),
+                  })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                placeholder="3500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Estimated Time
+              </label>
+              <input
+                type="text"
+                value={form.estimatedTime}
+                onChange={(e) => setForm({ ...form, estimatedTime: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                placeholder="2 hours"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Priority
+              </label>
+              <select
+                value={form.priority}
+                onChange={(e) =>
+                  setForm({ ...form, priority: e.target.value as Priority })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              >
+                <option value="Low">Low</option>
+                <option value="Normal">Normal</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+          </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">

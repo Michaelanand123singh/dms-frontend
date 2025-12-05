@@ -202,17 +202,18 @@ export function jobCardPart1ToJSON(part1: JobCardPart1): Record<string, string> 
 
 /**
  * Convert JobCardPart2Item[] to JSON format as specified in the extraction rules
+ * Note: qty and amount are returned as strings per specification
  */
-export function jobCardPart2ToJSON(part2: JobCardPart2Item[]): Array<Record<string, string | number>> {
+export function jobCardPart2ToJSON(part2: JobCardPart2Item[]): Array<Record<string, string>> {
   return part2.map((item) => ({
-    sr_no: item.srNo,
-    part_warranty_tag: item.partWarrantyTag,
-    part_name: item.partName,
-    part_code: item.partCode,
-    qty: item.qty,
-    amount: item.amount,
-    technician: item.technician,
-    labour_code: item.labourCode,
+    sr_no: String(item.srNo),
+    part_warranty_tag: item.partWarrantyTag || "",
+    part_name: item.partName || "",
+    part_code: item.partCode || "",
+    qty: String(item.qty || 0),
+    amount: String(item.amount || 0),
+    technician: item.technician || "",
+    labour_code: item.labourCode || "",
   }));
 }
 
@@ -234,23 +235,24 @@ export function jobCardPart2AToJSON(part2A: JobCardPart2A): Record<string, strin
 
 /**
  * Convert JobCardPart3 to JSON format as specified in the extraction rules
+ * Note: qty, issue_qty, and return_qty are returned as strings per specification
  */
-export function jobCardPart3ToJSON(part3: JobCardPart3): Record<string, string | number> {
+export function jobCardPart3ToJSON(part3: JobCardPart3): Record<string, string> {
   return {
-    customer_type: part3.customerType,
-    vehicle_brand: part3.vehicleBrand,
-    vehicle_model: part3.vehicleModel,
-    registration_number: part3.registrationNumber,
-    vin_chassis_number: part3.vinChassisNumber,
-    job_card_number: part3.jobCardNumber,
-    part_code: part3.partCode,
-    part_name: part3.partName,
-    qty: part3.qty,
-    issue_qty: part3.issueQty,
-    return_qty: part3.returnQty,
-    warranty_tag_number: part3.warrantyTagNumber,
-    return_part_number: part3.returnPartNumber,
-    approval_details: part3.approvalDetails,
+    customer_type: part3.customerType || "",
+    vehicle_brand: part3.vehicleBrand || "",
+    vehicle_model: part3.vehicleModel || "",
+    registration_number: part3.registrationNumber || "",
+    vin_chassis_number: part3.vinChassisNumber || "",
+    job_card_number: part3.jobCardNumber || "",
+    part_code: part3.partCode || "",
+    part_name: part3.partName || "",
+    qty: String(part3.qty || 0),
+    issue_qty: String(part3.issueQty || 0),
+    return_qty: String(part3.returnQty || 0),
+    warranty_tag_number: part3.warrantyTagNumber || "",
+    return_part_number: part3.returnPartNumber || "",
+    approval_details: part3.approvalDetails || "",
   };
 }
 
