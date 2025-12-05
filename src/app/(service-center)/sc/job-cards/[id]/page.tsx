@@ -110,7 +110,7 @@ export default function AdvisorJobCardDetailPage({ params, searchParams }: Advis
           <ClipboardList className="mx-auto text-red-600" size={32} />
           <p className="mt-4 text-lg font-semibold text-gray-900">Job card not found</p>
           <p className="text-sm text-gray-500">The job card you requested does not exist or may have been removed.</p>
-          <Link className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800" href="/sc/advisor-job-cards">
+          <Link className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800" href="/sc/job-cards">
             <ArrowLeft size={16} />
             Back to job cards
           </Link>
@@ -141,7 +141,7 @@ export default function AdvisorJobCardDetailPage({ params, searchParams }: Advis
             </div>
           )}
           <Link
-            href="/sc/advisor-job-cards"
+            href="/sc/job-cards"
             className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-indigo-400"
           >
             <ArrowLeft size={16} />

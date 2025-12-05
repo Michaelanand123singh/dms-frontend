@@ -1,5 +1,6 @@
 /**
  * Job Card Type Definitions
+ * Based on Job Card Extraction Rules: PART 1, PART 2, PART 2A, PART 3
  */
 
 import type { ServiceLocation, Priority } from './common.types';
@@ -18,6 +19,95 @@ export type JobCardStatus =
   | "Completed"
   | "Invoiced";
 
+/**
+ * PART 1 — CUSTOMER & VEHICLE INFORMATION
+ */
+export interface JobCardPart1 {
+  // LEFT SIDE
+  fullName: string;
+  mobilePrimary: string;
+  customerType: "B2C" | "B2B" | "";
+  vehicleBrand: string;
+  vehicleModel: string;
+  registrationNumber: string;
+  vinChassisNumber: string;
+  variantBatteryCapacity: string;
+  warrantyStatus: string;
+  estimatedDeliveryDate: string;
+  
+  // RIGHT SIDE
+  customerAddress: string;
+  
+  // TOP RIGHT
+  jobCardNumber: string;
+  
+  // BELOW DETAILS (Text Blocks)
+  customerFeedback: string; // Customer Feedback / Concerns
+  technicianObservation: string;
+  insuranceStartDate: string;
+  insuranceEndDate: string;
+  insuranceCompanyName: string;
+  
+  // MANDATORY SERIAL DATA (only if applicable)
+  batterySerialNumber: string;
+  mcuSerialNumber: string;
+  vcuSerialNumber: string;
+  otherPartSerialNumber: string;
+}
+
+/**
+ * PART 2 — PARTS & WORK ITEMS LIST
+ */
+export interface JobCardPart2Item {
+  srNo: number; // Auto-generate starting from 1
+  partWarrantyTag: string; // Job Card Line Name
+  partName: string; // Clean name from description
+  partCode: string; // First alphanumeric block from description
+  qty: number; // Quantity
+  amount: number; // Amount (if available, default 0)
+  technician: string; // Technician (if provided)
+  labourCode: string; // If Item Type = Work Item → extract labour text, If Item Type = Part → "Auto Select With Part"
+  itemType?: "part" | "work_item"; // To distinguish between parts and work items
+}
+
+/**
+ * PART 2A — WARRANTY / INSURANCE CASE DETAILS
+ * ONLY extract if input indicates warranty or insurance case
+ */
+export interface JobCardPart2A {
+  videoEvidence: "Yes" | "No" | "";
+  vinImage: "Yes" | "No" | "";
+  odoImage: "Yes" | "No" | ""; // ODO Meter Image
+  damageImages: "Yes" | "No" | ""; // Images of Damaged Parts
+  issueDescription: string;
+  numberOfObservations: string;
+  symptom: string;
+  defectPart: string;
+}
+
+/**
+ * PART 3 — PART REQUISITION & ISSUE DETAILS
+ */
+export interface JobCardPart3 {
+  customerType: "B2C" | "B2B" | "";
+  vehicleBrand: string;
+  vehicleModel: string;
+  registrationNumber: string;
+  vinChassisNumber: string;
+  jobCardNumber: string;
+  partCode: string;
+  partName: string;
+  qty: number;
+  issueQty: number;
+  returnQty: number;
+  warrantyTagNumber: string;
+  returnPartNumber: string;
+  approvalDetails: string; // Approval Mail / Details (can be email/screenshot summary)
+}
+
+/**
+ * Complete Job Card Structure
+ */
 export interface JobCard {
   id: string;
   jobCardNumber: string; // Format: SC001-2025-11-0001
@@ -27,10 +117,10 @@ export interface JobCard {
   customerId: string;
   customerName: string;
   vehicleId?: string;
-  vehicle: string;
-  registration: string;
-  vehicleMake?: string;
-  vehicleModel?: string;
+  vehicle: string; // Legacy field for backward compatibility
+  registration: string; // Legacy field for backward compatibility
+  vehicleMake?: string; // Legacy field for backward compatibility
+  vehicleModel?: string; // Legacy field for backward compatibility
   customerType?: "B2C" | "B2B";
   serviceType: string;
   description: string;
@@ -42,7 +132,7 @@ export interface JobCard {
   startTime?: string;
   createdAt: string;
   completedAt?: string;
-  parts: string[];
+  parts: string[]; // Legacy field for backward compatibility
   location: ServiceLocation;
   quotationId?: string;
   workflowState?: JobCardStatus;
@@ -56,20 +146,26 @@ export interface JobCard {
   partRequests?: string[];
   technicianNotes?: string;
   workCompletionNotified?: boolean;
-  // Insurance details
+  // Insurance details (legacy)
   hasInsurance?: boolean;
   insurerName?: string;
   insurerAddress?: string;
   insurerGstNumber?: string;
   // Part pending status
   partsPending?: boolean;
-  // Warranty information
+  // Warranty information (legacy)
   warrantyStatus?: string;
   warrantyDetails?: string;
   sourceAppointmentId?: number;
   isTemporary?: boolean;
   customerArrivalTimestamp?: string;
   draftIntake?: Record<string, any>;
+  
+  // NEW STRUCTURED DATA (PART 1, PART 2, PART 2A, PART 3)
+  part1?: JobCardPart1; // Customer & Vehicle Information
+  part2?: JobCardPart2Item[]; // Parts & Work Items List
+  part2A?: JobCardPart2A; // Warranty / Insurance Case Details (only if applicable)
+  part3?: JobCardPart3; // Part Requisition & Issue Details
 }
 
 export interface KanbanColumn {

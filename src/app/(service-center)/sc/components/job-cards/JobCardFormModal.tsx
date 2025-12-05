@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { PlusCircle, Loader2, X } from "lucide-react";
+import { PlusCircle, Loader2, X, Plus, Trash2, Edit2 } from "lucide-react";
 
 import type { JobCard, Priority, ServiceLocation } from "@/shared/types";
 import { availableParts } from "@/__mocks__/data/job-cards.mock";
@@ -9,8 +9,12 @@ import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { createPartsRequestFromJobCard } from "@/shared/utils/jobCardPartsRequest.util";
+import { populateJobCardPart1, createEmptyJobCardPart1, generateSrNoForPart2Items } from "@/shared/utils/jobCardData.util";
+import { customerService } from "@/services/customers/customer.service";
+import type { JobCardPart2Item } from "@/shared/types/job-card.types";
 
 export type CreateJobCardForm = {
+  // Basic fields
   vehicleId: string;
   customerId: string;
   customerName: string;
@@ -25,6 +29,29 @@ export type CreateJobCardForm = {
   estimatedTime: string;
   priority: Priority;
   selectedParts: string[];
+  
+  // PART 2 items
+  part2Items: JobCardPart2Item[];
+  
+  // PART 1 fields
+  fullName: string;
+  mobilePrimary: string;
+  customerType: "B2C" | "B2B" | "";
+  vehicleBrand: string;
+  vinChassisNumber: string;
+  variantBatteryCapacity: string;
+  warrantyStatus: string;
+  estimatedDeliveryDate: string;
+  customerAddress: string;
+  customerFeedback: string;
+  technicianObservation: string;
+  insuranceStartDate: string;
+  insuranceEndDate: string;
+  insuranceCompanyName: string;
+  batterySerialNumber: string;
+  mcuSerialNumber: string;
+  vcuSerialNumber: string;
+  otherPartSerialNumber: string;
 };
 
 export const INITIAL_JOB_CARD_FORM: CreateJobCardForm = {
@@ -42,6 +69,26 @@ export const INITIAL_JOB_CARD_FORM: CreateJobCardForm = {
   estimatedTime: "",
   priority: "Normal",
   selectedParts: [],
+  part2Items: [],
+  // PART 1 fields
+  fullName: "",
+  mobilePrimary: "",
+  customerType: "",
+  vehicleBrand: "",
+  vinChassisNumber: "",
+  variantBatteryCapacity: "",
+  warrantyStatus: "",
+  estimatedDeliveryDate: "",
+  customerAddress: "",
+  customerFeedback: "",
+  technicianObservation: "",
+  insuranceStartDate: "",
+  insuranceEndDate: "",
+  insuranceCompanyName: "",
+  batterySerialNumber: "",
+  mcuSerialNumber: "",
+  vcuSerialNumber: "",
+  otherPartSerialNumber: "",
 };
 
 const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
@@ -70,7 +117,16 @@ export default function JobCardFormModal({
     ...(initialValues ?? {}),
   });
   const [creating, setCreating] = useState(false);
+  const [previewJobCardNumber, setPreviewJobCardNumber] = useState<string>("");
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
+
+  useEffect(() => {
+    if (open) {
+      const serviceCenterId = String(serviceCenterContext.serviceCenterId ?? "1");
+      const serviceCenterCode = SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
+      setPreviewJobCardNumber(generateJobCardNumber(serviceCenterCode));
+    }
+  }, [open, serviceCenterContext.serviceCenterId]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,10 +136,54 @@ export default function JobCardFormModal({
     });
   }, [initialValues, open]);
 
+  // Auto-populate form when customer/vehicle data is available
+  useEffect(() => {
+    if (form.customerId && form.vehicleId && open) {
+      const fetchAndPopulate = async () => {
+        try {
+          const customerData = await customerService.getById(form.customerId);
+          if (customerData.vehicles) {
+            const vehicleData = customerData.vehicles.find(
+              (v) => v.id === form.vehicleId || v.id === form.vehicleId.toString()
+            );
+            if (vehicleData) {
+              setForm((prev) => ({
+                ...prev,
+                fullName: prev.fullName || customerData.name,
+                mobilePrimary: prev.mobilePrimary || customerData.phone,
+                customerType: (prev.customerType || customerData.customerType || "") as "B2C" | "B2B" | "",
+                vehicleBrand: prev.vehicleBrand || vehicleData.vehicleMake,
+                vehicleModel: prev.vehicleModel || vehicleData.vehicleModel,
+                vehicleRegistration: prev.vehicleRegistration || vehicleData.registration,
+                vinChassisNumber: prev.vinChassisNumber || vehicleData.vin,
+                customerAddress: prev.customerAddress || customerData.address || "",
+              }));
+            }
+          }
+        } catch (err) {
+          console.warn("Could not auto-populate customer/vehicle data:", err);
+        }
+      };
+      fetchAndPopulate();
+    }
+  }, [form.customerId, form.vehicleId, open]);
+
   const resetForm = () => {
     setForm({
       ...INITIAL_JOB_CARD_FORM,
       ...(initialValues ?? {}),
+    });
+    setEditingPart2Index(null);
+    setNewPart2Item({
+      partWarrantyTag: "",
+      partName: "",
+      partCode: "",
+      qty: 1,
+      amount: 0,
+      technician: "",
+      labourCode: "",
+      itemType: "part",
+      description: "",
     });
   };
 
@@ -93,6 +193,149 @@ export default function JobCardFormModal({
       selectedParts: prev.selectedParts.includes(partName)
         ? prev.selectedParts.filter((part) => part !== partName)
         : [...prev.selectedParts, partName],
+    }));
+  };
+
+  // PART 2 Item Management
+  const [editingPart2Index, setEditingPart2Index] = useState<number | null>(null);
+  const [newPart2Item, setNewPart2Item] = useState<Partial<JobCardPart2Item> & { description?: string }>({
+    partWarrantyTag: "",
+    partName: "",
+    partCode: "",
+    qty: 1,
+    amount: 0,
+    technician: "",
+    labourCode: "",
+    itemType: "part",
+    description: "",
+  });
+
+  // Extract part code from description (alphanumeric prefix before dash/comma)
+  const extractPartCode = (description: string): string => {
+    const match = description.match(/^([A-Z0-9_]+)/i);
+    return match ? match[1] : "";
+  };
+
+  // Extract part name from description (clean name after dash/comma)
+  const extractPartName = (description: string): string => {
+    // Remove part code prefix and clean up
+    let cleaned = description.replace(/^[A-Z0-9_]+[-_]\s*/i, ""); // Remove code prefix
+    cleaned = cleaned.split(/[-–—,]/)[0].trim(); // Take first part before dash/comma
+    // Capitalize first letter of each word
+    return cleaned
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Extract labour code from work item description
+  const extractLabourCode = (description: string): string => {
+    const labourMatch = description.match(/labour[:\s-]+(r\s*&\s*r|r\s+and\s+r|.+)/i);
+    if (labourMatch) {
+      return labourMatch[1].trim();
+    }
+    return "R & R"; // Default
+  };
+
+  const handleAddPart2Item = () => {
+    if (!newPart2Item.partName || !newPart2Item.partCode) {
+      onError?.("Please enter Part Name and Part Code.");
+      return;
+    }
+
+    const item: JobCardPart2Item = {
+      srNo: form.part2Items.length + 1,
+      partWarrantyTag: newPart2Item.partWarrantyTag || "",
+      partName: newPart2Item.partName,
+      partCode: newPart2Item.partCode,
+      qty: newPart2Item.qty || 1,
+      amount: newPart2Item.amount || 0,
+      technician: newPart2Item.technician || "",
+      labourCode: newPart2Item.itemType === "work_item" 
+        ? (newPart2Item.labourCode || extractLabourCode(newPart2Item.partName))
+        : "Auto Select With Part",
+      itemType: newPart2Item.itemType || "part",
+    };
+
+    setForm((prev) => ({
+      ...prev,
+      part2Items: [...prev.part2Items, item],
+    }));
+
+    // Reset new item form
+    setNewPart2Item({
+      partWarrantyTag: "",
+      partName: "",
+      partCode: "",
+      qty: 1,
+      amount: 0,
+      technician: "",
+      labourCode: "",
+      itemType: "part",
+      description: "",
+    });
+  };
+
+  const handleUpdatePart2Item = (index: number) => {
+    const updatedItems = [...form.part2Items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      ...newPart2Item,
+      labourCode: newPart2Item.itemType === "work_item"
+        ? (newPart2Item.labourCode || extractLabourCode(newPart2Item.partName || ""))
+        : "Auto Select With Part",
+    };
+    
+    setForm((prev) => ({
+      ...prev,
+      part2Items: generateSrNoForPart2Items(updatedItems),
+    }));
+    
+    setEditingPart2Index(null);
+    setNewPart2Item({
+      partWarrantyTag: "",
+      partName: "",
+      partCode: "",
+      qty: 1,
+      amount: 0,
+      technician: "",
+      labourCode: "",
+      itemType: "part",
+      description: "",
+    });
+  };
+
+  const handleDeletePart2Item = (index: number) => {
+    const updatedItems = form.part2Items.filter((_, i) => i !== index);
+    setForm((prev) => ({
+      ...prev,
+      part2Items: generateSrNoForPart2Items(updatedItems),
+    }));
+  };
+
+  const handleEditPart2Item = (index: number) => {
+    const item = form.part2Items[index];
+    setNewPart2Item({
+      partWarrantyTag: item.partWarrantyTag,
+      partName: item.partName,
+      partCode: item.partCode,
+      qty: item.qty,
+      amount: item.amount,
+      technician: item.technician,
+      labourCode: item.labourCode,
+      itemType: item.itemType,
+    });
+    setEditingPart2Index(index);
+  };
+
+  const handlePart2DescriptionChange = (description: string) => {
+    const partCode = extractPartCode(description);
+    const partName = extractPartName(description);
+    setNewPart2Item((prev) => ({
+      ...prev,
+      partCode: partCode || prev.partCode,
+      partName: partName || prev.partName,
+      description: description,
     }));
   };
 
@@ -133,6 +376,73 @@ export default function JobCardFormModal({
       const serviceCenterCode =
         SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
       const jobCardNumber = generateJobCardNumber(serviceCenterCode);
+
+      // Try to fetch customer and vehicle data to populate PART 1
+      let customerData = null;
+      let vehicleData = null;
+      
+      if (form.customerId) {
+        try {
+          customerData = await customerService.getById(form.customerId);
+          if (form.vehicleId && customerData.vehicles) {
+            vehicleData = customerData.vehicles.find((v) => v.id === form.vehicleId || v.id === form.vehicleId.toString());
+          }
+        } catch (err) {
+          console.warn("Could not fetch customer data:", err);
+          // Continue with basic data
+        }
+      }
+
+      // Populate PART 1 from customer/vehicle data or use form data
+      const part1 = customerData && vehicleData
+        ? populateJobCardPart1(
+            customerData,
+            vehicleData,
+            jobCardNumber,
+            {
+              customerFeedback: form.customerFeedback || form.description,
+              technicianObservation: form.technicianObservation,
+              insuranceStartDate: form.insuranceStartDate,
+              insuranceEndDate: form.insuranceEndDate,
+              insuranceCompanyName: form.insuranceCompanyName,
+              batterySerialNumber: form.batterySerialNumber,
+              mcuSerialNumber: form.mcuSerialNumber,
+              vcuSerialNumber: form.vcuSerialNumber,
+              otherPartSerialNumber: form.otherPartSerialNumber,
+              variantBatteryCapacity: form.variantBatteryCapacity,
+              warrantyStatus: form.warrantyStatus,
+              estimatedDeliveryDate: form.estimatedDeliveryDate,
+            }
+          )
+        : createEmptyJobCardPart1(jobCardNumber);
+
+      // Populate PART 1 from form fields
+      part1.fullName = form.fullName || form.customerName;
+      part1.mobilePrimary = form.mobilePrimary;
+      part1.customerType = form.customerType as "B2C" | "B2B" | "";
+      part1.vehicleBrand = form.vehicleBrand || form.vehicleMake;
+      part1.vehicleModel = form.vehicleModel;
+      part1.registrationNumber = form.vehicleRegistration;
+      part1.vinChassisNumber = form.vinChassisNumber;
+      part1.variantBatteryCapacity = form.variantBatteryCapacity;
+      part1.warrantyStatus = form.warrantyStatus;
+      part1.estimatedDeliveryDate = form.estimatedDeliveryDate;
+      part1.customerAddress = form.customerAddress;
+      part1.customerFeedback = form.customerFeedback || form.description;
+      part1.technicianObservation = form.technicianObservation;
+      part1.insuranceStartDate = form.insuranceStartDate;
+      part1.insuranceEndDate = form.insuranceEndDate;
+      part1.insuranceCompanyName = form.insuranceCompanyName;
+      part1.batterySerialNumber = form.batterySerialNumber;
+      part1.mcuSerialNumber = form.mcuSerialNumber;
+      part1.vcuSerialNumber = form.vcuSerialNumber;
+      part1.otherPartSerialNumber = form.otherPartSerialNumber;
+
+      // Use PART 2 items from form (or convert selected parts if no PART 2 items)
+      const part2 = form.part2Items.length > 0
+        ? generateSrNoForPart2Items(form.part2Items)
+        : [];
+
       const newJobCard: JobCard = {
         id: `JC-${Date.now()}`,
         jobCardNumber,
@@ -145,7 +455,7 @@ export default function JobCardFormModal({
         registration: form.vehicleRegistration,
         vehicleMake: form.vehicleMake,
         vehicleModel: form.vehicleModel,
-        customerType: "B2C",
+        customerType: customerData?.customerType || "B2C",
         serviceType: form.serviceType,
         description: form.description,
         status: "Created",
@@ -156,10 +466,13 @@ export default function JobCardFormModal({
           : "₹0",
         estimatedTime: form.estimatedTime,
         createdAt: new Date().toISOString(),
-        parts: form.selectedParts,
+        parts: form.selectedParts, // Legacy field for backward compatibility
         location: form.location,
         serviceCenterName:
           serviceCenterContext.serviceCenterName || "Service Center",
+        // NEW STRUCTURED DATA
+        part1,
+        part2,
       };
 
       const existingJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
@@ -186,9 +499,12 @@ export default function JobCardFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Create Job Card</h2>
+      <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[95vh] overflow-y-auto p-6">
+        <div className="flex items-center justify-between mb-6 border-b pb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Create Job Card</h2>
+            <p className="text-sm text-gray-500 mt-1">Fill in customer and vehicle information</p>
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -201,222 +517,666 @@ export default function JobCardFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Customer Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.customerName}
-                onChange={(e) => setForm({ ...form, customerName: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                required
-                placeholder="Enter or search customer"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Vehicle Registration
-              </label>
-              <input
-                type="text"
-                value={form.vehicleRegistration}
-                onChange={(e) =>
-                  setForm({ ...form, vehicleRegistration: e.target.value })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="PB10AB1234"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Vehicle Make
-              </label>
-              <input
-                type="text"
-                value={form.vehicleMake}
-                onChange={(e) => setForm({ ...form, vehicleMake: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="Honda"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Vehicle Model
-              </label>
-              <input
-                type="text"
-                value={form.vehicleModel}
-                onChange={(e) => setForm({ ...form, vehicleModel: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="City"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Service Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={form.serviceType}
-                onChange={(e) => setForm({ ...form, serviceType: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                required
-              >
-                <option value="">Select Service Type</option>
-                {SERVICE_TYPE_OPTIONS.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Service Location <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={form.location}
-                onChange={(e) =>
-                  setForm({ ...form, location: e.target.value as ServiceLocation })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                required
-              >
-                <option value="Station">Station</option>
-                <option value="Home Service">Home Service</option>
-              </select>
-            </div>
-            {form.location === "Home Service" && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Home Address
-                </label>
-                <textarea
-                  value={form.homeAddress}
-                  onChange={(e) => setForm({ ...form, homeAddress: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  rows={2}
-                  placeholder="Enter pick-up or service address"
-                />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* PART 1: CUSTOMER & VEHICLE INFORMATION */}
+          <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">1</span>
+              Customer & Vehicle Information
+            </h3>
+            
+            {/* TOP RIGHT: Job Card Number (will be auto-generated) */}
+            <div className="mb-4 flex justify-end">
+              <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg font-semibold text-sm">
+                Job Card: {previewJobCardNumber || "Generating..."}
               </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estimated Cost (₹)
-              </label>
-              <input
-                type="text"
-                value={form.estimatedCost}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    estimatedCost: e.target.value.replace(/[^0-9]/g, ""),
-                  })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="3500"
-              />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estimated Time
-              </label>
-              <input
-                type="text"
-                value={form.estimatedTime}
-                onChange={(e) => setForm({ ...form, estimatedTime: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="2 hours"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Priority
-              </label>
-              <select
-                value={form.priority}
-                onChange={(e) =>
-                  setForm({ ...form, priority: e.target.value as Priority })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="Low">Low</option>
-                <option value="Normal">Normal</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
-              </select>
-            </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              rows={4}
-              placeholder="Describe the service needed..."
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Required Parts
-            </label>
-            <div className="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
-              {availableParts.length === 0 ? (
-                <p className="text-sm text-gray-500">No parts available</p>
-              ) : (
-                <div className="space-y-2">
-                  {availableParts.map((part) => (
-                    <label
-                      key={part.id}
-                      className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.selectedParts.includes(part.name)}
-                        onChange={() => togglePartSelection(part.name)}
-                        className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">{part.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {part.sku} • Qty: {part.availableQty} • {part.unitPrice}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* LEFT SIDE */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Customer & Vehicle Details</h4>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.fullName || form.customerName}
+                    onChange={(e) => setForm({ ...form, fullName: e.target.value, customerName: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    required
+                    placeholder="Enter customer full name"
+                  />
                 </div>
-              )}
-            </div>
-            {form.selectedParts.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {form.selectedParts.map((part) => (
-                  <span
-                    key={part}
-                    className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1"
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mobile Number (Primary) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={form.mobilePrimary}
+                    onChange={(e) => setForm({ ...form, mobilePrimary: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    required
+                    placeholder="9876543210"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Customer Type
+                  </label>
+                  <select
+                    value={form.customerType}
+                    onChange={(e) => setForm({ ...form, customerType: e.target.value as "B2C" | "B2B" | "" })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
-                    {part}
+                    <option value="">Select Type</option>
+                    <option value="B2C">B2C</option>
+                    <option value="B2B">B2B</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vehicle Brand <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.vehicleBrand || form.vehicleMake}
+                    onChange={(e) => setForm({ ...form, vehicleBrand: e.target.value, vehicleMake: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    required
+                    placeholder="Honda"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vehicle Model <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.vehicleModel}
+                    onChange={(e) => setForm({ ...form, vehicleModel: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    required
+                    placeholder="City"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Registration Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.vehicleRegistration}
+                    onChange={(e) => setForm({ ...form, vehicleRegistration: e.target.value.toUpperCase() })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    required
+                    placeholder="PB10AB1234"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    VIN / Chassis Number
+                  </label>
+                  <input
+                    type="text"
+                    value={form.vinChassisNumber}
+                    onChange={(e) => setForm({ ...form, vinChassisNumber: e.target.value.toUpperCase() })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="MH12AB3456CD7890"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Variant / Battery Capacity
+                  </label>
+                  <input
+                    type="text"
+                    value={form.variantBatteryCapacity}
+                    onChange={(e) => setForm({ ...form, variantBatteryCapacity: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g., 50kWh"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Warranty Status
+                  </label>
+                  <input
+                    type="text"
+                    value={form.warrantyStatus}
+                    onChange={(e) => setForm({ ...form, warrantyStatus: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g., Active, Expired"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estimated Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.estimatedDeliveryDate}
+                    onChange={(e) => setForm({ ...form, estimatedDeliveryDate: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* RIGHT SIDE */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Address & Additional Information</h4>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Customer Address
+                  </label>
+                  <textarea
+                    value={form.customerAddress}
+                    onChange={(e) => setForm({ ...form, customerAddress: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    rows={3}
+                    placeholder="Enter complete customer address"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Customer Feedback / Concerns <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={form.customerFeedback || form.description}
+                    onChange={(e) => setForm({ ...form, customerFeedback: e.target.value, description: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    rows={4}
+                    required
+                    placeholder="Describe customer concerns or feedback..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Technician Observation
+                  </label>
+                  <textarea
+                    value={form.technicianObservation}
+                    onChange={(e) => setForm({ ...form, technicianObservation: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    rows={3}
+                    placeholder="Technician observations and notes..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Insurance Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={form.insuranceStartDate}
+                      onChange={(e) => setForm({ ...form, insuranceStartDate: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Insurance End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={form.insuranceEndDate}
+                      onChange={(e) => setForm({ ...form, insuranceEndDate: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Insurance Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={form.insuranceCompanyName}
+                    onChange={(e) => setForm({ ...form, insuranceCompanyName: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Insurance company name"
+                  />
+                </div>
+
+                {/* MANDATORY SERIAL DATA */}
+                <div className="border-t pt-4 mt-4">
+                  <h5 className="text-sm font-semibold text-gray-700 mb-3">Serial Numbers (if applicable)</h5>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Battery Serial Number
+                      </label>
+                      <input
+                        type="text"
+                        value={form.batterySerialNumber}
+                        onChange={(e) => setForm({ ...form, batterySerialNumber: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        placeholder="BAT-XXX"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        MCU Serial Number
+                      </label>
+                      <input
+                        type="text"
+                        value={form.mcuSerialNumber}
+                        onChange={(e) => setForm({ ...form, mcuSerialNumber: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        placeholder="MCU-XXX"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        VCU Serial Number
+                      </label>
+                      <input
+                        type="text"
+                        value={form.vcuSerialNumber}
+                        onChange={(e) => setForm({ ...form, vcuSerialNumber: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        placeholder="VCU-XXX"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Other Part Serial Number
+                      </label>
+                      <input
+                        type="text"
+                        value={form.otherPartSerialNumber}
+                        onChange={(e) => setForm({ ...form, otherPartSerialNumber: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        placeholder="PART-XXX"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* PART 2: PARTS & WORK ITEMS LIST */}
+          <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">2</span>
+              Parts & Work Items List
+            </h3>
+
+            {/* Add New Item Form */}
+            <div className="bg-white rounded-lg p-4 mb-4 border border-gray-300">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                {editingPart2Index !== null ? "Edit Item" : "Add New Item"}
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Item Description <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newPart2Item.description || `${newPart2Item.partCode || ""} - ${newPart2Item.partName || ""}`}
+                    onChange={(e) => {
+                      handlePart2DescriptionChange(e.target.value);
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g., 2W0000000027_011 - Front Fender"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Part Warranty Tag
+                  </label>
+                  <input
+                    type="text"
+                    value={newPart2Item.partWarrantyTag || ""}
+                    onChange={(e) => setNewPart2Item({ ...newPart2Item, partWarrantyTag: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g., RQL251113259818"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Item Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newPart2Item.itemType || "part"}
+                    onChange={(e) => {
+                      const itemType = e.target.value as "part" | "work_item";
+                      setNewPart2Item({
+                        ...newPart2Item,
+                        itemType,
+                        labourCode: itemType === "part" ? "Auto Select With Part" : newPart2Item.labourCode || "",
+                      });
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="part">Part</option>
+                    <option value="work_item">Work Item</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Part Code
+                  </label>
+                  <input
+                    type="text"
+                    value={newPart2Item.partCode || ""}
+                    onChange={(e) => setNewPart2Item({ ...newPart2Item, partCode: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g., 2W0000000027_011"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Part Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newPart2Item.partName || ""}
+                    onChange={(e) => setNewPart2Item({ ...newPart2Item, partName: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g., Front Fender"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    QTY <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newPart2Item.qty || 1}
+                    onChange={(e) => setNewPart2Item({ ...newPart2Item, qty: parseInt(e.target.value) || 1 })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newPart2Item.amount || 0}
+                    onChange={(e) => setNewPart2Item({ ...newPart2Item, amount: parseFloat(e.target.value) || 0 })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Technician
+                  </label>
+                  <input
+                    type="text"
+                    value={newPart2Item.technician || ""}
+                    onChange={(e) => setNewPart2Item({ ...newPart2Item, technician: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Technician name"
+                  />
+                </div>
+                {newPart2Item.itemType === "work_item" && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Labour Code
+                    </label>
+                    <input
+                      type="text"
+                      value={newPart2Item.labourCode || ""}
+                      onChange={(e) => setNewPart2Item({ ...newPart2Item, labourCode: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      placeholder="e.g., R & R"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 mt-4">
+                {editingPart2Index !== null ? (
+                  <>
                     <button
                       type="button"
-                      onClick={() => togglePartSelection(part)}
-                      className="text-indigo-600 hover:text-indigo-900"
+                      onClick={() => handleUpdatePart2Item(editingPart2Index)}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
                     >
-                      <X size={12} />
+                      Update Item
                     </button>
-                  </span>
-                ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingPart2Index(null);
+                        setNewPart2Item({
+                          partWarrantyTag: "",
+                          partName: "",
+                          partCode: "",
+                          qty: 1,
+                          amount: 0,
+                          technician: "",
+                          labourCode: "",
+                          itemType: "part",
+                        });
+                      }}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAddPart2Item}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition inline-flex items-center gap-2"
+                  >
+                    <Plus size={16} />
+                    Add Item
+                  </button>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* PART 2 Items Table */}
+            <div className="bg-white rounded-lg border border-gray-300 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 border-b border-gray-300">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">SR NO</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Warranty Tag</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Part Name</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Part Code</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">QTY</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Amount</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Technician</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Labour Code</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Type</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.part2Items.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="px-3 py-8 text-center text-gray-500">
+                          No items added yet. Add items using the form above.
+                        </td>
+                      </tr>
+                    ) : (
+                      form.part2Items.map((item, index) => (
+                        <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                          <td className="px-3 py-2 text-gray-700 font-medium">{item.srNo}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.partWarrantyTag || "-"}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.partName}</td>
+                          <td className="px-3 py-2 text-gray-700 font-mono text-xs">{item.partCode}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.qty}</td>
+                          <td className="px-3 py-2 text-gray-700">₹{item.amount.toLocaleString("en-IN")}</td>
+                          <td className="px-3 py-2 text-gray-700">{item.technician || "-"}</td>
+                          <td className="px-3 py-2 text-gray-700">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              item.itemType === "work_item" 
+                                ? "bg-blue-100 text-blue-700" 
+                                : "bg-gray-100 text-gray-600"
+                            }`}>
+                              {item.labourCode}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              item.itemType === "part"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-purple-100 text-purple-700"
+                            }`}>
+                              {item.itemType === "part" ? "Part" : "Work Item"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleEditPart2Item(index)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition"
+                                title="Edit"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePart2Item(index)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded transition"
+                                title="Delete"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          {/* Service Details */}
+          <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Service Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Service Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.serviceType}
+                  onChange={(e) => setForm({ ...form, serviceType: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  required
+                >
+                  <option value="">Select Service Type</option>
+                  {SERVICE_TYPE_OPTIONS.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Service Location <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.location}
+                  onChange={(e) =>
+                    setForm({ ...form, location: e.target.value as ServiceLocation })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  required
+                >
+                  <option value="Station">Station</option>
+                  <option value="Home Service">Home Service</option>
+                </select>
+              </div>
+              {form.location === "Home Service" && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Home Address
+                  </label>
+                  <textarea
+                    value={form.homeAddress}
+                    onChange={(e) => setForm({ ...form, homeAddress: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    rows={2}
+                    placeholder="Enter pick-up or service address"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estimated Cost (₹)
+                </label>
+                <input
+                  type="text"
+                  value={form.estimatedCost}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      estimatedCost: e.target.value.replace(/[^0-9]/g, ""),
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="3500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estimated Time
+                </label>
+                <input
+                  type="text"
+                  value={form.estimatedTime}
+                  onChange={(e) => setForm({ ...form, estimatedTime: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="2 hours"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  value={form.priority}
+                  onChange={(e) =>
+                    setForm({ ...form, priority: e.target.value as Priority })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Normal">Normal</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <button
               type="button"
               onClick={() => {

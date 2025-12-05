@@ -1,6 +1,6 @@
 "use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { useState, useEffect, useMemo, FormEvent } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -29,7 +29,6 @@ import {
 import { useRole } from "@/shared/hooks";
 import type { JobCard, JobCardStatus, Priority, KanbanColumn, ServiceLocation } from "@/shared/types";
 import {
-  availableParts,
   defaultJobCards,
   engineers as engineersList,
   type Engineer,
@@ -41,8 +40,8 @@ import {
   shouldFilterByServiceCenter,
 } from "@/shared/lib/serviceCenter";
 
-import type { CreateJobCardForm } from "../components/job-cards/JobCardFormModal";
-import { INITIAL_JOB_CARD_FORM } from "../components/job-cards/JobCardFormModal";
+import JobCardFormModal from "../components/job-cards/JobCardFormModal";
+import type { JobCard as JobCardType } from "@/shared/types";
 
 const SERVICE_TYPES = SERVICE_TYPE_OPTIONS;
 const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
@@ -101,22 +100,6 @@ export default function JobCards() {
   const shouldFilterJobCards = shouldFilterByServiceCenter(serviceCenterContext);
 
   const [engineers] = useState<Engineer[]>(engineersList);
-  const [createForm, setCreateForm] = useState<CreateJobCardForm>({
-    ...INITIAL_JOB_CARD_FORM,
-  });
-
-  const resetCreateForm = () => {
-    setCreateForm({ ...INITIAL_JOB_CARD_FORM });
-  };
-
-  const togglePartSelection = (partName: string) => {
-    setCreateForm((prev) => ({
-      ...prev,
-      selectedParts: prev.selectedParts.includes(partName)
-        ? prev.selectedParts.filter((part) => part !== partName)
-        : [...prev.selectedParts, partName],
-    }));
-  };
 
   const handlePartRequestSubmit = () => {
     if (!selectedJob) {
@@ -221,61 +204,15 @@ export default function JobCards() {
     return `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
   };
 
-  const handleCreateSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!createForm.customerName || !createForm.serviceType || !createForm.description) {
-      alert("Please fill in all required fields.");
-      return;
-    }
+  const handleJobCardCreated = (newJobCard: JobCardType) => {
+    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    safeStorage.setItem("jobCards", [newJobCard, ...storedJobCards]);
+    setJobCards((prev) => [newJobCard, ...prev]);
+    setShowCreateModal(false);
+  };
 
-    try {
-      setLoading(true);
-      const serviceCenterId = String(serviceCenterContext.serviceCenterId ?? "1");
-      const serviceCenterCode =
-        SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
-      const jobCardNumber = generateJobCardNumber(serviceCenterCode);
-      const newJobCard: JobCard = {
-        id: `JC-${Date.now()}`,
-        jobCardNumber,
-        serviceCenterId,
-        serviceCenterCode,
-        customerId: createForm.customerId || `customer-${Date.now()}`,
-        customerName: createForm.customerName,
-        vehicleId: createForm.vehicleId,
-        vehicle:
-          `${createForm.vehicleMake} ${createForm.vehicleModel}`.trim() ||
-          createForm.vehicleRegistration ||
-          createForm.vehicleModel ||
-          createForm.vehicleMake,
-        registration: createForm.vehicleRegistration,
-        vehicleMake: createForm.vehicleMake,
-        vehicleModel: createForm.vehicleModel,
-        customerType: "B2C",
-        serviceType: createForm.serviceType,
-        description: createForm.description,
-        status: "Created",
-        priority: createForm.priority,
-        assignedEngineer: null,
-        estimatedCost: createForm.estimatedCost
-          ? `₹${parseFloat(createForm.estimatedCost).toLocaleString("en-IN")}`
-          : "₹0",
-        estimatedTime: createForm.estimatedTime,
-        createdAt: new Date().toISOString(),
-        parts: createForm.selectedParts,
-        location: createForm.location,
-        serviceCenterName: serviceCenterContext.serviceCenterName || "Service Center",
-      };
-      const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-      safeStorage.setItem("jobCards", [newJobCard, ...storedJobCards]);
-      setJobCards((prev) => [newJobCard, ...prev]);
-      resetCreateForm();
-      setShowCreateModal(false);
-    } catch (error) {
-      console.error("Error creating job card:", error);
-      alert("Failed to create job card. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+  const handleJobCardError = (message: string) => {
+    alert(message);
   };
 
 
@@ -1175,263 +1112,13 @@ export default function JobCards() {
         </div>
       )}
 
-      {/* Create Job Card Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Create Job Card</h2>
-              <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  resetCreateForm();
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Customer Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.customerName}
-                    onChange={(e) => setCreateForm({ ...createForm, customerName: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
-                    placeholder="Search vehicle to auto-fill"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Vehicle Registration
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.vehicleRegistration}
-                    onChange={(e) => setCreateForm({ ...createForm, vehicleRegistration: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="PB10AB1234"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Vehicle Make
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.vehicleMake}
-                    onChange={(e) => setCreateForm({ ...createForm, vehicleMake: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="Honda"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Vehicle Model
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.vehicleModel}
-                    onChange={(e) => setCreateForm({ ...createForm, vehicleModel: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="City"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Service Type <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={createForm.serviceType}
-                    onChange={(e) => setCreateForm({ ...createForm, serviceType: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
-                  >
-                    <option value="">Select Service Type</option>
-                    {SERVICE_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Service Location <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={createForm.location}
-                    onChange={(e) => setCreateForm({ ...createForm, location: e.target.value as ServiceLocation })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
-                  >
-                    <option value="Station">Station</option>
-                    <option value="Home Service">Home Service</option>
-                  </select>
-                </div>
-                {createForm.location === "Home Service" && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Home Address
-                    </label>
-                    <textarea
-                      value={createForm.homeAddress}
-                      onChange={(e) => setCreateForm({ ...createForm, homeAddress: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      rows={2}
-                      placeholder="Enter complete address"
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estimated Cost (₹)
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.estimatedCost}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9]/g, "");
-                      setCreateForm({ ...createForm, estimatedCost: value });
-                    }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="3500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estimated Time
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.estimatedTime}
-                    onChange={(e) => setCreateForm({ ...createForm, estimatedTime: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="2 hours"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Priority
-                  </label>
-                  <select
-                    value={createForm.priority}
-                    onChange={(e) => setCreateForm({ ...createForm, priority: e.target.value as Priority })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Normal">Normal</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  rows={4}
-                  placeholder="Describe the service required..."
-                  required
-                />
-              </div>
-
-              {/* Parts Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Required Parts
-                </label>
-                <div className="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
-                  {availableParts.length === 0 ? (
-                    <p className="text-sm text-gray-500">No parts available</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {availableParts.map((part) => (
-                        <label
-                          key={part.id}
-                          className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={createForm.selectedParts.includes(part.name)}
-                            onChange={() => togglePartSelection(part.name)}
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                          />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-700">{part.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {part.sku} • Qty: {part.availableQty} • {part.unitPrice}
-                            </p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {createForm.selectedParts.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {createForm.selectedParts.map((part) => (
-                      <span
-                        key={part}
-                        className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1"
-                      >
-                        {part}
-                        <button
-                          type="button"
-                          onClick={() => togglePartSelection(part)}
-                          className="hover:text-blue-900"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 justify-end pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    resetCreateForm();
-                  }}
-                  className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-200 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-2 rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50 inline-flex items-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <PlusCircle size={16} />
-                      Create Job Card
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Create Job Card Modal - Using the updated JobCardFormModal component */}
+      <JobCardFormModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={handleJobCardCreated}
+        onError={handleJobCardError}
+      />
 
       {/* Assign Engineer Modal */}
       {showAssignEngineerModal && assigningJobId && (
