@@ -29,7 +29,6 @@ export const SC_MENU_ITEMS: Record<UserRole, MenuItem[]> = {
     { name: "Vehicle Search", icon: Search, href: "/sc/vehicle-search" },
     { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
     { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
-    { name: "Advisor Job Cards", icon: ClipboardList, href: "/sc/advisor-job-cards" },
     { name: "Workshop", icon: Wrench, href: "/sc/workshop" },
     { name: "Inventory", icon: Package, href: "/sc/inventory" },
     { name: "OTC Orders", icon: ShoppingCart, href: "/sc/otc-orders" },

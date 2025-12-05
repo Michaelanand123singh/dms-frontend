@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, startTransition } from "react";
 import { partsMasterService } from "@/services/inventory/partsMaster.service";
 import { partsOrderService } from "@/services/inventory/partsOrder.service";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -18,11 +18,6 @@ export default function PartsOrderEntryPage() {
   });
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
 
-  useEffect(() => {
-    initializeInventoryMockData();
-    fetchParts();
-  }, []);
-
   const fetchParts = async () => {
     try {
       const data = await partsMasterService.getAll();
@@ -31,6 +26,13 @@ export default function PartsOrderEntryPage() {
       console.error("Failed to fetch parts:", error);
     }
   };
+
+  useEffect(() => {
+    initializeInventoryMockData();
+    startTransition(() => {
+      fetchParts();
+    });
+  }, []);
 
   const handlePartSelect = (partId: string) => {
     const part = parts.find((p) => p.id === partId);

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Home,
   Search,
@@ -44,7 +44,6 @@ const roleMenus: Record<UserRole, MenuItem[]> = {
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
     { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
     { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
-    { name: "Advisor Job Cards", icon: ClipboardList, href: "/sc/advisor-job-cards" },
     { name: "Workshop", icon: Wrench, href: "/sc/workshop" },
     { name: "Inventory", icon: Package, href: "/sc/inventory" },
     { name: "OTC Orders", icon: ShoppingCart, href: "/sc/otc-orders" },
@@ -96,8 +95,12 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userInfo, userRole, isLoading } = useRole();
-  // Use lazy initializer to check if we're on the client side
-  const [isMounted] = useState(() => typeof window !== "undefined");
+  // Track if component has mounted to avoid hydration mismatch
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Use role from hook (most reliable) - it reads directly from localStorage
   // Use consistent role during SSR to avoid hydration mismatch
