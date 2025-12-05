@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Search,
   Car,
@@ -23,9 +23,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import type { SearchType, Vehicle, ServiceHistoryItem, NewVehicleForm } from "@/shared/types";
-import { defaultVehicles, defaultVehicleServiceHistory } from "@/__mocks__/data/vehicles.mock";
+import type { SearchType, Vehicle, ServiceHistoryItem, NewVehicleForm, CustomerWithVehicles } from "@/shared/types";
+import { defaultVehicles, defaultVehicleServiceHistory, vehiclesData, type VehicleData } from "@/__mocks__/data/vehicles.mock";
 import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
+import { InfoCard, CustomerInfoCard } from "../components/shared/InfoComponents";
 
 export default function VehicleSearch() {
   const [searchType, setSearchType] = useState<SearchType>("phone");
@@ -60,6 +61,42 @@ export default function VehicleSearch() {
   // Use mock data from __mocks__ folder
   const mockVehicles = defaultVehicles;
   const mockServiceHistory = defaultVehicleServiceHistory;
+  const recentVehicles = vehiclesData.slice(0, 4);
+
+  const getStatusLabel = (currentStatus?: string, override?: string) => {
+    if (override) return override;
+    if (!currentStatus) return "Available";
+    return currentStatus === "Active Job Card" ? "In Progress" : currentStatus;
+  };
+
+  const getStatusBadgeClasses = (label: string) => {
+    const normalized = label.toLowerCase();
+    if (normalized.includes("in progress") || normalized.includes("active")) {
+      return "bg-orange-100 text-orange-700";
+    }
+    if (normalized.includes("available")) {
+      return "bg-emerald-100 text-emerald-700";
+    }
+    if (normalized.includes("billed")) {
+      return "bg-blue-100 text-blue-700";
+    }
+    return "bg-gray-100 text-gray-700";
+  };
+
+  const customerSummary = useMemo<CustomerWithVehicles | null>(() => {
+    if (!searchResults) return null;
+    return {
+      id: searchResults.customerId || searchResults.id,
+      customerNumber: searchResults.customerNumber || `CUST-${searchResults.id}`,
+      name: searchResults.customerName,
+      phone: searchResults.phone,
+      email: searchResults.customerEmail || undefined,
+      address: searchResults.customerAddress || "",
+      cityState: searchResults.customerAddress || "",
+      createdAt: new Date().toISOString(),
+      vehicles: [],
+    };
+  }, [searchResults]);
 
   const validateSearchInput = (): boolean => {
     setValidationError("");
@@ -234,7 +271,7 @@ export default function VehicleSearch() {
           </div>
 
           {/* Search Input */}
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
@@ -262,18 +299,62 @@ export default function VehicleSearch() {
                 </p>
               )}
             </div>
-            <button
-              onClick={handleSearch}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md"
-            >
-              Search
-            </button>
+            <div className="flex flex-col gap-2 md:flex-row">
+              <button
+                type="button"
+                onClick={handleSearch}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md"
+              >
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={handleAddNewVehicle}
+                className="border border-dashed border-gray-300 text-gray-600 px-6 py-3 rounded-lg font-medium hover:border-indigo-500 hover:text-indigo-600 transition flex items-center gap-2 justify-center"
+              >
+                <PlusCircle size={18} />
+                Add Vehicle
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Search Results */}
         {searchResults ? (
           <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2">
+                {customerSummary && (
+                  <CustomerInfoCard customer={customerSummary} title="Customer Information" />
+                )}
+              </div>
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-gray-700">Vehicle Snapshot</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <InfoCard
+                    icon={Calendar}
+                    label="Last Service Date"
+                    value={searchResults.lastServiceDate || "—"}
+                  />
+                  <InfoCard
+                    icon={History}
+                    label="Total Services"
+                    value={`${searchResults.totalServices} services`}
+                  />
+                  <InfoCard
+                    icon={Receipt}
+                    label="Total Spent"
+                    value={searchResults.totalSpent || "₹0"}
+                  />
+                  <InfoCard
+                    icon={Clock}
+                    label="Next Service"
+                    value={searchResults.nextServiceDate || "—"}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Vehicle Details Card */}
             <div className="bg-white rounded-2xl shadow-md p-6">
               <div className="flex items-center justify-between mb-6">
@@ -314,33 +395,7 @@ export default function VehicleSearch() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Customer Information */}
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl">
-                  <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
-                    <User size={20} />
-                    Customer Information
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <p>
-                      <span className="font-medium text-gray-700">Name:</span>{" "}
-                      <span className="text-gray-800">{searchResults.customerName}</span>
-                    </p>
-                    <p>
-                      <span className="font-medium text-gray-700">Phone:</span>{" "}
-                      <span className="text-gray-800">{searchResults.phone}</span>
-                    </p>
-                    <p>
-                      <span className="font-medium text-gray-700">Email:</span>{" "}
-                      <span className="text-gray-800">{searchResults.customerEmail}</span>
-                    </p>
-                    <p>
-                      <span className="font-medium text-gray-700">Address:</span>{" "}
-                      <span className="text-gray-800">{searchResults.customerAddress}</span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Vehicle Information */}
+                {/* Vehicle Information Summary */}
                 <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl">
                   <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
                     <Car size={20} />
@@ -375,34 +430,36 @@ export default function VehicleSearch() {
 
               {/* Current Status */}
               <div className="mt-6 mb-4">
-                <div className={`p-4 rounded-xl ${
-                  searchResults.currentStatus === "Active Job Card" 
-                    ? "bg-orange-50 border-2 border-orange-200" 
-                    : "bg-green-50 border-2 border-green-200"
-                }`}>
-                  <div className="flex items-center gap-3">
-                    {searchResults.currentStatus === "Active Job Card" ? (
-                      <Clock className="text-orange-600" size={20} />
-                    ) : (
-                      <CheckCircle className="text-green-600" size={20} />
-                    )}
-                    <div>
-                      <p className="text-sm text-gray-600">Current Status</p>
-                      <p className={`text-lg font-bold ${
-                        searchResults.currentStatus === "Active Job Card" 
-                          ? "text-orange-700" 
-                          : "text-green-700"
-                      }`}>
-                        {searchResults.currentStatus}
-                        {searchResults.activeJobCardId && (
-                          <span className="ml-2 text-sm font-normal">
-                            ({searchResults.activeJobCardId})
-                          </span>
+                {(() => {
+                  const statusLabel = getStatusLabel(searchResults.currentStatus);
+                  const isInProgress = statusLabel.toLowerCase().includes("progress");
+                  return (
+                    <div
+                      className={`p-4 rounded-xl ${
+                        isInProgress ? "bg-orange-50 border-2 border-orange-200" : "bg-emerald-50 border-2 border-emerald-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isInProgress ? (
+                          <Clock className="text-orange-600" size={20} />
+                        ) : (
+                          <CheckCircle className="text-emerald-600" size={20} />
                         )}
-                      </p>
+                        <div>
+                          <p className="text-sm text-gray-600">Current Status</p>
+                          <p className={`text-lg font-bold ${isInProgress ? "text-orange-700" : "text-emerald-700"}`}>
+                            {statusLabel}
+                            {searchResults.activeJobCardId && (
+                              <span className="ml-2 text-sm font-normal">
+                                ({searchResults.activeJobCardId})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Service Summary */}
@@ -646,6 +703,66 @@ export default function VehicleSearch() {
             </div>
           </div>
         ) : null}
+
+        {/* Recent Vehicles */}
+        {recentVehicles.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-md p-6 mt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5">
+              <h2 className="text-xl font-bold text-gray-900">Recent Vehicles</h2>
+              <p className="text-sm text-gray-500">
+                Statuses highlight availability, in-progress jobs, and billed vehicles.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {recentVehicles.map((vehicle) => {
+                const statusLabel = getStatusLabel(vehicle.currentStatus, vehicle.statusLabel);
+                const badgeClass = getStatusBadgeClasses(statusLabel);
+                return (
+                  <div key={vehicle.id} className="border border-gray-200 rounded-2xl p-5 flex flex-col justify-between gap-4">
+                    <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Reg. Number</p>
+                          <p className="text-lg font-bold text-gray-900">{vehicle.registrationNumber}</p>
+                        </div>
+                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${badgeClass}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-2">
+                        {vehicle.make} {vehicle.model} ({vehicle.year})
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Customer: {vehicle.customerName}
+                      </p>
+                      <p className="text-sm text-gray-600">Phone: {vehicle.phone}</p>
+                      <p className="text-sm text-gray-600 truncate">Email: {vehicle.email}</p>
+                      <p className="text-sm text-gray-600 mt-1">Last service: {vehicle.lastServiceDate}</p>
+                      <p className="text-sm text-gray-600">Next service: {vehicle.nextServiceDate}</p>
+                      {vehicle.activeJobCard && (
+                        <p className="text-xs text-gray-500 mt-1">Job card: {vehicle.activeJobCard}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      <Link
+                        href={`/sc/appointments?action=create&vehicleId=${vehicle.id}`}
+                        className="text-indigo-600 text-sm font-semibold"
+                      >
+                        Schedule Appointment
+                      </Link>
+                      <Link
+                        href={`/sc/invoices?vehicleId=${vehicle.id}`}
+                        className="text-gray-500 text-sm hover:text-indigo-600 transition"
+                      >
+                        View History
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Add New Vehicle Form Modal */}
         {showAddVehicleForm && (

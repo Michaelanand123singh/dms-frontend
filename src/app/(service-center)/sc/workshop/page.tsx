@@ -162,6 +162,12 @@ export default function Workshop() {
 
   const getStatusColor = (status: JobCardStatus): string => {
     const colors: Record<JobCardStatus, string> = {
+      arrival_pending: "bg-gray-100 text-gray-700 border-gray-300",
+      job_card_pending_vehicle: "bg-blue-50 text-blue-700 border-blue-200",
+      job_card_active: "bg-yellow-100 text-yellow-700 border-yellow-300",
+      check_in_only: "bg-indigo-50 text-indigo-700 border-indigo-200",
+      no_response_lead: "bg-red-100 text-red-700 border-red-200",
+      manager_quote: "bg-purple-50 text-purple-700 border-purple-200",
       Created: "bg-gray-100 text-gray-700 border-gray-300",
       Assigned: "bg-blue-100 text-blue-700 border-blue-300",
       "In Progress": "bg-yellow-100 text-yellow-700 border-yellow-300",

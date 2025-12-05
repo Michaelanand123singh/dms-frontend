@@ -10,7 +10,7 @@ export const mockCustomers: CustomerWithVehicles[] = [
     customerNumber: "CUST-2025-001",
     externalId: "cust-001",
     serviceCenterId: "sc-001",
-    serviceCenterName: "Delhi Central Hub",
+    serviceCenterName: "Pune Central Hub",
     name: "Rajesh Kumar",
     phone: "9876543210",
     whatsappNumber: "9876543210",

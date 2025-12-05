@@ -449,6 +449,7 @@ export default function SCDashboard() {
       <div className="pt-20 px-4 sm:px-6 lg:px-8 pb-10">
         <div className="mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Service Center</h1>
+          <p className="mt-1 text-sm text-gray-500">Assigned center: {serviceCenter}</p>
         </div>
 
         {/* Revenue Summary Section */}

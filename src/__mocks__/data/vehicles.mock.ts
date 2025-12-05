@@ -67,6 +67,7 @@ export interface VehicleData {
   currentStatus: string;
   activeJobCard: string | null;
   nextServiceDate: string;
+  statusLabel?: string;
 }
 
 export const vehiclesData: VehicleData[] = [
@@ -86,6 +87,7 @@ export const vehiclesData: VehicleData[] = [
     currentStatus: "Active Job Card",
     activeJobCard: "JC001",
     nextServiceDate: "2025-01-15",
+    statusLabel: "In Progress",
   },
   {
     id: 2,
@@ -103,6 +105,7 @@ export const vehiclesData: VehicleData[] = [
     currentStatus: "Available",
     activeJobCard: null,
     nextServiceDate: "2025-02-20",
+    statusLabel: "Available",
   },
   {
     id: 3,
@@ -120,6 +123,7 @@ export const vehiclesData: VehicleData[] = [
     currentStatus: "Available",
     activeJobCard: null,
     nextServiceDate: "2025-01-05",
+    statusLabel: "Billed",
   },
 ];
 

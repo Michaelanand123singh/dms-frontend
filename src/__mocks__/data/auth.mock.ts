@@ -33,7 +33,7 @@ export const mockUsers: MockUser[] = [
     role: "sc_manager",
     name: "SC Manager",
     initials: "SCM",
-    serviceCenter: "Pune Phase 1",
+    serviceCenter: "Delhi Central Hub",
     serviceCenterId: "sc-001",
   },
   {
@@ -42,7 +42,7 @@ export const mockUsers: MockUser[] = [
     role: "sc_staff",
     name: "SC Staff",
     initials: "SCS",
-    serviceCenter: "Pune Phase 1",
+    serviceCenter: "Delhi Central Hub",
     serviceCenterId: "sc-001",
   },
   {
@@ -51,16 +51,16 @@ export const mockUsers: MockUser[] = [
     role: "service_engineer",
     name: "Service Engineer",
     initials: "SE",
-    serviceCenter: "Pune Phase 1",
+    serviceCenter: "Delhi Central Hub",
     serviceCenterId: "sc-001",
   },
   {
     email: "advisor@service.com",
     password: "adv123",
     role: "service_advisor",
-    name: "Service Advisor",
+    name: "Service Advisor from Delhi Central Hub",
     initials: "SA",
-    serviceCenter: "Pune Phase 1",
+    serviceCenter: "Delhi Central Hub",
     serviceCenterId: "sc-001",
   },
   {

@@ -20,6 +20,12 @@ const STATUS_OPTIONS: ("All" | JobCardStatus)[] = [
 ];
 
 const STATUS_CLASSES: Record<JobCardStatus, string> = {
+  arrival_pending: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  job_card_pending_vehicle: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700",
+  job_card_active: "border-yellow-200 bg-yellow-50 text-yellow-700",
+  check_in_only: "border-cyan-200 bg-cyan-50 text-cyan-700",
+  no_response_lead: "border-gray-200 bg-gray-50 text-gray-700",
+  manager_quote: "border-emerald-200 bg-emerald-50 text-emerald-700",
   Created: "border-gray-200 bg-gray-50 text-gray-700",
   Assigned: "border-blue-200 bg-blue-50 text-blue-700",
   "In Progress": "border-yellow-200 bg-yellow-50 text-yellow-700",
@@ -116,6 +122,12 @@ export default function AdvisorJobCardsPage() {
 
   const statusCounts = useMemo(() => {
     const counts: Record<JobCardStatus, number> = {
+      arrival_pending: 0,
+      job_card_pending_vehicle: 0,
+      job_card_active: 0,
+      check_in_only: 0,
+      no_response_lead: 0,
+      manager_quote: 0,
       Created: 0,
       Assigned: 0,
       "In Progress": 0,

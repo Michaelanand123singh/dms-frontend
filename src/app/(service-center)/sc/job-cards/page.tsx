@@ -70,6 +70,7 @@ export default function JobCards() {
   const [updatingStatusJobId, setUpdatingStatusJobId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<JobCardStatus>("Assigned");
   const [selectedEngineer, setSelectedEngineer] = useState<string>("");
+  const jobForPanel = Boolean(selectedJob);
   const { userRole } = useRole();
   const isServiceManager = userRole === "sc_manager";
   const isInventoryManager = userRole === "sc_staff";
@@ -78,7 +79,9 @@ export default function JobCards() {
   const [partsApproved, setPartsApproved] = useState<boolean>(false);
   const [partRequestInput, setPartRequestInput] = useState<string>("");
   const [partRequests, setPartRequests] = useState<Record<string, { parts: string[]; status: "pending" | "service_manager_approved" | "inventory_manager_approved"; technicianNotified: boolean }>>({});
+  const activeRequest = selectedJob ? partRequests[selectedJob.id] : null;
   const [workCompletion, setWorkCompletion] = useState<Record<string, boolean>>({});
+  const currentWorkCompletion = selectedJob ? workCompletion[selectedJob.id] : false;
 
   // Use mock data from __mocks__ folder
   const [jobCards, setJobCards] = useState<JobCard[]>(() => {
@@ -113,6 +116,85 @@ export default function JobCards() {
         ? prev.selectedParts.filter((part) => part !== partName)
         : [...prev.selectedParts, partName],
     }));
+  };
+
+  const handlePartRequestSubmit = () => {
+    if (!selectedJob) {
+      alert("Select a job card before submitting a part request.");
+      return;
+    }
+    const parts = partRequestInput
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length === 0) {
+      alert("Please enter at least one part.");
+      return;
+    }
+    setPartRequests((prev) => ({
+      ...prev,
+      [selectedJob.id]: {
+        parts,
+        status: "pending",
+        technicianNotified: false,
+      },
+    }));
+    setPartRequestInput("");
+    alert("Part request submitted.");
+  };
+
+  const handleTechnicianNotifyManager = () => {
+    if (!selectedJob) return;
+    setPartRequests((prev) => {
+      const existing = prev[selectedJob.id];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [selectedJob.id]: { ...existing, technicianNotified: true },
+      };
+    });
+    alert("Manager notified about part request.");
+  };
+
+  const handleServiceManagerPartApproval = () => {
+    if (!selectedJob) return;
+    setPartRequests((prev) => {
+      const existing = prev[selectedJob.id];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [selectedJob.id]: {
+          ...existing,
+          status: "service_manager_approved",
+        },
+      };
+    });
+    alert("Part request approved by manager.");
+  };
+
+  const handleInventoryManagerPartsApproval = () => {
+    if (!selectedJob) return;
+    setPartRequests((prev) => {
+      const existing = prev[selectedJob.id];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [selectedJob.id]: {
+          ...existing,
+          status: "inventory_manager_approved",
+        },
+      };
+    });
+    alert("Inventory manager approved the parts.");
+  };
+
+  const handleWorkCompletionNotification = () => {
+    if (!selectedJob) return;
+    setWorkCompletion((prev) => ({
+      ...prev,
+      [selectedJob.id]: true,
+    }));
+    alert("Work completion notified.");
   };
 
   const generateJobCardNumber = (serviceCenterCode: string = "SC001") => {
@@ -297,6 +379,18 @@ export default function JobCards() {
       return;
     }
     updateStatus(updatingStatusJobId, newStatus);
+  };
+
+  const handleManagerQuoteAction = () => {
+    if (!selectedJob) {
+      alert("Please select a job card before creating the manager quote.");
+      return;
+    }
+    const params = new URLSearchParams({
+      action: "create",
+      jobCardId: selectedJob.id,
+    });
+    router.push(`/sc/quotations?${params.toString()}`);
   };
 
   useEffect(() => {
