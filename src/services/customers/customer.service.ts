@@ -143,6 +143,10 @@ class CustomerService {
   }
 
   async update(id: number | string, data: Partial<CustomerWithVehicles>): Promise<CustomerWithVehicles> {
+    // Use repository directly when in mock mode
+    if (this.useMock) {
+      return customerRepository.update(id, data);
+    }
     const response = await apiClient.put<CustomerWithVehicles>(API_ENDPOINTS.CUSTOMER(String(id)), data);
     return response.data;
   }

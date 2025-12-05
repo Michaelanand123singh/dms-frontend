@@ -12,6 +12,7 @@ export const FormInput = ({
   maxLength,
   readOnly,
   className = "",
+  error,
   ...props
 }: {
   label: string;
@@ -23,6 +24,7 @@ export const FormInput = ({
   maxLength?: number;
   readOnly?: boolean;
   className?: string;
+  error?: string;
   [key: string]: any;
 }) => (
   <div>
@@ -36,11 +38,21 @@ export const FormInput = ({
       placeholder={placeholder}
       maxLength={maxLength}
       readOnly={readOnly}
-      className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 ${
+      className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 ${
+        error 
+          ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500" 
+          : "focus:ring-indigo-500/20 border border-gray-200"
+      } ${
         readOnly ? "bg-gray-100 cursor-not-allowed" : "bg-gray-50/50 focus:bg-white"
       } ${className}`}
       {...props}
     />
+    {error && (
+      <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+        <span className="text-red-500">•</span>
+        {error}
+      </p>
+    )}
   </div>
 );
 
@@ -52,6 +64,7 @@ export const FormSelect = ({
   options,
   placeholder,
   className = "",
+  error,
   ...props
 }: {
   label: string;
@@ -61,6 +74,7 @@ export const FormSelect = ({
   options: { value: string; label: string }[];
   placeholder?: string;
   className?: string;
+  error?: string;
   [key: string]: any;
 }) => (
   <div>
@@ -70,7 +84,11 @@ export const FormSelect = ({
     <select
       value={value}
       onChange={onChange}
-      className={`w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 ${className}`}
+      className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 ${
+        error 
+          ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500" 
+          : "bg-gray-50/50 focus:ring-indigo-500/20 border border-gray-200"
+      } ${className}`}
       {...props}
     >
       {placeholder && <option value="">{placeholder}</option>}
@@ -80,6 +98,12 @@ export const FormSelect = ({
         </option>
       ))}
     </select>
+    {error && (
+      <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+        <span className="text-red-500">•</span>
+        {error}
+      </p>
+    )}
   </div>
 );
 
@@ -111,19 +135,9 @@ export const Modal = ({
       onClick={(e) => e.stopPropagation()}
     >
       <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl z-10">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors p-2 rounded-lg flex items-center gap-2 font-medium"
-            title="Close and go back"
-          >
-            <X size={18} strokeWidth={2} />
-            <span className="text-sm hidden sm:inline">Back</span>
-          </button>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-            {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
+          {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
         </div>
         <button
           onClick={onClose}

@@ -30,6 +30,7 @@ import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { canCreateCustomer } from "@/shared/constants/roles";
 import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
 import { useCustomerSearch, useCreateCustomer } from "../../../../hooks/api";
+import { customerService } from "@/services/customers";
 import type {
   CustomerSearchType,
   CustomerWithVehicles,
@@ -276,6 +277,8 @@ export default function CustomerFind() {
   const [shouldOpenAppointmentAfterVehicleAdd, setShouldOpenAppointmentAfterVehicleAdd] = useState<boolean>(false);
   const [serviceHistory, setServiceHistory] = useState<ServiceHistoryItem[]>([]);
   const [validationError, setValidationError] = useState<string>("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [appointmentFieldErrors, setAppointmentFieldErrors] = useState<Record<string, string>>({});
   const [detectedSearchType, setDetectedSearchType] = useState<CustomerSearchType | null>(null);
   const [serviceCenterSearch, setServiceCenterSearch] = useState<string>("");
   const [showServiceCenterSelector, setShowServiceCenterSelector] = useState<boolean>(false);
@@ -526,6 +529,7 @@ export default function CustomerFind() {
   const closeCustomerForm = useCallback(() => {
     setShowCreateForm(false);
     setValidationError("");
+    setFieldErrors({});
     resetCustomerForm();
   }, [resetCustomerForm]);
 
@@ -555,6 +559,7 @@ export default function CustomerFind() {
     });
     setShowScheduleAppointment(false);
     setValidationError("");
+    setAppointmentFieldErrors({});
   }, [setAppointmentForm]);
 
   // Handle direct create customer button
@@ -590,54 +595,63 @@ export default function CustomerFind() {
 
   // Save new customer
   const handleSaveNewCustomer = useCallback(async (): Promise<void> => {
-    // Validate form
-    if (!newCustomerForm.name || !newCustomerForm.phone) {
-      setValidationError("Full Name and Mobile Number (Primary) are required fields");
-      return;
+    const errors: Record<string, string> = {};
+    let hasErrors = false;
+
+    // Validate name
+    if (!newCustomerForm.name?.trim()) {
+      errors.name = "Full Name is required";
+      hasErrors = true;
     }
 
     // Validate primary phone
-    if (!validatePhone(newCustomerForm.phone)) {
-      setValidationError("Please enter a valid 10-digit primary mobile number");
-      return;
+    if (!newCustomerForm.phone?.trim()) {
+      errors.phone = "Mobile Number (Primary) is required";
+      hasErrors = true;
+    } else if (!validatePhone(newCustomerForm.phone)) {
+      errors.phone = "Please enter a valid 10-digit mobile number";
+      hasErrors = true;
+    }
+
+    // Validate address
+    if (!newCustomerForm.address?.trim()) {
+      errors.address = "Full Address is required";
+      hasErrors = true;
     }
 
     // Validate alternate mobile if provided
     if (newCustomerForm.alternateMobile) {
       if (!validatePhone(newCustomerForm.alternateMobile)) {
-        setValidationError("Please enter a valid 10-digit alternate mobile number");
-        return;
-      }
-      if (cleanPhone(newCustomerForm.alternateMobile) === cleanPhone(newCustomerForm.phone)) {
-        setValidationError("Alternate mobile number must be different from primary mobile number");
-        return;
+        errors.alternateMobile = "Please enter a valid 10-digit alternate mobile number";
+        hasErrors = true;
+      } else if (cleanPhone(newCustomerForm.alternateMobile) === cleanPhone(newCustomerForm.phone)) {
+        errors.alternateMobile = "Alternate mobile number must be different from primary mobile number";
+        hasErrors = true;
       }
     }
 
     // Validate email if provided
     if (newCustomerForm.email && !validateEmail(newCustomerForm.email)) {
-      setValidationError("Please enter a valid email address");
-      return;
+      errors.email = "Please enter a valid email address";
+      hasErrors = true;
     }
 
     // Validate pincode if provided
-    if (newCustomerForm.pincode) {
-      if (!/^\d{6}$/.test(newCustomerForm.pincode)) {
-        setValidationError("Pincode must be exactly 6 digits");
-        return;
-      }
+    if (newCustomerForm.pincode && !/^\d{6}$/.test(newCustomerForm.pincode)) {
+      errors.pincode = "Pincode must be exactly 6 digits";
+      hasErrors = true;
     }
 
     // Validate service type
     if (!newCustomerForm.serviceType) {
-      setValidationError("Please select a service type (Walk-in or Home Service)");
-      return;
+      errors.serviceType = "Please select a service type (Walk-in or Home Service)";
+      hasErrors = true;
     }
 
     // Validate work address if work address type is selected
     if (newCustomerForm.addressType === "work" && !newCustomerForm.workAddress?.trim()) {
-      setValidationError("Please enter work address for pickup/drop service");
-      return;
+      errors.workAddress = "Please enter work address for pickup/drop service";
+      hasErrors = true;
     }
 
     // Check permission before creating customer
@@ -647,7 +661,16 @@ export default function CustomerFind() {
       return;
     }
 
+    setFieldErrors(errors);
+
+    if (hasErrors) {
+      const errorCount = Object.keys(errors).length;
+      setValidationError(`Please fill ${errorCount} mandatory field${errorCount > 1 ? 's' : ''} to continue`);
+      return;
+    }
+
     setValidationError("");
+    setFieldErrors({});
 
     const fallbackCenterId = serviceCenterFilterId ? serviceCenterFilterId.toString() : undefined;
     const preferredServiceCenterId = serviceCenterContext.serviceCenterId ?? fallbackCenterId;
@@ -1043,13 +1066,19 @@ export default function CustomerFind() {
             onClose={closeCustomerForm}
             maxWidth="max-w-3xl"
           >
-            <div className="space-y-4">
+            <div className="p-6 space-y-4">
               <FormInput
                 label="Full Name"
                 required
                 value={newCustomerForm.name}
-                onChange={(e) => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
+                onChange={(e) => {
+                  setNewCustomerForm({ ...newCustomerForm, name: e.target.value });
+                  if (fieldErrors.name) {
+                    setFieldErrors({ ...fieldErrors, name: "" });
+                  }
+                }}
                 placeholder="Enter full name"
+                error={fieldErrors.name}
               />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1065,9 +1094,13 @@ export default function CustomerFind() {
                       phone: phoneValue,
                       ...(whatsappSameAsMobile ? { whatsappNumber: phoneValue } : {}),
                     });
+                    if (fieldErrors.phone) {
+                      setFieldErrors({ ...fieldErrors, phone: "" });
+                    }
                   }}
                   placeholder="10-digit mobile number"
                   maxLength={10}
+                  error={fieldErrors.phone}
                 />
                 <div>
                   <FormInput
@@ -1105,14 +1138,18 @@ export default function CustomerFind() {
                   label="Alternate Mobile Number"
                   type="tel"
                   value={newCustomerForm.alternateMobile || ""}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setNewCustomerForm({
                       ...newCustomerForm,
                       alternateMobile: e.target.value.replace(/\D/g, "").slice(0, 10),
-                    })
-                  }
+                    });
+                    if (fieldErrors.alternateMobile) {
+                      setFieldErrors({ ...fieldErrors, alternateMobile: "" });
+                    }
+                  }}
                   placeholder="10-digit mobile number (optional)"
                   maxLength={10}
+                  error={fieldErrors.alternateMobile}
                 />
               </div>
 
@@ -1120,8 +1157,14 @@ export default function CustomerFind() {
                 label="Email ID"
                 type="email"
                 value={newCustomerForm.email || ""}
-                onChange={(e) => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
+                onChange={(e) => {
+                  setNewCustomerForm({ ...newCustomerForm, email: e.target.value });
+                  if (fieldErrors.email) {
+                    setFieldErrors({ ...fieldErrors, email: "" });
+                  }
+                }}
                 placeholder="Enter email address"
+                error={fieldErrors.email}
               />
 
               {/* Full Address */}
@@ -1131,13 +1174,26 @@ export default function CustomerFind() {
                 </label>
                 <textarea
                   value={newCustomerForm.address || ""}
-                  onChange={(e) =>
-                    setNewCustomerForm({ ...newCustomerForm, address: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setNewCustomerForm({ ...newCustomerForm, address: e.target.value });
+                    if (fieldErrors.address) {
+                      setFieldErrors({ ...fieldErrors, address: "" });
+                    }
+                  }}
                   rows={3}
                   placeholder="House / Flat, Street, Area, City, State, Pincode"
-                  className="w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 resize-none"
+                  className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 resize-none ${
+                    fieldErrors.address 
+                      ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500" 
+                      : "bg-gray-50/50 focus:ring-indigo-500/20 border border-gray-200"
+                  }`}
                 />
+                {fieldErrors.address && (
+                  <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+                    <span className="text-red-500">•</span>
+                    {fieldErrors.address}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1150,9 +1206,15 @@ export default function CustomerFind() {
                 <FormInput
                   label="Pincode"
                   value={newCustomerForm.pincode || ""}
-                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) })}
+                  onChange={(e) => {
+                    setNewCustomerForm({ ...newCustomerForm, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) });
+                    if (fieldErrors.pincode) {
+                      setFieldErrors({ ...fieldErrors, pincode: "" });
+                    }
+                  }}
                   placeholder="6-digit pincode"
                   maxLength={6}
+                  error={fieldErrors.pincode}
                 />
               </div>
 
@@ -1182,11 +1244,18 @@ export default function CustomerFind() {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => handleServiceTypeSelect("walk-in")}
+                      onClick={() => {
+                        handleServiceTypeSelect("walk-in");
+                        if (fieldErrors.serviceType) {
+                          setFieldErrors({ ...fieldErrors, serviceType: "" });
+                        }
+                      }}
                       className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
                         newCustomerForm.serviceType === "walk-in"
-                          ? "bg-indigo-50"
-                          : "hover:bg-indigo-50/30"
+                          ? "bg-indigo-50 border-2 border-indigo-500"
+                          : fieldErrors.serviceType
+                          ? "hover:bg-indigo-50/30 border-2 border-red-300"
+                          : "hover:bg-indigo-50/30 border border-gray-200"
                       }`}
                     >
                       <Building2 className={`${newCustomerForm.serviceType === "walk-in" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
@@ -1194,38 +1263,45 @@ export default function CustomerFind() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleServiceTypeSelect("home-service")}
+                      onClick={() => {
+                        handleServiceTypeSelect("home-service");
+                        if (fieldErrors.serviceType) {
+                          setFieldErrors({ ...fieldErrors, serviceType: "" });
+                        }
+                      }}
                       className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
                         newCustomerForm.serviceType === "home-service"
-                          ? "bg-indigo-50"
-                          : "hover:bg-indigo-50/30"
+                          ? "bg-indigo-50 border-2 border-indigo-500"
+                          : fieldErrors.serviceType
+                          ? "hover:bg-indigo-50/30 border-2 border-red-300"
+                          : "hover:bg-indigo-50/30 border border-gray-200"
                       }`}
                     >
                       <Home className={`${newCustomerForm.serviceType === "home-service" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
                       <span className={`text-sm font-medium ${newCustomerForm.serviceType === "home-service" ? "text-indigo-700" : "text-gray-600"}`}>Home Service</span>
                     </button>
                   </div>
+                  {fieldErrors.serviceType && (
+                    <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+                      <span className="text-red-500">•</span>
+                      {fieldErrors.serviceType}
+                    </p>
+                  )}
                 </div>
               </div>
 
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormInput
-                  label="City / State"
-                  value={newCustomerForm.cityState || ""}
-                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, cityState: e.target.value })}
-                  placeholder="Enter city and state"
-                />
-                <FormInput
-                  label="Pincode"
-                  value={newCustomerForm.pincode || ""}
-                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) })}
-                  placeholder="6-digit pincode"
-                  maxLength={6}
-                />
-              </div>
-
               {validationError && <ErrorAlert message={validationError} />}
+              
+              {Object.keys(fieldErrors).length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-red-800 mb-2">Please fill the following mandatory fields:</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+                    {Object.entries(fieldErrors).map(([field, error]) => (
+                      <li key={field}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <Button onClick={closeCustomerForm} variant="secondary" className="flex-1">
@@ -1381,7 +1457,13 @@ export default function CustomerFind() {
                             onClick={() => {
                               setSelectedVehicle(vehicle);
                               setShowVehicleDetails(true);
-                              setServiceHistory(getMockServiceHistory(vehicle.id));
+                              // Only show service history if vehicle has services (totalServices > 0)
+                              // Newly added vehicles should have empty service history
+                              if (vehicle.totalServices > 0 && vehicle.lastServiceDate) {
+                                setServiceHistory(getMockServiceHistory(vehicle.id));
+                              } else {
+                                setServiceHistory([]);
+                              }
                             }}
                             size="sm"
                             icon={FileText}
@@ -1444,7 +1526,7 @@ export default function CustomerFind() {
         {/* Add Vehicle Popup Form */}
         {showAddVehiclePopup && selectedCustomer && (
           <Modal title="Add New Vehicle" onClose={closeVehicleForm}>
-            <div className="space-y-6">
+            <div className="p-6 space-y-6">
                 {validationError && <ErrorAlert message={validationError} />}
                 <CustomerInfoCard customer={selectedCustomer} />
 
@@ -1565,7 +1647,7 @@ export default function CustomerFind() {
                     Cancel
                   </Button>
                   <Button
-                    onClick={() => {
+                    onClick={async () => {
                       // Validate form
                       if (!newVehicleForm.vehicleBrand || !newVehicleForm.vehicleModel) {
                         setValidationError("Vehicle Brand and Vehicle Model are required");
@@ -1624,11 +1706,24 @@ export default function CustomerFind() {
                       };
 
                       // Add vehicle to customer's vehicles array
+                      const updatedVehicles = [...(selectedCustomer.vehicles || []), newVehicle];
                       const updatedCustomer: CustomerWithVehicles = {
                         ...selectedCustomer,
-                        vehicles: [...(selectedCustomer.vehicles || []), newVehicle],
-                        totalVehicles: (selectedCustomer.vehicles?.length || 0) + 1,
+                        vehicles: updatedVehicles,
+                        totalVehicles: updatedVehicles.length,
                       };
+
+                      // Persist the vehicle to the repository
+                      try {
+                        await customerService.update(selectedCustomer.id, {
+                          vehicles: updatedVehicles,
+                          totalVehicles: updatedVehicles.length,
+                        });
+                      } catch (error) {
+                        console.error("Failed to save vehicle:", error);
+                        setValidationError("Failed to save vehicle. Please try again.");
+                        return;
+                      }
 
                       // Update selected customer
                       setSelectedCustomer(updatedCustomer);
@@ -1907,9 +2002,8 @@ export default function CustomerFind() {
 
         {/* Schedule Appointment Modal */}
         {showScheduleAppointment && selectedVehicle && selectedCustomer && (
-          <Modal title="Schedule Appointment" onClose={closeAppointmentForm} maxWidth="2xl">
-            <div className="space-y-6">
-                {validationError && <ErrorAlert message={validationError} />}
+          <Modal title="Schedule Appointment" onClose={closeAppointmentForm} maxWidth="max-w-3xl">
+            <div className="p-6 space-y-6">
                 {canAccessCustomerType && (
                   <div className="space-y-4">
                     <CustomerInfoCard customer={selectedCustomer} title="Customer Information (Pre-filled)" />
@@ -1920,6 +2014,7 @@ export default function CustomerFind() {
                         value={appointmentForm.customerName}
                         onChange={() => {}}
                         readOnly
+                        error={appointmentFieldErrors.customerName}
                       />
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormInput
@@ -1930,6 +2025,7 @@ export default function CustomerFind() {
                           onChange={() => {}}
                           maxLength={10}
                           readOnly
+                          error={appointmentFieldErrors.phone}
                         />
                         <FormInput
                           label="WhatsApp Number"
@@ -2013,12 +2109,18 @@ export default function CustomerFind() {
                         label="Vehicle"
                         required
                         value={appointmentForm.vehicle}
-                        onChange={(e) => setAppointmentForm({ ...appointmentForm, vehicle: e.target.value })}
+                        onChange={(e) => {
+                          setAppointmentForm({ ...appointmentForm, vehicle: e.target.value });
+                          if (appointmentFieldErrors.vehicle) {
+                            setAppointmentFieldErrors({ ...appointmentFieldErrors, vehicle: "" });
+                          }
+                        }}
                         placeholder="Select vehicle"
                         options={selectedCustomer.vehicles.map((v) => ({
                           value: `${v.vehicleMake} ${v.vehicleModel} (${v.vehicleYear})`,
                           label: `${v.vehicleMake} ${v.vehicleModel} (${v.vehicleYear})${v.registration ? ` - ${v.registration}` : ""}`,
                         }))}
+                        error={appointmentFieldErrors.vehicle}
                       />
                     ) : (
                       <FormInput
@@ -2027,6 +2129,7 @@ export default function CustomerFind() {
                         value={appointmentForm.vehicle}
                         onChange={() => {}}
                         readOnly
+                        error={appointmentFieldErrors.vehicle}
                       />
                     )}
                     {selectedCustomer && appointmentForm.vehicle && (() => {
@@ -2046,9 +2149,15 @@ export default function CustomerFind() {
                     label="Service Type"
                     required
                     value={appointmentForm.serviceType}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, serviceType: e.target.value })}
+                    onChange={(e) => {
+                      setAppointmentForm({ ...appointmentForm, serviceType: e.target.value });
+                      if (appointmentFieldErrors.serviceType) {
+                        setAppointmentFieldErrors({ ...appointmentFieldErrors, serviceType: "" });
+                      }
+                    }}
                     placeholder="Select service type"
                     options={SERVICE_TYPE_OPTIONS.map((type) => ({ value: type, label: type }))}
+                    error={appointmentFieldErrors.serviceType}
                   />
 
                   {canAssignServiceCenter && (
@@ -2171,12 +2280,27 @@ export default function CustomerFind() {
                           </label>
                           <textarea
                             value={appointmentForm.customerComplaintIssue || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, customerComplaintIssue: e.target.value })}
+                            onChange={(e) => {
+                              setAppointmentForm({ ...appointmentForm, customerComplaintIssue: e.target.value });
+                              if (appointmentFieldErrors.customerComplaintIssue) {
+                                setAppointmentFieldErrors({ ...appointmentFieldErrors, customerComplaintIssue: "" });
+                              }
+                            }}
                             rows={3}
                             placeholder="Describe the customer complaint or issue..."
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
+                            className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 resize-none ${
+                              appointmentFieldErrors.customerComplaintIssue 
+                                ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500" 
+                                : "border border-gray-200 focus:ring-purple-500/20 focus:border-purple-500 bg-gray-50/50 focus:bg-white"
+                            }`}
                             required={isCallCenter}
                           />
+                          {appointmentFieldErrors.customerComplaintIssue && (
+                            <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+                              <span className="text-red-500">•</span>
+                              {appointmentFieldErrors.customerComplaintIssue}
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -2369,22 +2493,34 @@ export default function CustomerFind() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                    <FormInput
-                      label="Date"
-                      required
-                      type="date"
-                      value={appointmentForm.date}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, date: e.target.value })}
-                      // @ts-ignore
-                      min={new Date().toISOString().split("T")[0]}
-                    />
+                      <FormInput
+                        label="Date"
+                        required
+                        type="date"
+                        value={appointmentForm.date}
+                        onChange={(e) => {
+                          setAppointmentForm({ ...appointmentForm, date: e.target.value });
+                          if (appointmentFieldErrors.date) {
+                            setAppointmentFieldErrors({ ...appointmentFieldErrors, date: "" });
+                          }
+                        }}
+                        // @ts-ignore
+                        min={new Date().toISOString().split("T")[0]}
+                        error={appointmentFieldErrors.date}
+                      />
                     </div>
                     <FormInput
                       label="Time"
                       required
                       type="time"
                       value={appointmentForm.time}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, time: e.target.value })}
+                      onChange={(e) => {
+                        setAppointmentForm({ ...appointmentForm, time: e.target.value });
+                        if (appointmentFieldErrors.time) {
+                          setAppointmentFieldErrors({ ...appointmentFieldErrors, time: "" });
+                        }
+                      }}
+                      error={appointmentFieldErrors.time}
                     />
                   </div>
 
@@ -2589,33 +2725,80 @@ export default function CustomerFind() {
 
                 </div>
 
+                {/* Validation Errors at Bottom */}
+                {Object.keys(appointmentFieldErrors).length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-sm font-semibold text-red-800 mb-2">Please fill the following mandatory fields:</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+                      {Object.entries(appointmentFieldErrors).map(([field, error]) => (
+                        <li key={field}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <button
                     onClick={closeAppointmentForm}
-                    className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition"
+                    className="flex-1 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition text-sm"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => {
-                      // Validate form
-                      if (!appointmentForm.customerName || !appointmentForm.phone || !appointmentForm.vehicle || !appointmentForm.serviceType || !appointmentForm.date || !appointmentForm.time) {
-                        setValidationError("Please fill all required fields");
-                        return;
+                      // Validate form with field-level errors
+                      const errors: Record<string, string> = {};
+                      const missingFields: string[] = [];
+
+                      if (!appointmentForm.customerName?.trim()) {
+                        errors.customerName = "Customer Name is required";
+                        missingFields.push("Customer Name");
                       }
 
-                      if (isCallCenter && !appointmentForm.customerComplaintIssue) {
-                        setValidationError("Customer Complaint / Issue Description is required");
-                        return;
+                      if (!appointmentForm.phone?.trim()) {
+                        errors.phone = "Phone Number is required";
+                        missingFields.push("Phone Number");
+                      } else if (!validatePhone(appointmentForm.phone)) {
+                        errors.phone = "Please enter a valid 10-digit phone number";
+                        missingFields.push("Phone Number (invalid format)");
                       }
 
-                      if (!validatePhone(appointmentForm.phone)) {
-                        setValidationError("Please enter a valid 10-digit phone number");
+                      if (!appointmentForm.vehicle?.trim()) {
+                        errors.vehicle = "Vehicle is required";
+                        missingFields.push("Vehicle");
+                      }
+
+                      if (!appointmentForm.serviceType?.trim()) {
+                        errors.serviceType = "Service Type is required";
+                        missingFields.push("Service Type");
+                      }
+
+                      if (!appointmentForm.date?.trim()) {
+                        errors.date = "Date is required";
+                        missingFields.push("Date");
+                      }
+
+                      if (!appointmentForm.time?.trim()) {
+                        errors.time = "Time is required";
+                        missingFields.push("Time");
+                      }
+
+                      if (isCallCenter && !appointmentForm.customerComplaintIssue?.trim()) {
+                        errors.customerComplaintIssue = "Customer Complaint / Issue Description is required";
+                        missingFields.push("Customer Complaint / Issue Description");
+                      }
+
+                      setAppointmentFieldErrors(errors);
+
+                      if (Object.keys(errors).length > 0) {
+                        const errorMessage = `Please fill the following mandatory fields: ${missingFields.join(", ")}`;
+                        setValidationError(errorMessage);
                         return;
                       }
 
                       setValidationError("");
+                      setAppointmentFieldErrors({});
 
                       // Clean up file URLs before saving
                       const appointmentData: any = {
@@ -2694,7 +2877,7 @@ export default function CustomerFind() {
                       // Close modal and reset form
                       closeAppointmentForm();
                     }}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2.5 rounded-lg font-medium hover:opacity-90 transition text-sm"
                   >
                     Schedule Appointment
                   </button>

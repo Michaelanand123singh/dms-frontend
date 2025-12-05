@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import {
   Settings as SettingsIcon,
@@ -30,11 +30,7 @@ type SettingCategory = "general" | "email" | "sms" | "security" | "notifications
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingCategory>("general");
-  const [settings, setSettings] = useState<Record<string, Setting>>({});
-  const [loading, setLoading] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-
+  
   // Mock settings data (replace with API call)
   const defaultSettings: Record<string, Setting> = {
     "app.name": { key: "app.name", value: "DMS System", category: "general", description: "Application Name" },
@@ -56,15 +52,15 @@ export default function SettingsPage() {
     "billing.plan": { key: "billing.plan", value: "enterprise", category: "billing", description: "Subscription Plan" },
   };
 
-  useEffect(() => {
-    // Load settings from localStorage or API
+  // Use lazy initialization to load settings from localStorage
+  const [settings, setSettings] = useState<Record<string, Setting>>(() => {
     const storedSettings = safeStorage.getItem<Record<string, { key: string; value: string; category: string; description: string }> | null>("systemSettings", null);
-    if (storedSettings) {
-      setSettings(storedSettings);
-    } else {
-      setSettings(defaultSettings);
-    }
-  }, []);
+    return storedSettings || defaultSettings;
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
 
   const categories = [
     { id: "general" as SettingCategory, label: "General", icon: Globe },
