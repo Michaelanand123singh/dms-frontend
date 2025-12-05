@@ -23,6 +23,7 @@ import {
   shouldFilterByServiceCenter,
 } from "@/shared/lib/serviceCenter";
 import { defaultJobCards } from "@/__mocks__/data/job-cards.mock";
+import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
 import { populateJobCardPart1, createEmptyJobCardPart1, generateSrNoForPart2Items, createEmptyJobCardPart2A } from "@/shared/utils/jobCardData.util";
@@ -44,6 +45,7 @@ interface AppointmentRecord {
   vehicleExternalId?: string;
   serviceCenterId?: number | string;
   serviceCenterName?: string;
+  assignedServiceCenter?: string; // Legacy field for backward compatibility
   customerType?: "B2C" | "B2B";
   customerComplaintIssue?: string;
   previousServiceHistory?: string;
@@ -726,13 +728,42 @@ function AppointmentsContent() {
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
   const shouldFilterAppointments = shouldFilterByServiceCenter(serviceCenterContext);
 
+  // Normalize appointments: if they have assignedServiceCenter but no serviceCenterId, resolve it
+  const normalizeAppointments = useCallback((appointments: AppointmentRecord[]): AppointmentRecord[] => {
+    return appointments.map((appointment) => {
+      // If appointment already has serviceCenterId, return as is
+      if (appointment.serviceCenterId) {
+        return appointment;
+      }
+      
+      // If appointment has assignedServiceCenter (name) but no serviceCenterId, resolve it
+      const assignedCenter = (appointment as any).assignedServiceCenter;
+      if (assignedCenter && !appointment.serviceCenterId) {
+        const center = staticServiceCenters.find(
+          (c) => c.name === assignedCenter
+        );
+        if (center) {
+          return {
+            ...appointment,
+            serviceCenterId: (center as any).serviceCenterId || center.id?.toString() || null,
+            serviceCenterName: assignedCenter,
+          };
+        }
+      }
+      
+      return appointment;
+    });
+  }, []);
+
   const initializeAppointments = () => {
     if (typeof window !== "undefined") {
       const storedAppointments = safeStorage.getItem<AppointmentRecord[]>("appointments", []);
       const baseAppointments = storedAppointments.length > 0 ? storedAppointments : (defaultAppointments as AppointmentRecord[]);
+      // Normalize appointments to ensure serviceCenterId is set
+      const normalizedAppointments = normalizeAppointments(baseAppointments);
       return shouldFilterAppointments
-        ? filterByServiceCenter(baseAppointments, serviceCenterContext)
-        : baseAppointments;
+        ? filterByServiceCenter(normalizedAppointments, serviceCenterContext)
+        : normalizedAppointments;
     }
     return defaultAppointments as AppointmentRecord[];
   };
@@ -745,10 +776,21 @@ function AppointmentsContent() {
       if (typeof window !== "undefined") {
         const storedAppointments = safeStorage.getItem<AppointmentRecord[]>("appointments", []);
         const baseAppointments = storedAppointments.length > 0 ? storedAppointments : (defaultAppointments as AppointmentRecord[]);
+        // Normalize appointments to ensure serviceCenterId is set
+        const normalizedAppointments = normalizeAppointments(baseAppointments);
         const filteredAppointments = shouldFilterAppointments
-          ? filterByServiceCenter(baseAppointments, serviceCenterContext)
-          : baseAppointments;
+          ? filterByServiceCenter(normalizedAppointments, serviceCenterContext)
+          : normalizedAppointments;
         setAppointments(filteredAppointments);
+        
+        // Persist normalized appointments back to localStorage if they were updated
+        const needsUpdate = normalizedAppointments.some((app, index) => {
+          const original = baseAppointments[index];
+          return original && !original.serviceCenterId && app.serviceCenterId;
+        });
+        if (needsUpdate) {
+          safeStorage.setItem("appointments", normalizedAppointments);
+        }
       }
     };
 
@@ -766,7 +808,7 @@ function AppointmentsContent() {
     return () => {
       window.removeEventListener("storage", handleStorageChange);
     };
-  }, [serviceCenterContext, shouldFilterAppointments]);
+  }, [serviceCenterContext, shouldFilterAppointments, normalizeAppointments]);
 
   const [appointmentForm, setAppointmentForm] = useState<AppointmentForm>(INITIAL_APPOINTMENT_FORM);
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentRecord | null>(null);
