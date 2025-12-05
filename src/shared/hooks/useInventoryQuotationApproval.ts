@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from "react";
 import { inventoryApprovalService } from "@/services/inventory/inventory-approval.service";
-import type { InventoryApproval, InventoryApprovalRequest, InventoryApprovalStatus } from "@/shared/types/inventory-approval.types";
+import type { InventoryApproval, InventoryApprovalRequest } from "@/shared/types/inventory-approval.types";
 
 export function useInventoryQuotationApproval() {
   const [loading, setLoading] = useState(false);

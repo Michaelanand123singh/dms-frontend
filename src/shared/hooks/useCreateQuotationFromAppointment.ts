@@ -32,10 +32,10 @@ export function useCreateQuotationFromAppointment() {
           ...quotationData,
         };
 
-        const quotation = await quotationsService.createFromAppointment(appointment.id, appointment);
+        const quotation = await quotationsService.createFromAppointment(String(appointment.id), appointment);
         
         // Link quotation to appointment
-        await appointmentsService.linkQuotation(appointment.id, quotation.id);
+        await appointmentsService.linkQuotation(String(appointment.id), quotation.id);
 
         return quotation;
       } catch (err) {

@@ -16,7 +16,7 @@ export function useCustomerQuotationConfirmation() {
       setError(null);
 
       try {
-        const quotation = await quotationsService.updateStatus(quotationId, "customer_confirmed");
+        const quotation = await quotationsService.updateStatus(quotationId, "customer_approved");
         
         // Automatically create inventory approval request
         if (quotation.items && quotation.items.length > 0) {
@@ -26,7 +26,7 @@ export function useCustomerQuotationConfirmation() {
               quotationId: quotation.id,
               items: quotation.items.map((item) => ({
                 partName: item.partName,
-                partNumber: item.partNumber,
+                partNumber: item.partNumber || "",
                 quantity: item.quantity,
               })),
               notes: `Auto-generated from customer confirmed quotation ${quotation.quotationNumber}`,
@@ -56,7 +56,7 @@ export function useCustomerQuotationConfirmation() {
       setError(null);
 
       try {
-        const quotation = await quotationsService.updateStatus(quotationId, "customer_rejected", reason);
+        const quotation = await quotationsService.updateStatus(quotationId, "customer_rejected" as QuotationStatus, reason);
         return quotation;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to reject quotation";
