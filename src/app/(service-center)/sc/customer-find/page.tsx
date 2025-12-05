@@ -401,9 +401,14 @@ export default function CustomerFind() {
   const handleAssignNearestCenter = useCallback(() => {
     const nearest = getNearestServiceCenter();
     if (nearest) {
-      setAppointmentForm((prev) => ({ ...prev, assignedServiceCenter: nearest }));
+      const nearestCenter = staticServiceCenters.find((c) => c.name === nearest);
+      setAppointmentForm((prev) => ({ 
+        ...prev, 
+        assignedServiceCenter: nearest,
+        // Note: serviceCenterId will be resolved when saving the appointment
+      }));
     }
-  }, [getNearestServiceCenter, setAppointmentForm]);
+  }, [getNearestServiceCenter]);
 
 
   // Auto-detect search type based on input
@@ -2800,6 +2805,13 @@ export default function CustomerFind() {
                       setValidationError("");
                       setAppointmentFieldErrors({});
 
+                      // Map service center name to ID for proper filtering
+                      const selectedServiceCenter = appointmentForm.assignedServiceCenter
+                        ? staticServiceCenters.find((center) => center.name === appointmentForm.assignedServiceCenter)
+                        : null;
+                      const serviceCenterId = (selectedServiceCenter as any)?.serviceCenterId || selectedServiceCenter?.id?.toString() || null;
+                      const serviceCenterName = appointmentForm.assignedServiceCenter || null;
+
                       // Clean up file URLs before saving
                       const appointmentData: any = {
                         customerName: appointmentForm.customerName,
@@ -2823,6 +2835,9 @@ export default function CustomerFind() {
                         assignedServiceAdvisor: appointmentForm.assignedServiceAdvisor,
                         assignedTechnician: appointmentForm.assignedTechnician,
                         assignedServiceCenter: appointmentForm.assignedServiceCenter,
+                        // Add serviceCenterId and serviceCenterName for proper filtering
+                        serviceCenterId: serviceCenterId,
+                        serviceCenterName: serviceCenterName,
                         pickupDropRequired: appointmentForm.pickupDropRequired,
                         pickupAddress: appointmentForm.pickupAddress,
                         dropAddress: appointmentForm.dropAddress,
