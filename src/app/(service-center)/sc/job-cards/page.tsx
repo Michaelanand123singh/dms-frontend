@@ -30,9 +30,12 @@ import { useRole } from "@/shared/hooks";
 import type { JobCard, JobCardStatus, Priority, KanbanColumn, ServiceLocation } from "@/shared/types";
 import {
   defaultJobCards,
+  serviceEngineerJobCards,
   engineers as engineersList,
   type Engineer,
 } from "@/__mocks__/data/job-cards.mock";
+import { jobCardPartsRequestService } from "@/services/inventory/jobCardPartsRequest.service";
+import { partsMasterService } from "@/services/inventory/partsMaster.service";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 import {
   filterByServiceCenter,
@@ -70,105 +73,260 @@ export default function JobCards() {
   const [newStatus, setNewStatus] = useState<JobCardStatus>("Assigned");
   const [selectedEngineer, setSelectedEngineer] = useState<string>("");
   const jobForPanel = Boolean(selectedJob);
-  const { userRole } = useRole();
+  const { userRole, userInfo } = useRole();
   const isServiceManager = userRole === "sc_manager";
   const isInventoryManager = userRole === "sc_staff";
   const isTechnician = userRole === "service_engineer";
   const [technicianApproved, setTechnicianApproved] = useState<boolean>(false);
   const [partsApproved, setPartsApproved] = useState<boolean>(false);
   const [partRequestInput, setPartRequestInput] = useState<string>("");
-  const [partRequests, setPartRequests] = useState<Record<string, { parts: string[]; status: "pending" | "service_manager_approved" | "inventory_manager_approved"; technicianNotified: boolean }>>({});
-  const activeRequest = selectedJob ? partRequests[selectedJob.id] : null;
+  const [selectedJobCardForRequest, setSelectedJobCardForRequest] = useState<string>("");
+  const [partsRequestsData, setPartsRequestsData] = useState<Record<string, any>>({});
   const [workCompletion, setWorkCompletion] = useState<Record<string, boolean>>({});
   const currentWorkCompletion = selectedJob ? workCompletion[selectedJob.id] : false;
 
   // Use mock data from __mocks__ folder
-  const [jobCards, setJobCards] = useState<JobCard[]>(() => {
+  const [jobCards, setJobCards] = useState<JobCard[]>(defaultJobCards);
+  const [isClient, setIsClient] = useState(false);
+
+  // Initialize on client side only to avoid hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
     if (typeof window !== "undefined") {
+      // For service engineers, always use mock data
+      const currentRole = safeStorage.getItem<string>("userRole", "");
+      if (currentRole === "service_engineer") {
+        setJobCards(serviceEngineerJobCards);
+        return;
+      }
+      
       const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
       if (storedJobCards.length > 0) {
-        return storedJobCards;
+        setJobCards(storedJobCards);
       }
     }
-    return defaultJobCards;
-  });
+  }, []);
+  
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
-  const visibleJobCards = useMemo(
-    () => filterByServiceCenter(jobCards, serviceCenterContext),
-    [jobCards, serviceCenterContext]
-  );
+  
+  // For service engineers, always use mock data and bypass service center filtering
+  useEffect(() => {
+    if (isTechnician && Array.isArray(serviceEngineerJobCards) && serviceEngineerJobCards.length > 0) {
+      // Force set mock data for service engineers
+      setJobCards(serviceEngineerJobCards);
+    }
+  }, [isTechnician]);
+  
+  // Ensure service engineers always see mock data
+  const visibleJobCards = useMemo(() => {
+    // For service engineers, show all mock jobs without filtering
+    if (isTechnician) {
+      // Always return mock data for service engineers - ensure it's the actual array
+      return Array.isArray(serviceEngineerJobCards) && serviceEngineerJobCards.length > 0 
+        ? serviceEngineerJobCards 
+        : [];
+    }
+    return filterByServiceCenter(jobCards, serviceCenterContext);
+  }, [jobCards, serviceCenterContext, isTechnician]);
+  
   const shouldFilterJobCards = shouldFilterByServiceCenter(serviceCenterContext);
+
+  // Get job cards assigned to service engineer (excluding Parts Pending status)
+  const assignedJobCards = useMemo(() => {
+    if (!isTechnician) return [];
+    return visibleJobCards.filter((job) => 
+      job.status !== "Parts Pending" &&
+      (job.assignedEngineer === userInfo?.name || 
+      job.assignedEngineer === "Service Engineer" ||
+      job.status === "In Progress" || 
+      job.status === "Assigned")
+    );
+  }, [visibleJobCards, isTechnician, userInfo]);
+
+  // Get active parts request for selected job card
+  const activeRequest = useMemo(() => {
+    if (isTechnician) {
+      if (!selectedJobCardForRequest) return null;
+      const selectedJobCard = assignedJobCards.find((job) => job.id === selectedJobCardForRequest || job.jobCardNumber === selectedJobCardForRequest);
+      if (selectedJobCard) {
+        return partsRequestsData[selectedJobCard.id] || partsRequestsData[selectedJobCard.jobCardNumber || ""] || null;
+      }
+      return partsRequestsData[selectedJobCardForRequest] || null;
+    } else {
+      const jobCardId = selectedJob?.id || "";
+      return jobCardId ? partsRequestsData[jobCardId] : null;
+    }
+  }, [partsRequestsData, selectedJobCardForRequest, selectedJob, isTechnician, assignedJobCards]);
+
+  // Load parts requests for selected job card
+  useEffect(() => {
+    const loadPartsRequest = async () => {
+      const jobCardId = isTechnician ? selectedJobCardForRequest : (selectedJob?.id || "");
+      if (jobCardId) {
+        const requests = await jobCardPartsRequestService.getByJobCardId(jobCardId);
+        if (requests.length > 0) {
+          const latestRequest = requests.sort((a, b) => 
+            new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
+          )[0];
+          const key = isTechnician ? selectedJobCardForRequest : (selectedJob?.id || "");
+          setPartsRequestsData((prev) => ({
+            ...prev,
+            [key]: latestRequest,
+          }));
+        }
+      }
+    };
+    loadPartsRequest();
+  }, [selectedJobCardForRequest, selectedJob, isTechnician]);
 
   const [engineers] = useState<Engineer[]>(engineersList);
 
-  const handlePartRequestSubmit = () => {
-    if (!selectedJob) {
-      alert("Select a job card before submitting a part request.");
+  const handlePartRequestSubmit = async () => {
+    if (!selectedJobCardForRequest) {
+      alert("Select a job card from the dropdown before submitting a part request.");
       return;
     }
-    const parts = partRequestInput
+
+    const selectedJobCard = assignedJobCards.find((job) => job.id === selectedJobCardForRequest || job.jobCardNumber === selectedJobCardForRequest);
+    if (!selectedJobCard) {
+      alert("Selected job card not found.");
+      return;
+    }
+
+    const partNames = partRequestInput
       .split(",")
       .map((part) => part.trim())
       .filter(Boolean);
-    if (parts.length === 0) {
+    if (partNames.length === 0) {
       alert("Please enter at least one part.");
       return;
     }
-    setPartRequests((prev) => ({
-      ...prev,
-      [selectedJob.id]: {
-        parts,
-        status: "pending",
-        technicianNotified: false,
-      },
-    }));
-    setPartRequestInput("");
-    alert("Part request submitted.");
+
+    try {
+      setLoading(true);
+      
+      // Get all parts from master to map names to IDs
+      const allParts = await partsMasterService.getAll();
+      
+      // Map part names to part IDs and quantities
+      const partsWithDetails = partNames
+        .map((partName) => {
+          const part = allParts.find(
+            (p) => p.partName.toLowerCase() === partName.toLowerCase()
+          );
+          
+          if (part) {
+            return {
+              partId: part.id,
+              partName: part.partName,
+              quantity: 1,
+            };
+          }
+          
+      return {
+            partId: `unknown-${partName.replace(/\s+/g, "-").toLowerCase()}`,
+            partName: partName,
+            quantity: 1,
+          };
+        })
+        .filter((p) => p !== null);
+
+      // Create the parts request using the service
+      const requestedBy = userInfo?.name || "Service Engineer";
+      
+      const request = await jobCardPartsRequestService.createRequestFromJobCard(
+        selectedJobCard,
+        partsWithDetails,
+        requestedBy
+      );
+
+      // Update local state
+      setPartsRequestsData((prev) => ({
+        ...prev,
+        [selectedJobCardForRequest]: request,
+      }));
+      
+      setPartRequestInput("");
+      alert(`Part request submitted for Job Card: ${selectedJobCard.jobCardNumber || selectedJobCard.id}\nParts: ${partNames.join(", ")}\nRequest sent to SC Manager and Inventory Manager.`);
+    } catch (error) {
+      console.error("Failed to submit parts request:", error);
+      alert("Failed to submit parts request. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleTechnicianNotifyManager = () => {
-    if (!selectedJob) return;
-    setPartRequests((prev) => {
-      const existing = prev[selectedJob.id];
-      if (!existing) return prev;
-      return {
+  const handleServiceManagerPartApproval = async () => {
+    const jobCardId = isTechnician ? selectedJobCardForRequest : selectedJob?.id;
+    const currentRequest = jobCardId ? partsRequestsData[jobCardId] : null;
+    
+    if (!currentRequest) {
+      alert("No active parts request found for this job card.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const request = await jobCardPartsRequestService.approveByScManager(
+        currentRequest.id,
+        userInfo?.name || "SC Manager"
+      );
+      
+      // Update local state
+      setPartsRequestsData((prev) => ({
         ...prev,
-        [selectedJob.id]: { ...existing, technicianNotified: true },
-      };
-    });
-    alert("Manager notified about part request.");
+        [jobCardId || ""]: request,
+      }));
+      
+      alert("Parts request approved by SC Manager.");
+    } catch (error) {
+      console.error("Failed to approve request:", error);
+      alert("Failed to approve request. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleServiceManagerPartApproval = () => {
-    if (!selectedJob) return;
-    setPartRequests((prev) => {
-      const existing = prev[selectedJob.id];
-      if (!existing) return prev;
-      return {
-        ...prev,
-        [selectedJob.id]: {
-          ...existing,
-          status: "service_manager_approved",
-        },
-      };
-    });
-    alert("Part request approved by manager.");
-  };
+  const handleInventoryManagerPartsApproval = async () => {
+    const jobCardId = isTechnician ? selectedJobCardForRequest : selectedJob?.id;
+    const currentRequest = jobCardId ? partsRequestsData[jobCardId] : null;
+    
+    if (!currentRequest) {
+      alert("No active parts request found for this job card.");
+      return;
+    }
 
-  const handleInventoryManagerPartsApproval = () => {
-    if (!selectedJob) return;
-    setPartRequests((prev) => {
-      const existing = prev[selectedJob.id];
-      if (!existing) return prev;
-      return {
+    if (!currentRequest.scManagerApproved) {
+      alert("Request must be approved by SC Manager first.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const selectedJobCard = isTechnician 
+        ? assignedJobCards.find((job) => job.id === selectedJobCardForRequest || job.jobCardNumber === selectedJobCardForRequest)
+        : selectedJob;
+      const engineerName = selectedJobCard?.assignedEngineer || userInfo?.name || "Service Engineer";
+      
+      const request = await jobCardPartsRequestService.assignPartsByInventoryManager(
+        currentRequest.id,
+        userInfo?.name || "Inventory Manager",
+        engineerName
+      );
+      
+      // Update local state
+      setPartsRequestsData((prev) => ({
         ...prev,
-        [selectedJob.id]: {
-          ...existing,
-          status: "inventory_manager_approved",
-        },
-      };
-    });
-    alert("Inventory manager approved the parts.");
+        [jobCardId || ""]: request,
+      }));
+      
+      alert(`Parts assigned to ${engineerName} by Inventory Manager.`);
+    } catch (error) {
+      console.error("Failed to assign parts:", error);
+      alert(error instanceof Error ? error.message : "Failed to assign parts. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleWorkCompletionNotification = () => {
@@ -287,8 +445,8 @@ export default function JobCards() {
             ? {
               ...job,
               status,
-              startTime: status === "In Progress" ? new Date().toLocaleString() : job.startTime,
-              completedAt: status === "Completed" ? new Date().toLocaleString() : job.completedAt,
+              startTime: status === "In Progress" ? (typeof window !== "undefined" ? new Date().toLocaleString() : new Date().toISOString()) : job.startTime,
+              completedAt: status === "Completed" ? (typeof window !== "undefined" ? new Date().toLocaleString() : new Date().toISOString()) : job.completedAt,
             }
             : job
         )
@@ -331,9 +489,17 @@ export default function JobCards() {
   };
 
   useEffect(() => {
+    // For service engineers, use mock data only - skip localStorage and API calls
+    if (isTechnician) {
+      // Force set mock data and prevent any other loading
+      setJobCards(serviceEngineerJobCards);
+      return;
+    }
+
     fetchJobCards();
 
     // Load job cards from localStorage (created from service requests)
+    // Only for non-service-engineer roles
     const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
     if (storedJobCards.length > 0) {
       try {
@@ -349,7 +515,7 @@ export default function JobCards() {
         console.error("Error loading job cards from localStorage:", error);
       }
     }
-  }, []);
+  }, [isTechnician]);
 
   const getStatusColor = (status: JobCardStatus): string => {
     const colors: Record<JobCardStatus, string> = {
@@ -616,7 +782,8 @@ export default function JobCards() {
           </div>
         )}
 
-        {jobForPanel && (
+        {/* Parts Request UI - Always visible for service engineers, or when job is selected for managers */}
+        {(isTechnician || jobForPanel) && (
           <div className="mb-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div>
@@ -632,10 +799,74 @@ export default function JobCards() {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {isTechnician && (
+            {isClient && isTechnician && (
+              <div className="mt-4 space-y-4">
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                      Select Job Card {assignedJobCards.length > 0 && `(${assignedJobCards.length} available)`}
+                    </label>
+                    {assignedJobCards.length === 0 ? (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          No job cards assigned to you yet. Job cards will appear here once they are assigned.
+                        </p>
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedJobCardForRequest}
+                        onChange={(e) => {
+                          setSelectedJobCardForRequest(e.target.value);
+                          setPartRequestInput("");
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">-- Select Job Card --</option>
+                        {assignedJobCards.map((job) => {
+                        const jobCardId = job.id || job.jobCardNumber;
+                        const request = partsRequestsData[jobCardId] || partsRequestsData[job.id] || partsRequestsData[job.jobCardNumber || ""];
+                        const hasPendingRequest = request && !request.inventoryManagerAssigned;
+                        const hasRequest = !!request;
+                        return (
+                          <option 
+                            key={job.id} 
+                            value={job.id}
+                            disabled={hasPendingRequest}
+                          >
+                            {job.jobCardNumber || job.id} - {job.customerName} - {job.vehicle} ({job.status})
+                            {hasRequest && (
+                              request.inventoryManagerAssigned 
+                                ? " ✓ Parts Assigned" 
+                                : request.scManagerApproved 
+                                  ? " - SC Approved, Pending IM" 
+                                  : " - Parts Request Pending"
+                            )}
+                          </option>
+                        );
+                      })}
+                      </select>
+                    )}
+                  </div>
+
+                  {selectedJobCardForRequest && (
+                    <>
+                      <div>
+                        <label className="text-sm font-semibold text-gray-700 mb-2 block">Job Card Information</label>
+                        {(() => {
+                          const selectedJobCard = assignedJobCards.find((job) => job.id === selectedJobCardForRequest || job.jobCardNumber === selectedJobCardForRequest);
+                          return selectedJobCard ? (
+                            <div className="p-3 bg-gray-50 rounded-lg text-xs space-y-1">
+                              <p><span className="font-medium text-gray-700">Job Card:</span> <span className="text-gray-900">{selectedJobCard.jobCardNumber || selectedJobCard.id}</span></p>
+                              <p><span className="font-medium text-gray-700">Customer:</span> <span className="text-gray-900">{selectedJobCard.customerName}</span></p>
+                              <p><span className="font-medium text-gray-700">Vehicle:</span> <span className="text-gray-900">{selectedJobCard.vehicle} ({selectedJobCard.registration})</span></p>
+                              <p><span className="font-medium text-gray-700">Status:</span> <span className="text-gray-900">{selectedJobCard.status}</span></p>
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-700">Part Request (comma-separated)</label>
+                        <label className="text-sm font-semibold text-gray-700">Parts Needed (comma-separated)</label>
                   <input
                     type="text"
                     value={partRequestInput}
@@ -646,61 +877,143 @@ export default function JobCards() {
                   <button
                     type="button"
                     onClick={handlePartRequestSubmit}
-                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold shadow-sm hover:bg-indigo-700 transition"
+                          disabled={loading || !partRequestInput.trim()}
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed w-full"
                   >
-                    Submit Part Request
+                          {loading ? "Submitting..." : "Submit Parts Request"}
                   </button>
                 </div>
+                    </>
               )}
 
+                  {/* Approval Status - Show when job card is selected */}
+                  {selectedJobCardForRequest && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-3">
+                      <h4 className="text-sm font-semibold text-gray-800">Parts Request Status</h4>
+                      {activeRequest ? (
+                        <>
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">Current Request Status</p>
-                <p className="text-xs text-gray-500">{activeRequest?.status ?? "No active request"}</p>
-                <p className="text-xs text-gray-500">
-                  Parts: {(activeRequest?.parts || []).join(", ") || "—"}
+                            <p className="text-xs text-gray-600">
+                              <span className="font-medium">Requested Parts:</span> {activeRequest.parts && Array.isArray(activeRequest.parts) ? activeRequest.parts.map((p: any) => (typeof p === 'string' ? p : p.partName || '')).join(", ") : "—"}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              <span className="font-medium">Requested At:</span> {isClient ? new Date(activeRequest.requestedAt).toLocaleString() : new Date(activeRequest.requestedAt).toISOString()}
                 </p>
               </div>
+
+                          {/* SC Manager Approval Status */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-700 min-w-[120px]">SC Manager:</span>
+                            <button
+                              type="button"
+                              disabled
+                              className={`px-3 py-1.5 rounded text-xs font-semibold ${
+                                activeRequest.scManagerApproved
+                                  ? "bg-green-500 text-white"
+                                  : "bg-red-500 text-white"
+                              }`}
+                            >
+                              {activeRequest.scManagerApproved ? "✓ Approved" : "Pending"}
+                            </button>
+                            {activeRequest.scManagerApproved && (
+                              <span className="text-xs text-gray-500">
+                                by {activeRequest.scManagerApprovedBy} on {activeRequest.scManagerApprovedAt ? (isClient ? new Date(activeRequest.scManagerApprovedAt).toLocaleString() : new Date(activeRequest.scManagerApprovedAt).toISOString()) : ""}
+                              </span>
+                            )}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-3 text-xs">
+                          {/* Inventory Manager Assignment Status */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-700 min-w-[120px]">Inventory Manager:</span>
               <button
                 type="button"
-                onClick={handleTechnicianNotifyManager}
-                className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-500 hover:text-indigo-700 transition"
-                disabled={!activeRequest}
-              >
-                Notify Manager
+                              disabled
+                              className={`px-3 py-1.5 rounded text-xs font-semibold ${
+                                activeRequest.inventoryManagerAssigned
+                                  ? "bg-green-500 text-white"
+                                  : "bg-red-500 text-white"
+                              }`}
+                            >
+                              {activeRequest.inventoryManagerAssigned ? "✓ Parts Assigned" : "Pending"}
               </button>
+                            {activeRequest.inventoryManagerAssigned && (
+                              <span className="text-xs text-gray-500">
+                                by {activeRequest.inventoryManagerAssignedBy} on {activeRequest.inventoryManagerAssignedAt ? (isClient ? new Date(activeRequest.inventoryManagerAssignedAt).toLocaleString() : new Date(activeRequest.inventoryManagerAssignedAt).toISOString()) : ""}
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">No parts request submitted yet for this job card.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SC Manager and Inventory Manager Approval Buttons */}
+            {(isServiceManager || isInventoryManager) && selectedJob && (
+              <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                {activeRequest ? (
+                  <>
+                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Parts Request Approval</h4>
+                    <div className="space-y-2 mb-4">
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Job Card:</span> {selectedJob.jobCardNumber || selectedJob.id}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Requested Parts:</span> {activeRequest.parts && Array.isArray(activeRequest.parts) ? activeRequest.parts.map((p: any) => (typeof p === 'string' ? p : p.partName || '')).join(", ") : "—"}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Requested By:</span> {activeRequest.requestedBy}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Requested At:</span> {isClient ? new Date(activeRequest.requestedAt).toLocaleString() : new Date(activeRequest.requestedAt).toISOString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
               {isServiceManager && (
                 <button
                   type="button"
                   onClick={handleServiceManagerPartApproval}
-                  className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-500 hover:text-indigo-700 transition"
-                  disabled={!activeRequest}
-                >
-                  Approve Parts (Manager)
+                          disabled={loading || activeRequest.scManagerApproved}
+                          className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                            activeRequest.scManagerApproved
+                              ? "bg-green-500 text-white cursor-not-allowed"
+                              : "bg-red-500 text-white hover:bg-red-600"
+                          }`}
+                        >
+                          {activeRequest.scManagerApproved ? "✓ SC Manager Approved" : "Approve Parts (SC Manager)"}
                 </button>
               )}
               {isInventoryManager && (
                 <button
                   type="button"
                   onClick={handleInventoryManagerPartsApproval}
-                  className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-500 hover:text-indigo-700 transition"
-                  disabled={activeRequest?.status !== "service_manager_approved"}
-                >
-                  Approve Parts (Inventory)
+                          disabled={loading || !activeRequest.scManagerApproved || activeRequest.inventoryManagerAssigned}
+                          className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                            activeRequest.inventoryManagerAssigned
+                              ? "bg-green-500 text-white cursor-not-allowed"
+                              : activeRequest.scManagerApproved
+                              ? "bg-red-500 text-white hover:bg-red-600"
+                              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          }`}
+                        >
+                          {activeRequest.inventoryManagerAssigned 
+                            ? "✓ Parts Assigned to Engineer" 
+                            : activeRequest.scManagerApproved
+                            ? "Assign Parts to Engineer"
+                            : "Wait for SC Manager Approval"}
                 </button>
               )}
-              {isTechnician && (
-                <button
-                  type="button"
-                  onClick={handleWorkCompletionNotification}
-                  className="px-3 py-2 rounded-lg border border-green-300 text-green-700 hover:border-green-400 hover:text-green-800 transition"
-                >
-                  Notify Work Completion
-                </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">No parts request found for this job card.</p>
               )}
             </div>
+            )}
           </div>
         )}
 

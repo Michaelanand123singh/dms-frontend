@@ -1,28 +1,112 @@
 "use client";
-import { useState } from "react";
-import { usePartsApproval } from "@/shared/hooks/usePartsApproval";
+import { useState, useEffect } from "react";
+import { jobCardPartsRequestService } from "@/services/inventory/jobCardPartsRequest.service";
 import { useRole } from "@/shared/hooks";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { CheckCircle, XCircle, Package, AlertCircle } from "lucide-react";
+import { CheckCircle, XCircle, Package, User, Clock } from "lucide-react";
 import type { JobCardPartsRequest } from "@/shared/types/jobcard-inventory.types";
 
 export default function ApprovalsPage() {
-  const { pendingRequests, isLoading, approve, reject } = usePartsApproval();
-  const { userInfo } = useRole();
+  const { userInfo, userRole } = useRole();
+  const isInventoryManager = userRole === "inventory_manager" || userRole === "sc_staff";
+  const isScManager = userRole === "sc_manager";
+  const [newRequests, setNewRequests] = useState<JobCardPartsRequest[]>([]);
+  const [scApprovedRequests, setScApprovedRequests] = useState<JobCardPartsRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [assignedEngineer, setAssignedEngineer] = useState("");
 
-  const handleApprove = async (id: string) => {
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  const fetchRequests = async () => {
+    try {
+      setIsLoading(true);
+      const allRequests = await jobCardPartsRequestService.getAll();
+      
+      // New requests - pending SC Manager approval (not yet approved by SC Manager)
+      // Exclude rejected requests
+      const newReqs = allRequests.filter(
+        (r) => 
+          r.status !== "rejected" && 
+          !r.scManagerApproved && 
+          !r.inventoryManagerAssigned
+      );
+      
+      // SC Manager approved requests - pending Inventory Manager approval
+      // Show all requests where SC Manager has approved but Inventory Manager hasn't assigned yet
+      // Exclude rejected requests
+      const scApproved = allRequests.filter(
+        (r) => 
+          r.status !== "rejected" &&
+          r.scManagerApproved === true && 
+          !r.inventoryManagerAssigned
+      );
+      
+      setNewRequests(newReqs);
+      setScApprovedRequests(scApproved);
+    } catch (error) {
+      console.error("Failed to fetch requests:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleScManagerApprove = async (id: string) => {
+    if (!isScManager) {
+      alert("Only SC Manager can approve requests as SC Manager.");
+      return;
+    }
     try {
       setIsProcessing(true);
-      await approve(id, userInfo?.name || "Inventory Manager", notes || undefined);
+      await jobCardPartsRequestService.approveByScManager(
+        id,
+        userInfo?.name || "SC Manager",
+        notes || undefined
+      );
       setSelectedRequest(null);
       setNotes("");
+      await fetchRequests();
+      alert("Request approved successfully! It will now appear in 'SC Manager Approved - Ready to Assign' section for Inventory Manager.");
     } catch (error) {
       console.error("Failed to approve:", error);
+      alert(error instanceof Error ? error.message : "Failed to approve request");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleInventoryManagerApprove = async (id: string) => {
+    if (!isInventoryManager) {
+      alert("Only Inventory Manager can approve and assign parts.");
+      return;
+    }
+    if (!assignedEngineer.trim()) {
+      alert("Please enter the engineer name to assign parts to.");
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await jobCardPartsRequestService.assignPartsByInventoryManager(
+        id,
+        userInfo?.name || "Inventory Manager",
+        assignedEngineer,
+        notes || undefined
+      );
+      setSelectedRequest(null);
+      setNotes("");
+      setAssignedEngineer("");
+      await fetchRequests();
+      alert("Parts assigned successfully! Stock has been decreased.");
+    } catch (error) {
+      console.error("Failed to assign parts:", error);
+      alert(error instanceof Error ? error.message : "Failed to assign parts");
     } finally {
       setIsProcessing(false);
     }
@@ -31,20 +115,296 @@ export default function ApprovalsPage() {
   const handleReject = async (id: string) => {
     try {
       setIsProcessing(true);
-      await reject(id, userInfo?.name || "Inventory Manager", notes || undefined);
+      const allRequests = await jobCardPartsRequestService.getAll();
+      const index = allRequests.findIndex((r) => r.id === id);
+      if (index === -1) {
+        throw new Error("Request not found");
+      }
+      allRequests[index] = {
+        ...allRequests[index],
+        status: "rejected",
+        rejectedBy: userInfo?.name || "Inventory Manager",
+        rejectedAt: new Date().toISOString(),
+        notes: notes || allRequests[index].notes,
+      };
+      // Save using localStorage directly since service doesn't have update method
+      const { localStorage: safeStorage } = await import("@/shared/lib/localStorage");
+      safeStorage.setItem("jobCardPartsRequests", allRequests);
       setSelectedRequest(null);
       setNotes("");
+      setAssignedEngineer("");
+      await fetchRequests();
     } catch (error) {
       console.error("Failed to reject:", error);
+      alert("Failed to reject request");
     } finally {
       setIsProcessing(false);
     }
   };
 
+  const renderRequestCard = (request: JobCardPartsRequest, isScApproved: boolean = false) => {
+    const isSelected = selectedRequest === request.id;
+    const scApproved = request.scManagerApproved;
+    const imApproved = request.inventoryManagerAssigned;
+
+    return (
+      <Card
+        key={request.id}
+        className={`border-l-4 ${
+          imApproved
+            ? "border-l-green-500"
+            : scApproved
+            ? "border-l-blue-500"
+            : "border-l-orange-500"
+        }`}
+      >
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Job Card: {request.jobCardId}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Vehicle: {request.vehicleNumber || request.vehicleId || "N/A"} | Customer:{" "}
+                {request.customerName || "N/A"}
+              </p>
+              {request.requestedBy && (
+                <p className="text-xs text-gray-500 mt-1">Requested by: {request.requestedBy}</p>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 items-end">
+              {imApproved ? (
+                <Badge variant="success">Assigned to Engineer</Badge>
+              ) : scApproved ? (
+                <Badge variant="info">SC Manager Approved</Badge>
+              ) : (
+                <Badge variant="warning">Pending</Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardBody>
+          {/* Approval Status Buttons */}
+          <div className="mb-4 flex gap-3">
+            <button
+              disabled
+              className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 ${
+                scApproved
+                  ? "bg-green-500 text-white"
+                  : "bg-red-500 text-white"
+              }`}
+            >
+              <CheckCircle size={16} />
+              SC Manager {scApproved ? "✓ Approved" : "Pending"}
+            </button>
+            <button
+              disabled
+              className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 ${
+                imApproved
+                  ? "bg-green-500 text-white"
+                  : "bg-red-500 text-white"
+              }`}
+            >
+              <CheckCircle size={16} />
+              Inventory Manager {imApproved ? "✓ Approved" : "Pending"}
+            </button>
+          </div>
+
+          {/* Approval Details */}
+          {scApproved && request.scManagerApprovedBy && (
+            <div className="mb-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
+              SC Manager approved by {request.scManagerApprovedBy} on{" "}
+              {request.scManagerApprovedAt
+                ? new Date(request.scManagerApprovedAt).toLocaleString()
+                : "N/A"}
+            </div>
+          )}
+
+          {imApproved && request.inventoryManagerAssignedBy && (
+            <div className="mb-3 p-2 bg-green-50 rounded text-xs text-green-700">
+              Parts assigned to {request.assignedEngineer} by {request.inventoryManagerAssignedBy} on{" "}
+              {request.inventoryManagerAssignedAt
+                ? new Date(request.inventoryManagerAssignedAt).toLocaleString()
+                : "N/A"}
+            </div>
+          )}
+
+          <div className="mb-4">
+            <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <Package size={16} />
+              Required Parts:
+            </h4>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              {request.parts.map((part, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{part.partName}</p>
+                    <p className="text-sm text-gray-600">Part ID: {part.partId}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-900">Qty: {part.quantity}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {isSelected && !imApproved && (
+            <div className="border-t pt-4 mt-4">
+              {!scApproved ? (
+                // SC Manager Approval Section - Only visible to SC Manager
+                isScManager ? (
+                  <>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add notes (optional)..."
+                      className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      rows={3}
+                    />
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => handleScManagerApprove(request.id)}
+                        disabled={isProcessing}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <CheckCircle size={16} className="mr-2" />
+                        Approve as SC Manager
+                      </Button>
+                      <Button
+                        onClick={() => handleReject(request.id)}
+                        disabled={isProcessing}
+                        variant="outline"
+                        className="border-red-500 text-red-600 hover:bg-red-50"
+                      >
+                        <XCircle size={16} className="mr-2" />
+                        Reject
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setSelectedRequest(null);
+                          setNotes("");
+                        }}
+                        variant="outline"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    <p>Only SC Manager can approve this request.</p>
+                    <Button
+                      onClick={() => {
+                        setSelectedRequest(null);
+                        setNotes("");
+                      }}
+                      variant="outline"
+                      className="mt-3"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                )
+              ) : (
+                // Inventory Manager Approval Section - Only visible to Inventory Manager
+                isInventoryManager ? (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Assign to Engineer *
+                      </label>
+                      <input
+                        type="text"
+                        value={assignedEngineer}
+                        onChange={(e) => setAssignedEngineer(e.target.value)}
+                        placeholder="Enter engineer name"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        required
+                      />
+                    </div>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add notes (optional)..."
+                      className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      rows={3}
+                    />
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => handleInventoryManagerApprove(request.id)}
+                        disabled={isProcessing || !assignedEngineer.trim()}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <CheckCircle size={16} className="mr-2" />
+                        Approve & Assign Parts as Inventory Manager
+                      </Button>
+                      <Button
+                        onClick={() => handleReject(request.id)}
+                        disabled={isProcessing}
+                        variant="outline"
+                        className="border-red-500 text-red-600 hover:bg-red-50"
+                      >
+                        <XCircle size={16} className="mr-2" />
+                        Reject
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setSelectedRequest(null);
+                          setNotes("");
+                          setAssignedEngineer("");
+                        }}
+                        variant="outline"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    <p>Only Inventory Manager can assign parts for this request.</p>
+                    <Button
+                      onClick={() => {
+                        setSelectedRequest(null);
+                        setNotes("");
+                        setAssignedEngineer("");
+                      }}
+                      variant="outline"
+                      className="mt-3"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
+          {!isSelected && !imApproved && (
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setSelectedRequest(request.id)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {scApproved ? "Assign Parts" : "Review Request"}
+              </Button>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="bg-[#f9f9fb] min-h-screen pt-24 px-8 pb-10">
-        <div className="text-center">Loading...</div>
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+          <p className="text-gray-600">Loading approval requests...</p>
+        </div>
       </div>
     );
   }
@@ -54,112 +414,59 @@ export default function ApprovalsPage() {
       <div className="pt-24 px-8 pb-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-indigo-600">Parts Approval Requests</h1>
-          <p className="text-gray-500 mt-1">Review and approve parts requests from job cards</p>
+          <p className="text-gray-500 mt-1">
+            Review and approve parts requests - SC Manager approves first, then Inventory Manager assigns parts
+          </p>
         </div>
 
-        {pendingRequests.length === 0 ? (
-          <Card>
-            <CardBody>
-              <div className="text-center py-12">
-                <CheckCircle className="mx-auto text-green-500 mb-4" size={48} />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Pending Requests</h3>
-                <p className="text-gray-600">All parts requests have been processed.</p>
-              </div>
-            </CardBody>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {pendingRequests.map((request) => (
-              <Card key={request.id} className="border-l-4 border-l-orange-500">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Job Card: {request.jobCardId}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Vehicle: {request.vehicleNumber || request.vehicleId} | Customer: {request.customerName || "N/A"}
-                      </p>
-                    </div>
-                    <Badge variant="warning">Pending</Badge>
-                  </div>
-                </CardHeader>
-                <CardBody>
-                  <div className="mb-4">
-                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                      <Package size={16} />
-                      Required Parts:
-                    </h4>
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                      {request.parts.map((part, idx) => (
-                        <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
-                          <div>
-                            <p className="font-medium text-gray-900">{part.partName}</p>
-                            <p className="text-sm text-gray-600">Part ID: {part.partId}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-gray-900">Qty: {part.quantity}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {selectedRequest === request.id ? (
-                    <div className="border-t pt-4 mt-4">
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Add notes (optional)..."
-                        className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        rows={3}
-                      />
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={() => handleApprove(request.id)}
-                          disabled={isProcessing}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <CheckCircle size={16} className="mr-2" />
-                          Approve
-                        </Button>
-                        <Button
-                          onClick={() => handleReject(request.id)}
-                          disabled={isProcessing}
-                          variant="outline"
-                          className="border-red-500 text-red-600 hover:bg-red-50"
-                        >
-                          <XCircle size={16} className="mr-2" />
-                          Reject
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setSelectedRequest(null);
-                            setNotes("");
-                          }}
-                          variant="outline"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={() => setSelectedRequest(request.id)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                      >
-                        Review Request
-                      </Button>
-                    </div>
-                  )}
-                </CardBody>
-              </Card>
-            ))}
+        {/* New Requests Section - Pending SC Manager Approval */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="text-orange-600" size={20} />
+            <h2 className="text-xl font-semibold text-gray-900">
+              New Requests from Service Engineers ({newRequests.length})
+            </h2>
           </div>
-        )}
+          {newRequests.length === 0 ? (
+            <Card>
+              <CardBody>
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="mx-auto text-green-500 mb-2" size={32} />
+                  <p>No new requests pending SC Manager approval</p>
+                </div>
+              </CardBody>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {newRequests.map((request) => renderRequestCard(request, false))}
+            </div>
+          )}
+        </div>
+
+        {/* SC Manager Approved Requests - Pending Inventory Manager Approval */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <User className="text-blue-600" size={20} />
+            <h2 className="text-xl font-semibold text-gray-900">
+              SC Manager Approved - Ready to Assign ({scApprovedRequests.length})
+            </h2>
+          </div>
+          {scApprovedRequests.length === 0 ? (
+            <Card>
+              <CardBody>
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="mx-auto text-green-500 mb-2" size={32} />
+                  <p>No requests pending Inventory Manager assignment</p>
+                </div>
+              </CardBody>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {scApprovedRequests.map((request) => renderRequestCard(request, true))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
-

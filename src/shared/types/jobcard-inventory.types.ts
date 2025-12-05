@@ -23,5 +23,13 @@ export interface JobCardPartsRequest {
   rejectedBy?: string;
   rejectedAt?: string;
   notes?: string;
+  // Approval workflow fields
+  scManagerApproved?: boolean;
+  scManagerApprovedBy?: string;
+  scManagerApprovedAt?: string;
+  inventoryManagerAssigned?: boolean;
+  inventoryManagerAssignedBy?: string;
+  inventoryManagerAssignedAt?: string;
+  assignedEngineer?: string;
 }
 

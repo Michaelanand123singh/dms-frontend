@@ -1,15 +1,19 @@
 "use client";
 import { useState, useEffect, startTransition } from "react";
 import { partsMasterService } from "@/services/inventory/partsMaster.service";
-import { partsOrderService } from "@/services/inventory/partsOrder.service";
+import { partsOrderService, type PartsOrder } from "@/services/inventory/partsOrder.service";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/Badge";
+import { Package, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import type { Part, PartsOrderFormData } from "@/shared/types/inventory.types";
 
 export default function PartsOrderEntryPage() {
   const [parts, setParts] = useState<Part[]>([]);
+  const [orders, setOrders] = useState<PartsOrder[]>([]);
+  const [showOrderView, setShowOrderView] = useState(true);
   const [formData, setFormData] = useState<PartsOrderFormData>({
     partId: "",
     requiredQty: 0,
@@ -27,10 +31,20 @@ export default function PartsOrderEntryPage() {
     }
   };
 
+  const fetchOrders = async () => {
+    try {
+      const data = await partsOrderService.getAll();
+      setOrders(data);
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+    }
+  };
+
   useEffect(() => {
     initializeInventoryMockData();
     startTransition(() => {
       fetchParts();
+      fetchOrders();
     });
   }, []);
 
@@ -61,9 +75,40 @@ export default function PartsOrderEntryPage() {
         notes: "",
       });
       setSelectedPart(null);
+      // Refresh orders and show order view
+      await fetchOrders();
+      setShowOrderView(true);
     } catch (error) {
       console.error("Failed to create order:", error);
       alert("Failed to create purchase order. Please try again.");
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge variant="warning">Pending</Badge>;
+      case "approved":
+        return <Badge variant="success">Approved</Badge>;
+      case "received":
+        return <Badge variant="info">Received</Badge>;
+      case "rejected":
+        return <Badge variant="danger">Rejected</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  const getUrgencyBadge = (urgency: string) => {
+    switch (urgency) {
+      case "high":
+        return <Badge variant="danger">High</Badge>;
+      case "medium":
+        return <Badge variant="warning">Medium</Badge>;
+      case "low":
+        return <Badge variant="info">Low</Badge>;
+      default:
+        return <Badge>{urgency}</Badge>;
     }
   };
 
@@ -75,7 +120,7 @@ export default function PartsOrderEntryPage() {
           <p className="text-gray-500 mt-1">Create purchase orders for parts</p>
         </div>
 
-        <div className="max-w-2xl">
+        <div className="max-w-2xl mx-auto">
           <Card>
             <CardHeader>
               <h2 className="text-lg font-semibold">New Purchase Order</h2>
@@ -149,6 +194,114 @@ export default function PartsOrderEntryPage() {
                 </Button>
               </form>
             </CardBody>
+          </Card>
+        </div>
+
+        {/* Order View Section */}
+        <div className="mt-8 max-w-6xl mx-auto">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Purchase Orders</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {orders.length} {orders.length === 1 ? "order" : "orders"} total
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowOrderView(!showOrderView)}
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  {showOrderView ? (
+                    <>
+                      <span className="text-sm">Hide</span>
+                      <ChevronUp size={20} />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm">Show</span>
+                      <ChevronDown size={20} />
+                    </>
+                  )}
+                </button>
+              </div>
+            </CardHeader>
+            {showOrderView && (
+              <CardBody>
+                {orders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="mx-auto text-gray-400 mb-4" size={48} />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Orders Found</h3>
+                    <p className="text-gray-600">Create your first purchase order above.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.map((order) => (
+                      <Card key={order.id} className="hover:shadow-md transition-shadow">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Package className="text-indigo-600" size={20} />
+                                <h3 className="text-lg font-semibold text-gray-900">{order.orderNumber}</h3>
+                              </div>
+                              <p className="text-sm text-gray-600">{order.partName}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              {getStatusBadge(order.status)}
+                              {getUrgencyBadge(order.urgency)}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardBody>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                            <div>
+                              <p className="text-gray-600 mb-1">Part ID</p>
+                              <p className="font-medium text-gray-900">{order.partId}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 mb-1">Quantity</p>
+                              <p className="font-medium text-gray-900">{order.requiredQty}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 mb-1">Requested By</p>
+                              <p className="font-medium text-gray-900">{order.requestedBy}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 mb-1">Requested At</p>
+                              <p className="font-medium text-gray-900">
+                                {new Date(order.requestedAt).toLocaleString("en-IN", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                          {order.notes && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-xs text-gray-600 mb-1">Notes:</p>
+                              <p className="text-sm text-gray-700">{order.notes}</p>
+                            </div>
+                          )}
+                          {order.status === "approved" && order.approvedBy && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-xs text-gray-600">
+                                Approved by {order.approvedBy} on{" "}
+                                {order.approvedAt
+                                  ? new Date(order.approvedAt).toLocaleDateString()
+                                  : "N/A"}
+                              </p>
+                            </div>
+                          )}
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardBody>
+            )}
           </Card>
         </div>
       </div>

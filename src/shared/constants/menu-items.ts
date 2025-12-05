@@ -51,9 +51,7 @@ export const INVENTORY_MANAGER_MENU_ITEMS: MenuItem[] = [
   { name: "Parts Master", icon: Boxes, href: "/inventory-manager/parts-master" },
   { name: "Stock Update", icon: TrendingUp, href: "/inventory-manager/parts-stock-update" },
   { name: "Parts Entry", icon: PlusCircle, href: "/inventory-manager/parts-entry" },
-  { name: "Parts View", icon: Eye, href: "/inventory-manager/parts-view" },
   { name: "Order Entry", icon: ShoppingCart, href: "/inventory-manager/parts-order-entry" },
-  { name: "Order View", icon: ListChecks, href: "/inventory-manager/parts-order-view" },
   { name: "Approvals", icon: CheckCircle, href: "/inventory-manager/approvals" },
 ];
 

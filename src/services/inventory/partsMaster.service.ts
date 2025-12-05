@@ -76,6 +76,64 @@ class PartsMasterService {
     safeStorage.setItem(this.storageKey, parts);
     return parts[index];
   }
+
+  async bulkCreate(partsData: PartFormData[]): Promise<{ success: number; failed: number; errors: string[] }> {
+    const existingParts = await this.getAll();
+    const existingPartIds = new Set(existingParts.map((p) => p.partId));
+    const existingPartNumbers = new Set(existingParts.map((p) => p.partNumber));
+    
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+    const newParts: Part[] = [];
+
+    partsData.forEach((data, index) => {
+      // Validate required fields
+      if (!data.partId || !data.partName || !data.partNumber || !data.category) {
+        failed++;
+        errors.push(`Row ${index + 2}: Missing required fields (Part ID, Part Name, Part Number, or Category)`);
+        return;
+      }
+
+      // Check for duplicates
+      if (existingPartIds.has(data.partId)) {
+        failed++;
+        errors.push(`Row ${index + 2}: Part ID "${data.partId}" already exists`);
+        return;
+      }
+
+      if (existingPartNumbers.has(data.partNumber)) {
+        failed++;
+        errors.push(`Row ${index + 2}: Part Number "${data.partNumber}" already exists`);
+        return;
+      }
+
+      // Create new part
+      const newPart: Part = {
+        id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`,
+        ...data,
+        stockQuantity: 0,
+        price: data.price || 0,
+        minStockLevel: data.minStockLevel || 0,
+        unit: data.unit || "piece",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      newParts.push(newPart);
+      existingPartIds.add(data.partId);
+      existingPartNumbers.add(data.partNumber);
+      success++;
+    });
+
+    // Save all new parts
+    if (newParts.length > 0) {
+      const updatedParts = [...existingParts, ...newParts];
+      safeStorage.setItem(this.storageKey, updatedParts);
+    }
+
+    return { success, failed, errors };
+  }
 }
 
 export const partsMasterService = new PartsMasterService();
