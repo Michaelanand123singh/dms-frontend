@@ -99,11 +99,31 @@ const perCustomerServiceHistory: Record<string, ExtendedServiceHistoryItem[]> = 
   ],
 };
 
-export const serviceHistoryData: Record<number, ExtendedServiceHistoryItem[]> = {
-  1: perCustomerServiceHistory["cust-001"],
-  2: perCustomerServiceHistory["cust-002"],
-  3: perCustomerServiceHistory["cust-003"],
+export const serviceHistoryData: Record<string, ExtendedServiceHistoryItem[]> = {
+  "cust-001": perCustomerServiceHistory["cust-001"],
+  "cust-002": perCustomerServiceHistory["cust-002"],
+  "cust-003": perCustomerServiceHistory["cust-003"],
 };
 
 export const serviceHistoryByCustomer = perCustomerServiceHistory;
+
+/**
+ * Get service history by vehicle ID
+ * Maps vehicle IDs to their service history from customer service history
+ */
+export const getServiceHistoryByVehicleId = (vehicleId: string | number): ExtendedServiceHistoryItem[] => {
+  const vehicleIdStr = String(vehicleId);
+  const allHistory: ExtendedServiceHistoryItem[] = [];
+  
+  // Iterate through all customer service histories and filter by vehicleExternalId
+  Object.values(perCustomerServiceHistory).forEach((customerHistory) => {
+    customerHistory.forEach((item) => {
+      if (item.vehicleExternalId && String(item.vehicleExternalId) === vehicleIdStr) {
+        allHistory.push(item);
+      }
+    });
+  });
+  
+  return allHistory.sort((a, b) => new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime());
+};
 

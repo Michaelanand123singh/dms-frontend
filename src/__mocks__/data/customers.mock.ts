@@ -27,7 +27,7 @@ export const mockCustomers: CustomerWithVehicles[] = [
     totalVehicles: 2,
     totalSpent: "₹45,000",
     lastServiceDate: "2024-12-15",
-    lastServiceCenterId: 1,
+    lastServiceCenterId: "sc-001",
     lastServiceCenterName: "Delhi Central Hub",
     vehicles: [
       {

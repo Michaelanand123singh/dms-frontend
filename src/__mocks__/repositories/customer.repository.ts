@@ -173,8 +173,10 @@ class CustomerRepository {
       data.serviceCenterId ??
       this.loadUserContext().serviceCenterId ??
       newCustomer.serviceCenterId ??
-      1;
-    const normalizedCenterId = String(preferredServiceCenterId);
+      "sc-001";
+    const normalizedCenterId = String(preferredServiceCenterId).startsWith("sc-") 
+      ? String(preferredServiceCenterId) 
+      : `sc-${String(preferredServiceCenterId).padStart(3, "0")}`;
     newCustomer.serviceCenterId = normalizedCenterId;
     newCustomer.lastServiceCenterId = normalizedCenterId;
     newCustomer.lastServiceCenterName =

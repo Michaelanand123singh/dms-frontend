@@ -752,7 +752,7 @@ const handleCreateAndSendToCustomer = async () => {
     // Get next sequence number
     const existingJobCards = safeStorage.getItem<any[]>("jobCards", []);
     const lastJobCard = existingJobCards
-    .filter((jc) => jc.jobCardNumber?.startsWith(`${serviceCenterCode}-${year}-${month}`))
+      .filter((jc) => jc.jobCardNumber?.startsWith(`${serviceCenterCode}-${year}-${month}`))
       .sort((a, b) => {
         const aSeq = parseInt(a.jobCardNumber?.split("-")[3] || "0");
         const bSeq = parseInt(b.jobCardNumber?.split("-")[3] || "0");

@@ -11,6 +11,7 @@ export * from "./vehicles.mock";
 export * from "./service-requests.mock";
 export * from "./jobs.mock";
 export * from "./service-history.mock";
+export { getServiceHistoryByVehicleId } from "./service-history.mock";
 export * from "./customer-service-history.mock";
 export * from "./complaints.mock";
 export * from "./invoices.mock";

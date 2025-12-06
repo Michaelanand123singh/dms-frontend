@@ -24,7 +24,7 @@ export const defaultVehicles: Vehicle[] = mockCustomers.flatMap((customer) =>
  */
 export const defaultVehicleServiceHistory: ServiceHistoryItem[] = [
   {
-    id: 1,
+    id: "sh-001",
     date: "2024-12-15",
     type: "Routine Maintenance",
     engineer: "Engineer 1",
@@ -37,7 +37,7 @@ export const defaultVehicleServiceHistory: ServiceHistoryItem[] = [
     odometer: "25,000 km",
   },
   {
-    id: 2,
+    id: "sh-002",
     date: "2024-11-20",
     type: "Repair",
     engineer: "Engineer 2",
@@ -52,7 +52,7 @@ export const defaultVehicleServiceHistory: ServiceHistoryItem[] = [
 ];
 
 export interface VehicleData {
-  id: number;
+  id: string | number; // Support both for backward compatibility
   registrationNumber: string;
   make: string;
   model: string;
@@ -72,7 +72,7 @@ export interface VehicleData {
 
 export const vehiclesData: VehicleData[] = [
   {
-    id: 1,
+    id: "veh-001",
     registrationNumber: "DL-01-AB-1234",
     make: "Honda",
     model: "City",
@@ -108,7 +108,7 @@ export const vehiclesData: VehicleData[] = [
     statusLabel: "Available",
   },
   {
-    id: 3,
+    id: "veh-003",
     registrationNumber: "DL-01-EF-9012",
     make: "Hyundai",
     model: "i20",

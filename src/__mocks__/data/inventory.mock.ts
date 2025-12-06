@@ -250,7 +250,7 @@ export const mockJobCardPartsRequests: JobCardPartsRequest[] = [
   {
     id: "req-1",
     jobCardId: "JC-2024-01-001",
-    vehicleId: "veh-1",
+    vehicleId: "veh-001",
     vehicleNumber: "MH12AB1234",
     customerName: "Rajesh Kumar",
     requestedBy: "SC Manager - Pune Phase 1",
@@ -272,7 +272,7 @@ export const mockJobCardPartsRequests: JobCardPartsRequest[] = [
   {
     id: "req-2",
     jobCardId: "JC-2024-01-002",
-    vehicleId: "veh-2",
+    vehicleId: "veh-002",
     vehicleNumber: "MH12CD5678",
     customerName: "Priya Sharma",
     requestedBy: "SC Manager - Mumbai",
@@ -294,7 +294,7 @@ export const mockJobCardPartsRequests: JobCardPartsRequest[] = [
   {
     id: "req-3",
     jobCardId: "JC-2024-01-003",
-    vehicleId: "veh-3",
+    vehicleId: "veh-003",
     vehicleNumber: "MH12EF9012",
     customerName: "Amit Patel",
     requestedBy: "SC Manager - Pune Phase 1",

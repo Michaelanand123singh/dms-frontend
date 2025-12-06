@@ -47,6 +47,30 @@ export const filterByServiceCenter = <T extends { serviceCenterId?: number | str
   context: ServiceCenterContext
 ): T[] => {
   if (!shouldFilterByServiceCenter(context)) return items;
-  return items.filter((item) => String(item.serviceCenterId) === String(context.serviceCenterId));
+  
+  const contextId = context.serviceCenterId;
+  if (!contextId) return items;
+  
+  // Convert context ID to string for comparison
+  const contextIdStr = String(contextId);
+  
+  return items.filter((item) => {
+    if (item.serviceCenterId === null || item.serviceCenterId === undefined) return false;
+    
+    // Convert item ID to string for comparison
+    const itemIdStr = String(item.serviceCenterId);
+    
+    // Direct string comparison
+    if (itemIdStr === contextIdStr) return true;
+    
+    // Handle numeric comparison: if both can be parsed as numbers, compare them
+    const itemNum = parseInt(itemIdStr, 10);
+    const contextNum = parseInt(contextIdStr, 10);
+    if (!isNaN(itemNum) && !isNaN(contextNum) && itemNum === contextNum) {
+      return true;
+    }
+    
+    return false;
+  });
 };
 

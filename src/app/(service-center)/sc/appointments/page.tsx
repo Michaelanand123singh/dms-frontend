@@ -3,7 +3,7 @@ import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2, Search } from "lucide-react";
-import CheckInSlip from "@/components/check-in-slip/CheckInSlip";
+import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
 import { useCustomerSearch } from "../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -23,8 +23,12 @@ import {
   shouldFilterByServiceCenter,
 } from "@/shared/lib/serviceCenter";
 import { defaultJobCards } from "@/__mocks__/data/job-cards.mock";
+import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
+import { populateJobCardPart1, createEmptyJobCardPart1, generateSrNoForPart2Items, createEmptyJobCardPart2A } from "@/shared/utils/jobCardData.util";
+import { customerService } from "@/services/customers/customer.service";
+import type { JobCardPart2Item } from "@/shared/types/job-card.types";
 
 // ==================== Types ====================
 interface AppointmentRecord {
@@ -41,13 +45,13 @@ interface AppointmentRecord {
   vehicleExternalId?: string;
   serviceCenterId?: number | string;
   serviceCenterName?: string;
+  assignedServiceCenter?: string; // Legacy field for backward compatibility
   customerType?: "B2C" | "B2B";
   customerComplaintIssue?: string;
   previousServiceHistory?: string;
   estimatedServiceTime?: string;
   estimatedCost?: string;
   odometerReading?: string;
-  isMajorIssue?: boolean;
   documentationFiles?: {
     customerIdProof?: number;
     vehicleRCCopy?: number;
@@ -87,7 +91,6 @@ interface AppointmentForm {
   estimatedServiceTime?: string;
   estimatedCost?: string;
   odometerReading?: string;
-  isMajorIssue?: boolean;
   // Documentation
   customerIdProof?: DocumentationFiles;
   vehicleRCCopy?: DocumentationFiles;
@@ -168,7 +171,6 @@ interface ServiceIntakeForm {
   estimatedServiceTime: string;
   estimatedCost: string;
   odometerReading: string;
-  isMajorIssue: boolean;
   
   // Operational Details (Job Card)
   estimatedDeliveryDate: string;
@@ -267,7 +269,6 @@ const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   estimatedServiceTime: undefined,
   estimatedCost: undefined,
   odometerReading: undefined,
-  isMajorIssue: undefined,
   // Documentation
   customerIdProof: undefined,
   vehicleRCCopy: undefined,
@@ -334,7 +335,6 @@ const INITIAL_SERVICE_INTAKE_FORM: ServiceIntakeForm = {
   estimatedServiceTime: "",
   estimatedCost: "",
   odometerReading: "",
-  isMajorIssue: false,
   
   // Operational Details (Job Card)
   estimatedDeliveryDate: "",
@@ -362,6 +362,15 @@ import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 
 const SERVICE_TYPES = SERVICE_TYPE_OPTIONS;
+
+const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
+  "1": "SC001",
+  "2": "SC002",
+  "3": "SC003",
+  "sc-001": "SC001",
+  "sc-002": "SC002",
+  "sc-003": "SC003",
+};
 
 const STATUS_CONFIG: Record<AppointmentStatus, { bg: string; text: string }> = {
   Confirmed: { bg: "bg-green-100", text: "text-green-800" },
@@ -400,9 +409,6 @@ const validateAppointmentForm = (form: AppointmentForm, isCallCenter: boolean = 
     return "Please select a service center to assign this appointment.";
   }
   // If major issue is checked, customer complaint is required
-  if (form.isMajorIssue && !form.customerComplaintIssue) {
-    return "Customer Complaint/Issue Description is required for major issues.";
-  }
   return null;
 };
 
@@ -714,18 +720,87 @@ function AppointmentsContent() {
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
   const shouldFilterAppointments = shouldFilterByServiceCenter(serviceCenterContext);
 
+  // Normalize appointments: if they have assignedServiceCenter but no serviceCenterId, resolve it
+  const normalizeAppointments = useCallback((appointments: AppointmentRecord[]): AppointmentRecord[] => {
+    return appointments.map((appointment) => {
+      // If appointment already has serviceCenterId, return as is
+      if (appointment.serviceCenterId) {
+        return appointment;
+      }
+      
+      // If appointment has assignedServiceCenter (name) but no serviceCenterId, resolve it
+      const assignedCenter = (appointment as any).assignedServiceCenter;
+      if (assignedCenter && !appointment.serviceCenterId) {
+        const center = staticServiceCenters.find(
+          (c) => c.name === assignedCenter
+        );
+        if (center) {
+          return {
+            ...appointment,
+            serviceCenterId: (center as any).serviceCenterId || center.id?.toString() || null,
+            serviceCenterName: assignedCenter,
+          };
+        }
+      }
+      
+      return appointment;
+    });
+  }, []);
+
   const initializeAppointments = () => {
     if (typeof window !== "undefined") {
       const storedAppointments = safeStorage.getItem<AppointmentRecord[]>("appointments", []);
       const baseAppointments = storedAppointments.length > 0 ? storedAppointments : (defaultAppointments as AppointmentRecord[]);
+      // Normalize appointments to ensure serviceCenterId is set
+      const normalizedAppointments = normalizeAppointments(baseAppointments);
       return shouldFilterAppointments
-        ? filterByServiceCenter(baseAppointments, serviceCenterContext)
-        : baseAppointments;
+        ? filterByServiceCenter(normalizedAppointments, serviceCenterContext)
+        : normalizedAppointments;
     }
     return defaultAppointments as AppointmentRecord[];
   };
 
   const [appointments, setAppointments] = useState<AppointmentRecord[]>(initializeAppointments);
+
+  // Reload appointments from localStorage when component mounts or when serviceCenterContext changes
+  useEffect(() => {
+    const loadAppointments = () => {
+      if (typeof window !== "undefined") {
+        const storedAppointments = safeStorage.getItem<AppointmentRecord[]>("appointments", []);
+        const baseAppointments = storedAppointments.length > 0 ? storedAppointments : (defaultAppointments as AppointmentRecord[]);
+        // Normalize appointments to ensure serviceCenterId is set
+        const normalizedAppointments = normalizeAppointments(baseAppointments);
+        const filteredAppointments = shouldFilterAppointments
+          ? filterByServiceCenter(normalizedAppointments, serviceCenterContext)
+          : normalizedAppointments;
+        setAppointments(filteredAppointments);
+        
+        // Persist normalized appointments back to localStorage if they were updated
+        const needsUpdate = normalizedAppointments.some((app, index) => {
+          const original = baseAppointments[index];
+          return original && !original.serviceCenterId && app.serviceCenterId;
+        });
+        if (needsUpdate) {
+          safeStorage.setItem("appointments", normalizedAppointments);
+        }
+      }
+    };
+
+    // Load appointments on mount
+    loadAppointments();
+
+    // Listen for storage events (when appointments are updated from another tab/window)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "appointments") {
+        loadAppointments();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [serviceCenterContext, shouldFilterAppointments, normalizeAppointments]);
 
   const [appointmentForm, setAppointmentForm] = useState<AppointmentForm>(INITIAL_APPOINTMENT_FORM);
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentRecord | null>(null);
@@ -1048,8 +1123,9 @@ function AppointmentsContent() {
   }, [selectedCustomer, availableServiceCenters]);
 
   // Convert Appointment to Job Card
-  const convertAppointmentToJobCard = useCallback((appointment: AppointmentRecord): JobCard => {
-    const serviceCenterCode = "SC001"; // In production, get from user context or serviceCenterName
+  const convertAppointmentToJobCard = useCallback(async (appointment: AppointmentRecord): Promise<JobCard> => {
+    const serviceCenterId = serviceCenterContext.serviceCenterId?.toString() || appointment.serviceCenterId?.toString() || "sc-001";
+    const serviceCenterCode = SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -1075,24 +1151,74 @@ function AppointmentsContent() {
     const vehicleMake = vehicleParts ? vehicleParts[1] : appointment.vehicle.split(" ")[0] || "";
     const vehicleModel = vehicleParts ? vehicleParts[2] : appointment.vehicle.split(" ").slice(1, -1).join(" ") || "";
     
-    // Create job card from appointment
+    // Try to fetch customer and vehicle data to populate PART 1
+    let customerData: CustomerWithVehicles | null = null;
+    let vehicleData: Vehicle | null = null;
+    
+    // Try to find customer by phone or external ID
+    if (appointment.customerExternalId) {
+      try {
+        customerData = await customerService.getById(appointment.customerExternalId);
+        // Find matching vehicle
+        if (customerData.vehicles) {
+          vehicleData = customerData.vehicles.find((v) => {
+            const vehicleString = formatVehicleString(v);
+            return vehicleString === appointment.vehicle || 
+                   v.vehicleMake === vehicleMake || 
+                   v.registration === appointment.vehicle;
+          }) || customerData.vehicles[0] || null;
+        }
+      } catch (err) {
+        console.warn("Could not fetch customer data for job card:", err);
+      }
+    }
+    
+    // Populate PART 1 from customer/vehicle data or use appointment data
+    const part1 = customerData && vehicleData
+      ? populateJobCardPart1(
+          customerData,
+          vehicleData,
+          jobCardNumber,
+          {
+            customerFeedback: appointment.customerComplaintIssue || "",
+            estimatedDeliveryDate: appointment.estimatedDeliveryDate || "",
+            warrantyStatus: "", // Will be filled from service intake form
+          }
+        )
+      : createEmptyJobCardPart1(jobCardNumber);
+    
+    // If customer/vehicle data not found, populate from appointment
+    if (!customerData) {
+      part1.fullName = appointment.customerName;
+      part1.mobilePrimary = appointment.phone;
+      part1.customerType = appointment.customerType || "";
+      part1.customerFeedback = appointment.customerComplaintIssue || "";
+      part1.estimatedDeliveryDate = appointment.estimatedDeliveryDate || "";
+    }
+    if (!vehicleData) {
+      part1.vehicleBrand = vehicleMake;
+      part1.vehicleModel = vehicleModel;
+      part1.registrationNumber = ""; // Will be filled from service intake form
+    }
+    
+    // Create job card from appointment with structured PART 1
     const newJobCard: JobCard = {
       id: `JC-${Date.now()}`,
       jobCardNumber,
-      serviceCenterId: appointment.serviceCenterId?.toString() || "sc-001",
+      serviceCenterId: appointment.serviceCenterId?.toString() || serviceCenterContext.serviceCenterId?.toString() || "sc-001",
       serviceCenterCode,
-      customerId: `customer-${appointment.id}`, // Temporary ID, in production use actual customer ID
+      customerId: customerData?.id?.toString() || appointment.customerExternalId?.toString() || `customer-${appointment.id}`,
       customerName: appointment.customerName,
-      vehicleId: undefined, // Will be set when vehicle is found
+      vehicleId: vehicleData?.id?.toString(),
       vehicle: appointment.vehicle,
-      registration: "", // Will be populated from vehicle search if available
+      registration: vehicleData?.registration || "",
       vehicleMake,
       vehicleModel,
       customerType: appointment.customerType,
       serviceType: appointment.serviceType,
       description: appointment.customerComplaintIssue || `Service: ${appointment.serviceType}`,
       status: "Created",
-      priority: appointment.isMajorIssue ? "High" : "Normal",
+      priority: "Normal",
       assignedEngineer: appointment.assignedTechnician || null,
       estimatedCost: appointment.estimatedCost ? `₹${appointment.estimatedCost}` : "₹0",
       estimatedTime: appointment.estimatedServiceTime || "To be determined",
@@ -1103,6 +1229,11 @@ function AppointmentsContent() {
       sourceAppointmentId: appointment.id,
       isTemporary: true,
       customerArrivalTimestamp: new Date().toISOString(),
+      // Structured PART 1 data
+      part1,
+      // PART 2 will be populated from service intake form
+      part2: [],
+      // PART 2A and PART 3 will be populated later if needed
     };
     
     // Save job card
@@ -1111,7 +1242,7 @@ function AppointmentsContent() {
     setCurrentJobCardId(newJobCard.id);
     
     return newJobCard;
-  }, []);
+  }, [serviceCenterContext]);
 
   const updateStoredJobCard = useCallback(
     (jobId: string, updater: (card: JobCard) => JobCard) => {
@@ -1123,11 +1254,28 @@ function AppointmentsContent() {
     []
   );
 
-  const handleSaveDraft = useCallback(() => {
+  const handleSaveDraft = useCallback(async () => {
     if (!currentJobCardId) {
       showToast("Please arrive a customer before saving a draft.", "error");
       return;
     }
+    
+    // Try to fetch customer data for PART 1
+    let customerData: CustomerWithVehicles | null = null;
+    let vehicleData: Vehicle | null = null;
+    
+    if (selectedCustomer) {
+      customerData = selectedCustomer;
+      vehicleData = selectedCustomer.vehicles?.find((v) => 
+        formatVehicleString(v) === selectedAppointment?.vehicle
+      ) || selectedCustomer.vehicles?.[0] || null;
+    } else if (detailCustomer) {
+      customerData = detailCustomer;
+      vehicleData = detailCustomer.vehicles?.find((v) => 
+        formatVehicleString(v) === selectedAppointment?.vehicle
+      ) || detailCustomer.vehicles?.[0] || null;
+    }
+    
     const intakeSnapshot = {
       ...serviceIntakeForm,
       customerIdProof: {
@@ -1148,16 +1296,62 @@ function AppointmentsContent() {
       },
     };
 
+    // Get current job card to preserve jobCardNumber
+    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    const currentJobCard = storedJobCards.find((card) => card.id === currentJobCardId);
+    const jobCardNumber = currentJobCard?.jobCardNumber || "";
+
+    // Populate PART 1 from service intake form
+    const part1 = customerData && vehicleData
+      ? populateJobCardPart1(
+          customerData,
+          vehicleData,
+          jobCardNumber,
+          {
+            customerFeedback: serviceIntakeForm.customerComplaintIssue || "",
+            technicianObservation: serviceIntakeForm.checkInNotes || "",
+            insuranceStartDate: serviceIntakeForm.insuranceStartDate || "",
+            insuranceEndDate: serviceIntakeForm.insuranceEndDate || "",
+            insuranceCompanyName: serviceIntakeForm.insuranceCompanyName || "",
+            variantBatteryCapacity: serviceIntakeForm.variantBatteryCapacity || "",
+            warrantyStatus: serviceIntakeForm.warrantyStatus || "",
+            estimatedDeliveryDate: serviceIntakeForm.estimatedDeliveryDate || "",
+            batterySerialNumber: "", // Will be filled if applicable
+            mcuSerialNumber: "", // Will be filled if applicable
+            vcuSerialNumber: "", // Will be filled if applicable
+            otherPartSerialNumber: "", // Will be filled if applicable
+          }
+        )
+      : createEmptyJobCardPart1(jobCardNumber);
+
+    // Override with service intake form data
+    if (serviceIntakeForm.vehicleBrand) part1.vehicleBrand = serviceIntakeForm.vehicleBrand;
+    if (serviceIntakeForm.vehicleModel) part1.vehicleModel = serviceIntakeForm.vehicleModel;
+    if (serviceIntakeForm.registrationNumber) part1.registrationNumber = serviceIntakeForm.registrationNumber;
+    if (serviceIntakeForm.vinChassisNumber) part1.vinChassisNumber = serviceIntakeForm.vinChassisNumber;
+    if (serviceIntakeForm.variantBatteryCapacity) part1.variantBatteryCapacity = serviceIntakeForm.variantBatteryCapacity;
+    if (serviceIntakeForm.warrantyStatus) part1.warrantyStatus = serviceIntakeForm.warrantyStatus;
+    if (serviceIntakeForm.estimatedDeliveryDate) part1.estimatedDeliveryDate = serviceIntakeForm.estimatedDeliveryDate;
+    if (serviceIntakeForm.customerComplaintIssue) part1.customerFeedback = serviceIntakeForm.customerComplaintIssue;
+    if (serviceIntakeForm.checkInNotes) part1.technicianObservation = serviceIntakeForm.checkInNotes;
+    if (serviceIntakeForm.insuranceStartDate) part1.insuranceStartDate = serviceIntakeForm.insuranceStartDate;
+    if (serviceIntakeForm.insuranceEndDate) part1.insuranceEndDate = serviceIntakeForm.insuranceEndDate;
+    if (serviceIntakeForm.insuranceCompanyName) part1.insuranceCompanyName = serviceIntakeForm.insuranceCompanyName;
+
     const updated = updateStoredJobCard(currentJobCardId, (card) => ({
       ...card,
       status: "Created",
       draftIntake: intakeSnapshot,
+      // Update PART 1 with service intake form data
+      part1,
+      // PART 2 will be populated when parts are added
+      part2: card.part2 || [],
     }));
     if (updated) {
       setCurrentJobCardId(updated.id);
     }
     showToast("Job card saved as draft.", "success");
-  }, [currentJobCardId, showToast, updateStoredJobCard, serviceIntakeForm]);
+  }, [currentJobCardId, showToast, updateStoredJobCard, serviceIntakeForm, selectedCustomer, detailCustomer, selectedAppointment]);
 
   const handleViewVehicleDetails = useCallback(() => {
     if (!selectedAppointment) return;
@@ -1175,9 +1369,111 @@ function AppointmentsContent() {
     setCurrentJobCard(jobCard);
   }, [currentJobCardId]);
 
+  // Generate check-in slip data
+  const generateCheckInSlipData = useCallback((): CheckInSlipData | null => {
+    if (!selectedAppointment || !currentJobCard) return null;
+
+    const serviceCenterId = selectedAppointment.serviceCenterId?.toString() || serviceCenterContext.serviceCenterId?.toString() || "sc-001";
+    const serviceCenterCode = SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
+    const serviceCenter = defaultServiceCenters.find(
+      (sc) => (sc as any).serviceCenterId === serviceCenterId || sc.id?.toString() === serviceCenterId
+    );
+
+    const now = new Date();
+    const checkInDate = serviceIntakeForm.checkInDate || now.toISOString().split("T")[0];
+    const checkInTime = serviceIntakeForm.checkInTime || now.toTimeString().slice(0, 5);
+    const slipNumber = serviceIntakeForm.checkInSlipNumber || generateCheckInSlipNumber(serviceCenterCode);
+
+    // Extract vehicle details
+    const vehicleParts = selectedAppointment.vehicle.match(/^(.+?)\s+(.+?)\s+\((\d+)\)$/);
+    const vehicleMake = vehicleParts ? vehicleParts[1] : selectedAppointment.vehicle.split(" ")[0] || "";
+    const vehicleModel = vehicleParts ? vehicleParts[2] : selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "";
+
+    // Get registration from service intake form or job card
+    const registrationNumber = serviceIntakeForm.registrationNumber || currentJobCard.registration || "";
+    const vin = serviceIntakeForm.vinChassisNumber || currentJobCard.vehicleId || "";
+
+    // Get customer email if available
+    const customerEmail = detailCustomer?.email || selectedCustomer?.email || undefined;
+
+    // Parse service center location for address components
+    const locationParts = serviceCenter?.location?.split(",") || [];
+    const serviceCenterAddress = locationParts[0]?.trim() || serviceCenter?.location || "";
+    const serviceCenterCity = locationParts[1]?.trim() || "";
+    const serviceCenterState = locationParts[2]?.trim() || "";
+    const serviceCenterPincode = ""; // Not in mock data, can be added later
+
+    return {
+      slipNumber,
+      customerName: selectedAppointment.customerName,
+      phone: selectedAppointment.phone,
+      email: customerEmail,
+      vehicleMake,
+      vehicleModel,
+      registrationNumber,
+      vin: vin || undefined,
+      checkInDate,
+      checkInTime,
+      serviceCenterName: serviceCenter?.name || serviceCenterContext.serviceCenterName || "Service Center",
+      serviceCenterAddress,
+      serviceCenterCity,
+      serviceCenterState,
+      serviceCenterPincode,
+      serviceCenterPhone: undefined, // Can be added to service center data
+      expectedServiceDate: serviceIntakeForm.estimatedDeliveryDate || selectedAppointment.estimatedDeliveryDate || undefined,
+      serviceType: serviceIntakeForm.serviceType || selectedAppointment.serviceType || undefined,
+      notes: serviceIntakeForm.checkInNotes || undefined,
+    };
+  }, [selectedAppointment, currentJobCard, serviceIntakeForm, detailCustomer, selectedCustomer, serviceCenterContext]);
+
   const handleArrivalModeSelect = useCallback((mode: AppointmentForm["arrivalMode"] | null) => {
+    if (!selectedAppointment) return;
+
     setArrivalMode(mode);
-  }, []);
+    setServiceIntakeForm((prev) => ({ ...prev, arrivalMode: mode || "" }));
+
+    // If vehicle is present, generate check-in slip immediately
+    if (mode === "vehicle_present") {
+      // Ensure job card exists
+      if (!currentJobCardId) {
+        showToast("Please wait for job card to be created first.", "error");
+        setArrivalMode(null);
+        setServiceIntakeForm((prev) => ({ ...prev, arrivalMode: "" }));
+        return;
+      }
+
+      // Generate check-in slip data
+      const slipData = generateCheckInSlipData();
+      if (slipData) {
+        setCheckInSlipData(slipData);
+        setServiceIntakeForm((prev) => ({
+          ...prev,
+          checkInSlipNumber: slipData.slipNumber,
+          checkInDate: slipData.checkInDate,
+          checkInTime: slipData.checkInTime,
+        }));
+
+        // Show check-in slip modal
+        setShowCheckInSlipModal(true);
+        showToast("Check-in slip generated. Vehicle is confirmed at service center.", "success");
+      }
+    } else if (mode === "vehicle_absent") {
+      // Check if pickup/drop address is provided
+      const hasPickupAddress = selectedAppointment.pickupDropRequired && 
+        (selectedAppointment.pickupAddress || selectedAppointment.dropAddress);
+      
+      if (!hasPickupAddress) {
+        showToast("Vehicle Absent mode requires pickup/drop address. Please update appointment with pickup/drop address first.", "error");
+        setArrivalMode(null);
+        setServiceIntakeForm((prev) => ({ ...prev, arrivalMode: "" }));
+        return;
+      }
+
+      // For vehicle absent with pickup address, check-in slip will be generated when vehicle is picked up
+      setCheckInSlipData(null);
+      showToast("Vehicle will be picked up from provided address. Check-in slip will be generated when vehicle arrives.", "success");
+    }
+  }, [selectedAppointment, currentJobCardId, generateCheckInSlipData, showToast]);
 
   useEffect(() => {
     if (!currentJobCardId) {
@@ -1246,20 +1542,17 @@ function AppointmentsContent() {
               ...apt,
               ...appointmentForm,
       duration: "2 hours",
-              status: appointmentForm.isMajorIssue ? "Sent to Manager" : apt.status,
+              status: apt.status,
               serviceCenterId: appointmentForm.serviceCenterId,
               serviceCenterName: selectedServiceCenter?.name,
-              // If major issue, mark estimated service time
-              estimatedServiceTime: appointmentForm.isMajorIssue ? "Major Issue - Requires Manager Review" : appointmentForm.estimatedServiceTime,
+              estimatedServiceTime: appointmentForm.estimatedServiceTime,
             }
           : apt
       );
       setAppointments(updatedAppointments);
       safeStorage.setItem("appointments", updatedAppointments);
       
-      const successMessage = appointmentForm.isMajorIssue
-        ? "Appointment with major issue has been sent to Service Manager."
-        : selectedServiceCenter
+      const successMessage = selectedServiceCenter
         ? `Appointment updated and assigned to ${selectedServiceCenter.name}!`
         : "Appointment updated successfully!";
       showToast(successMessage, "success");
@@ -1273,19 +1566,16 @@ function AppointmentsContent() {
         id: getNextAppointmentId(appointments),
         ...appointmentForm,
         duration: "2 hours",
-        status: appointmentForm.isMajorIssue ? "Sent to Manager" : "Confirmed",
+        status: "Confirmed",
         serviceCenterId: appointmentForm.serviceCenterId ?? contextServiceCenterId,
         serviceCenterName: selectedServiceCenter?.name ?? contextServiceCenterName,
-        // If major issue, mark estimated service time
-        estimatedServiceTime: appointmentForm.isMajorIssue ? "Major Issue - Requires Manager Review" : appointmentForm.estimatedServiceTime,
+        estimatedServiceTime: appointmentForm.estimatedServiceTime,
       };
       const updatedAppointments = [...appointments, newAppointment];
       setAppointments(updatedAppointments);
       safeStorage.setItem("appointments", updatedAppointments);
       
-      const successMessage = appointmentForm.isMajorIssue
-        ? "Appointment with major issue has been sent to Service Manager."
-        : selectedServiceCenter
+      const successMessage = selectedServiceCenter
         ? `Appointment scheduled successfully and assigned to ${selectedServiceCenter.name}!`
         : "Appointment scheduled successfully!";
       showToast(successMessage, "success");
@@ -1461,44 +1751,9 @@ function AppointmentsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Service Intake Handlers - Send to Service Manager (for Major Issues)
-  const handleSendToServiceManager = useCallback(() => {
-    if (!selectedAppointment) return;
-
-    // Basic validation for major issue
-    if (!serviceIntakeForm.serviceType || !serviceIntakeForm.customerComplaintIssue) {
-      showToast("Please fill in Service Type and Customer Complaint/Issue Description.", "error");
-      return;
-    }
-
-    // Update appointment with major issue flag and send to service manager
-    const updatedAppointments = appointments.map((apt) =>
-      apt.id === selectedAppointment.id
-        ? { 
-            ...apt, 
-            status: "Sent to Manager",
-            customerComplaintIssue: serviceIntakeForm.customerComplaintIssue,
-            serviceType: serviceIntakeForm.serviceType,
-            previousServiceHistory: serviceIntakeForm.previousServiceHistory,
-            // Mark as major issue in appointment
-            estimatedServiceTime: "Major Issue - Requires Manager Review",
-          }
-        : apt
-    );
-
-    setAppointments(updatedAppointments);
-    safeStorage.setItem("appointments", updatedAppointments);
-    
-    // Reset form and close modal
-    setServiceIntakeForm(INITIAL_SERVICE_INTAKE_FORM);
-    setCustomerArrivalStatus(null);
-    closeDetailModal();
-    
-    showToast("Appointment with major issue has been sent to Service Manager.", "success");
-  }, [selectedAppointment, serviceIntakeForm, appointments, closeDetailModal, showToast]);
 
   // Service Intake Handlers - Convert to Estimation/Quotation
-  const handleConvertToQuotation = useCallback(() => {
+  const handleConvertToQuotation = useCallback(async () => {
     if (!selectedAppointment) return;
 
     // Basic validation
@@ -1507,9 +1762,97 @@ function AppointmentsContent() {
       return;
     }
 
-    if (!serviceIntakeForm.jobCardId) {
+    if (!currentJobCardId) {
       showToast("Select an arrival mode to generate the job card before creating a quotation.", "error");
       return;
+    }
+
+    // Try to fetch customer data for PART 1
+    let customerData: CustomerWithVehicles | null = null;
+    let vehicleData: Vehicle | null = null;
+    
+    if (selectedCustomer) {
+      customerData = selectedCustomer;
+      vehicleData = selectedCustomer.vehicles?.find((v) => 
+        formatVehicleString(v) === selectedAppointment.vehicle
+      ) || selectedCustomer.vehicles?.[0] || null;
+    } else if (detailCustomer) {
+      customerData = detailCustomer;
+      vehicleData = detailCustomer.vehicles?.find((v) => 
+        formatVehicleString(v) === selectedAppointment.vehicle
+      ) || detailCustomer.vehicles?.[0] || null;
+    }
+
+    // Get current job card to preserve jobCardNumber
+    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    const currentJobCard = storedJobCards.find((card) => card.id === currentJobCardId);
+    const jobCardNumber = currentJobCard?.jobCardNumber || "";
+
+    // Populate PART 1 from service intake form
+    const part1 = customerData && vehicleData
+      ? populateJobCardPart1(
+          customerData,
+          vehicleData,
+          jobCardNumber,
+          {
+            customerFeedback: serviceIntakeForm.customerComplaintIssue || "",
+            technicianObservation: serviceIntakeForm.checkInNotes || "",
+            insuranceStartDate: serviceIntakeForm.insuranceStartDate || "",
+            insuranceEndDate: serviceIntakeForm.insuranceEndDate || "",
+            insuranceCompanyName: serviceIntakeForm.insuranceCompanyName || "",
+            variantBatteryCapacity: serviceIntakeForm.variantBatteryCapacity || "",
+            warrantyStatus: serviceIntakeForm.warrantyStatus || "",
+            estimatedDeliveryDate: serviceIntakeForm.estimatedDeliveryDate || "",
+          }
+        )
+      : createEmptyJobCardPart1(jobCardNumber);
+
+    // Override with service intake form data
+    if (serviceIntakeForm.vehicleBrand) part1.vehicleBrand = serviceIntakeForm.vehicleBrand;
+    if (serviceIntakeForm.vehicleModel) part1.vehicleModel = serviceIntakeForm.vehicleModel;
+    if (serviceIntakeForm.registrationNumber) part1.registrationNumber = serviceIntakeForm.registrationNumber;
+    if (serviceIntakeForm.vinChassisNumber) part1.vinChassisNumber = serviceIntakeForm.vinChassisNumber;
+    if (serviceIntakeForm.variantBatteryCapacity) part1.variantBatteryCapacity = serviceIntakeForm.variantBatteryCapacity;
+    if (serviceIntakeForm.warrantyStatus) part1.warrantyStatus = serviceIntakeForm.warrantyStatus;
+    if (serviceIntakeForm.estimatedDeliveryDate) part1.estimatedDeliveryDate = serviceIntakeForm.estimatedDeliveryDate;
+    if (serviceIntakeForm.customerComplaintIssue) part1.customerFeedback = serviceIntakeForm.customerComplaintIssue;
+    if (serviceIntakeForm.checkInNotes) part1.technicianObservation = serviceIntakeForm.checkInNotes;
+    if (serviceIntakeForm.insuranceStartDate) part1.insuranceStartDate = serviceIntakeForm.insuranceStartDate;
+    if (serviceIntakeForm.insuranceEndDate) part1.insuranceEndDate = serviceIntakeForm.insuranceEndDate;
+    if (serviceIntakeForm.insuranceCompanyName) part1.insuranceCompanyName = serviceIntakeForm.insuranceCompanyName;
+
+    // Populate PART 2A if warranty/insurance evidence exists
+    const part2A = (serviceIntakeForm.photosVideos.urls.length > 0 || 
+                     serviceIntakeForm.warrantyCardServiceBook.urls.length > 0)
+      ? {
+          videoEvidence: serviceIntakeForm.photosVideos.urls.some(url => url.includes('video') || url.includes('mp4')) ? "Yes" : "No" as "Yes" | "No" | "",
+          vinImage: serviceIntakeForm.photosVideos.urls.some(url => url.includes('vin')) ? "Yes" : "No" as "Yes" | "No" | "",
+          odoImage: serviceIntakeForm.photosVideos.urls.some(url => url.includes('odo')) ? "Yes" : "No" as "Yes" | "No" | "",
+          damageImages: serviceIntakeForm.photosVideos.urls.length > 0 ? "Yes" : "No" as "Yes" | "No" | "",
+          issueDescription: serviceIntakeForm.customerComplaintIssue || "",
+          numberOfObservations: String(serviceIntakeForm.photosVideos.urls.length),
+          symptom: serviceIntakeForm.previousServiceHistory || "",
+          defectPart: serviceIntakeForm.customerComplaintIssue || "",
+        }
+      : undefined;
+
+    // Update job card with structured PART 1 and PART 2A before converting to quotation
+    if (currentJobCardId) {
+      updateStoredJobCard(currentJobCardId, (card) => ({
+        ...card,
+        status: "In Progress",
+        // Update PART 1 with service intake form data
+        part1,
+        // PART 2 will be populated when parts are added in quotation
+        part2: card.part2 || [],
+        // PART 2A if warranty/insurance evidence exists
+        part2A,
+        // Update legacy fields for backward compatibility
+        vehicleMake: serviceIntakeForm.vehicleBrand,
+        vehicleModel: serviceIntakeForm.vehicleModel,
+        registration: serviceIntakeForm.registrationNumber,
+        description: serviceIntakeForm.customerComplaintIssue || card.description,
+      }));
     }
 
     // Save service intake data to localStorage for quotation page to use
@@ -1535,6 +1878,7 @@ function AppointmentsContent() {
       customerId: customerIdForQuotation,
       serviceCenterId: serviceCenterIdForQuotation,
       serviceCenterName: serviceCenterNameForQuotation,
+      jobCardId: currentJobCardId,
       serviceIntakeForm: {
         ...serviceIntakeForm,
         // Convert File objects to URLs for storage (in real app, these would be uploaded first)
@@ -1569,19 +1913,12 @@ function AppointmentsContent() {
     setAppointments(updatedAppointments);
     safeStorage.setItem("appointments", updatedAppointments);
 
-    if (currentJobCardId) {
-      updateStoredJobCard(currentJobCardId, (card) => ({
-        ...card,
-        status: "In Progress",
-      }));
-    }
-
     // Navigate to quotations page
     router.push("/sc/quotations?fromAppointment=true");
     
     // Close the appointment detail modal
     closeDetailModal();
-  }, [selectedAppointment, serviceIntakeForm, appointments, router, closeDetailModal, showToast, currentJobCardId, updateStoredJobCard]);
+  }, [selectedAppointment, serviceIntakeForm, appointments, router, closeDetailModal, showToast, currentJobCardId, updateStoredJobCard, selectedCustomer, detailCustomer, serviceCenterContext]);
 
   const updateLeadForAppointment = useCallback(
     (appointment: AppointmentRecord) => {
@@ -1608,6 +1945,37 @@ function AppointmentsContent() {
   );
 
   // ==================== Effects ====================
+  // Sync customerArrivalStatus with appointment status
+  useEffect(() => {
+    if (!selectedAppointment) {
+      setCustomerArrivalStatus(null);
+      return;
+    }
+    
+    // If appointment status indicates customer has arrived, set arrival status
+    if (selectedAppointment.status === "In Progress" || selectedAppointment.status === "Sent to Manager") {
+      if (customerArrivalStatus !== "arrived") {
+        setCustomerArrivalStatus("arrived");
+      }
+      
+      // Try to find associated job card
+      if (!currentJobCardId) {
+        const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+        const associatedJobCard = storedJobCards.find(
+          (card) => card.sourceAppointmentId === selectedAppointment.id
+        );
+        if (associatedJobCard) {
+          setCurrentJobCardId(associatedJobCard.id);
+        }
+      }
+    } else if (selectedAppointment.status === "Confirmed" || selectedAppointment.status === "Pending") {
+      // Reset arrival status if appointment is still pending/confirmed
+      if (customerArrivalStatus === "arrived") {
+        setCustomerArrivalStatus(null);
+      }
+    }
+  }, [selectedAppointment, customerArrivalStatus, currentJobCardId]);
+
   // Watch for customer search results to populate vehicle details
   useEffect(() => {
     if (!customerSearchResults.length || !selectedAppointment || !showVehicleDetails) return;
@@ -1923,29 +2291,8 @@ function AppointmentsContent() {
               options={SERVICE_TYPES.map((type) => ({ value: type, label: type }))}
             />
 
-            {/* Major Issue Checkbox */}
-            <div className="bg-red-50 p-4 rounded-lg border-2 border-red-200">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={!!appointmentForm.isMajorIssue}
-                  onChange={(e) => setAppointmentForm({ ...appointmentForm, isMajorIssue: e.target.checked })}
-                  className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                />
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="text-red-600" size={20} />
-                  <span className="text-base font-bold text-red-700">Major Issue - Send to Service Manager Directly</span>
-                </div>
-              </label>
-              {appointmentForm.isMajorIssue && (
-                <p className="text-sm text-red-600 mt-2 ml-8">
-                  Appointment will be sent directly to Service Manager. Only Service Type and Customer Complaint are required.
-                </p>
-              )}
-            </div>
-
-            {/* Service Center - Hidden for Service Advisor when major issue, always visible for Call Center */}
-            {(isCallCenter || (isServiceAdvisor && !appointmentForm.isMajorIssue)) && (
+            {/* Service Center */}
+            {(isCallCenter || isServiceAdvisor) && (
               <div className="space-y-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="flex-1">
@@ -2028,9 +2375,7 @@ function AppointmentsContent() {
                       readOnly={isEditing && !canEditServiceDetailsSection}
                     />
                   </div>
-                  {/* Additional fields - Hidden when major issue */}
-                  {!appointmentForm.isMajorIssue && (
-                    <>
+                  {/* Additional fields */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                           Previous Service History
@@ -2089,15 +2434,13 @@ function AppointmentsContent() {
                           disabled={isEditing && !canEditServiceDetailsSection}
                           readOnly={isEditing && !canEditServiceDetailsSection}
                         />
-                      )}
-                    </>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Documentation Section (Call Center, Service Advisor, SC Manager when editing) - Hidden when major issue */}
-            {(isCallCenter || isServiceAdvisor || (isEditing && canEditDocumentationSection)) && !appointmentForm.isMajorIssue && (
+            {/* Documentation Section (Call Center, Service Advisor, SC Manager when editing) */}
+            {(isCallCenter || isServiceAdvisor || (isEditing && canEditDocumentationSection)) && (
               <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <Upload className="text-amber-600" size={20} />
@@ -2304,8 +2647,8 @@ function AppointmentsContent() {
               </div>
             </div>
 
-          {/* Operational Details Section - Hidden when major issue */}
-          {(isCallCenter || isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && !appointmentForm.isMajorIssue && (
+          {/* Operational Details Section */}
+          {(isCallCenter || isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <Clock className="text-blue-600" size={20} />
@@ -2473,8 +2816,8 @@ function AppointmentsContent() {
             </div>
           )}
 
-          {/* Billing & Payment Section - Hidden when major issue */}
-          {(canAccessBillingSection || (isEditing && canEditBillingPaymentSection)) && !appointmentForm.isMajorIssue && (
+          {/* Billing & Payment Section */}
+          {(canAccessBillingSection || (isEditing && canEditBillingPaymentSection)) && (
             <div className="bg-white p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <FileText className="text-indigo-600" size={20} />
@@ -2546,22 +2889,12 @@ function AppointmentsContent() {
             <button onClick={closeAppointmentModal} className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition">
               Cancel
             </button>
-            {appointmentForm.isMajorIssue ? (
-              <button
-                onClick={handleSubmitAppointment}
-                className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
-              >
-                <AlertTriangle size={18} />
-                Send to Manager
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmitAppointment}
-                className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
-              >
-                Schedule Appointment
-              </button>
-            )}
+            <button
+              onClick={handleSubmitAppointment}
+              className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+            >
+              Schedule Appointment
+            </button>
             </div>
         </div>
       </Modal>
@@ -2696,8 +3029,11 @@ function AppointmentsContent() {
               </div>
             </div>
 
-            {/* Customer Arrival Section (Service Advisor Only) */}
-            {isServiceAdvisor && (
+            {/* Customer Arrival Section (Service Advisor Only) - Only show if customer hasn't arrived yet */}
+            {isServiceAdvisor && 
+             customerArrivalStatus !== "arrived" && 
+             selectedAppointment.status !== "In Progress" && 
+             selectedAppointment.status !== "Sent to Manager" && (
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <CheckCircle size={20} className="text-blue-600" />
@@ -2709,10 +3045,11 @@ function AppointmentsContent() {
                       if (!selectedAppointment) return;
                       
                       // Automatically create job card when customer arrives
+                      (async () => {
                       try {
-                        const jobCard = convertAppointmentToJobCard(selectedAppointment);
+                          const jobCard = await convertAppointmentToJobCard(selectedAppointment);
                         
-                        // Update appointment status
+                          // Update appointment status to "In Progress"
                         const updatedAppointments = appointments.map((apt) =>
                           apt.id === selectedAppointment.id
                             ? { ...apt, status: "In Progress" }
@@ -2721,34 +3058,45 @@ function AppointmentsContent() {
                         setAppointments(updatedAppointments);
                         safeStorage.setItem("appointments", updatedAppointments);
 
+                          // Update selectedAppointment state to reflect status change
+                          setSelectedAppointment({ ...selectedAppointment, status: "In Progress" });
+
                         // Show success message
                         showToast(
-                          `Job Card Created: ${jobCard.jobCardNumber}. Customer arrival recorded.`,
+                            `Job Card Created: ${jobCard.jobCardNumber}. Customer arrival recorded. Appointment status updated to "In Progress".`,
                           "success"
                         );
                         
-                        // Pre-fill form with appointment data
+                          // Pre-fill form with appointment and job card PART 1 data
                         setServiceIntakeForm({
                           ...INITIAL_SERVICE_INTAKE_FORM,
-                          serviceType: selectedAppointment.serviceType,
-                          vehicleBrand: selectedAppointment.vehicle.split(" ")[0] || "",
-                          vehicleModel: selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
+                            serviceType: selectedAppointment.serviceType || jobCard.part1?.vehicleBrand || "",
+                            vehicleBrand: jobCard.part1?.vehicleBrand || selectedAppointment.vehicle.split(" ")[0] || "",
+                            vehicleModel: jobCard.part1?.vehicleModel || selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
+                            registrationNumber: jobCard.part1?.registrationNumber || "",
+                            vinChassisNumber: jobCard.part1?.vinChassisNumber || "",
+                            variantBatteryCapacity: jobCard.part1?.variantBatteryCapacity || "",
+                            warrantyStatus: jobCard.part1?.warrantyStatus || "",
+                            estimatedDeliveryDate: jobCard.part1?.estimatedDeliveryDate || selectedAppointment.estimatedDeliveryDate || "",
+                            insuranceStartDate: jobCard.part1?.insuranceStartDate || "",
+                            insuranceEndDate: jobCard.part1?.insuranceEndDate || "",
+                            insuranceCompanyName: jobCard.part1?.insuranceCompanyName || "",
+                            customerComplaintIssue: jobCard.part1?.customerFeedback || selectedAppointment.customerComplaintIssue || "",
+                            jobCardId: jobCard.id,
                         });
 
                         // Set arrival status
                         setCustomerArrivalStatus("arrived");
+                          setCurrentJobCardId(jobCard.id);
                         // Ensure detail modal stays open so advisor can fill intake
                         setShowDetailModal(true);
                       } catch (error) {
                         console.error("Error creating job card:", error);
                         showToast("Failed to create job card. Please try again.", "error");
                       }
+                      })();
                     }}
-                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition ${
-                      customerArrivalStatus === "arrived"
-                        ? "bg-green-600 text-white"
-                        : "bg-white text-gray-700 border border-gray-300 hover:bg-green-50"
-                    }`}
+                    className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-white text-gray-700 border border-gray-300 hover:bg-green-50"
                   >
                     <CheckCircle size={18} className="inline mr-2" />
                     Customer Arrived
@@ -2771,6 +3119,27 @@ function AppointmentsContent() {
                     <AlertCircle size={18} className="inline mr-2" />
                     Customer Not Arrived
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Customer Arrival Confirmation (Service Advisor Only) - Show when customer has arrived */}
+            {isServiceAdvisor && 
+             (customerArrivalStatus === "arrived" || 
+              selectedAppointment.status === "In Progress" || 
+              selectedAppointment.status === "Sent to Manager") && (
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="text-green-600" size={24} />
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-800">Customer Arrived</h3>
+                    <p className="text-sm text-green-700">
+                      Appointment status: <span className="font-medium">{selectedAppointment.status}</span>
+                      {currentJobCard && (
+                        <span className="ml-2">• Job Card: <span className="font-medium">{currentJobCard.jobCardNumber}</span></span>
+                      )}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -2807,6 +3176,60 @@ function AppointmentsContent() {
                   </div>
                 </div>
 
+                {/* Arrival Mode Status Messages */}
+                {arrivalMode === "vehicle_present" && checkInSlipData && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="text-green-600" size={20} />
+                      <p className="font-semibold text-green-800">Vehicle Present - Check-in Slip Generated</p>
+                    </div>
+                    <p className="text-sm text-green-700">
+                      The vehicle is confirmed at the service center. Check-in slip has been generated and can be sent to the customer.
+                      You can now proceed to create a quotation/estimation.
+                    </p>
+                  </div>
+                )}
+
+                {arrivalMode === "vehicle_absent" && selectedAppointment?.pickupDropRequired && 
+                 (selectedAppointment.pickupAddress || selectedAppointment.dropAddress) && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="text-amber-600" size={20} />
+                      <p className="font-semibold text-amber-800">Vehicle Will Be Picked Up</p>
+                    </div>
+                    <p className="text-sm text-amber-700 mb-3">
+                      Vehicle will be picked up from: <span className="font-medium">{selectedAppointment.pickupAddress || selectedAppointment.dropAddress}</span>
+                    </p>
+                    {!checkInSlipData && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!currentJobCardId) {
+                            showToast("Please wait for job card to be created first.", "error");
+                            return;
+                          }
+                          const slipData = generateCheckInSlipData();
+                          if (slipData) {
+                            setCheckInSlipData(slipData);
+                            setServiceIntakeForm((prev) => ({
+                              ...prev,
+                              checkInSlipNumber: slipData.slipNumber,
+                              checkInDate: slipData.checkInDate,
+                              checkInTime: slipData.checkInTime,
+                            }));
+                            setShowCheckInSlipModal(true);
+                            showToast("Check-in slip generated. Vehicle is now at service center.", "success");
+                          }
+                        }}
+                        className="bg-amber-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-amber-700 transition text-sm flex items-center gap-2"
+                      >
+                        <FileText size={16} />
+                        Generate Check-in Slip (Vehicle Picked Up)
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-3 space-y-2">
                     <p className="text-xs font-semibold text-gray-500">Job Card</p>
@@ -2816,14 +3239,15 @@ function AppointmentsContent() {
                     <p className="text-xs text-gray-500">
                       Status: {currentJobCard?.status || "Created"}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowCheckInSlipModal(true)}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 disabled:text-gray-400"
-                      disabled={!checkInSlipData}
-                    >
-                      View / Print Check-in Slip
-                    </button>
+                    {checkInSlipData && (
+                      <button
+                        type="button"
+                        onClick={() => setShowCheckInSlipModal(true)}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 mt-2"
+                      >
+                        View / Print Check-in Slip
+                      </button>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-gray-700">Check-in Notes</label>
@@ -2839,7 +3263,7 @@ function AppointmentsContent() {
 
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700">Vehicle Condition Media</label>
-                  <input
+                    <input
                     type="file"
                     multiple
                     accept="image/*,video/*"
@@ -2859,7 +3283,7 @@ function AppointmentsContent() {
                           ) : (
                             <div className="w-full h-24 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
                               {file.name}
-                            </div>
+                    </div>
                           )}
                           <button
                             onClick={() => handleRemoveDocument("photosVideos", index)}
@@ -2868,7 +3292,7 @@ function AppointmentsContent() {
                           >
                             <Trash2 size={12} />
                           </button>
-                        </div>
+                </div>
                       ))}
                     </div>
                   )}
@@ -2881,29 +3305,7 @@ function AppointmentsContent() {
               <div className="space-y-6 border-t border-gray-200 pt-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Service Intake Form</h3>
                 
-                {/* Major Issue Checkbox - At the top */}
-                <div className="bg-red-50 p-4 rounded-lg border-2 border-red-200">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={serviceIntakeForm.isMajorIssue}
-                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, isMajorIssue: e.target.checked })}
-                      className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                    />
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="text-red-600" size={20} />
-                      <span className="text-base font-bold text-red-700">Major Issue - Send to Service Manager Directly</span>
-                    </div>
-                  </label>
-                  {serviceIntakeForm.isMajorIssue && (
-                    <p className="text-sm text-red-600 mt-2 ml-8">
-                      All other fields will be hidden. Only Service Type and Customer Complaint are required.
-                    </p>
-                  )}
-                </div>
-                
-                {/* Documentation Section - Hidden when major issue */}
-                {!serviceIntakeForm.isMajorIssue && (
+                {/* Documentation Section */}
                 <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-5 rounded-xl border border-indigo-200">
                   <h4 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-indigo-600 rounded"></span>
@@ -3098,10 +3500,8 @@ function AppointmentsContent() {
                     </div>
                   </div>
                 </div>
-                )}
 
-                {/* Vehicle Information Section - Hidden when major issue */}
-                {!serviceIntakeForm.isMajorIssue && (
+                {/* Vehicle Information Section */}
                 <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
                   <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-green-600 rounded"></span>
@@ -3196,7 +3596,6 @@ function AppointmentsContent() {
                     />
                   </div>
                 </div>
-                )}
 
                 {/* Service Details Section */}
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200">
@@ -3225,9 +3624,7 @@ function AppointmentsContent() {
                         className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
                       />
                     </div>
-                    {/* Additional fields - Hidden when major issue */}
-                    {!serviceIntakeForm.isMajorIssue && (
-                      <>
+                    {/* Additional fields */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
                             Previous Service History
@@ -3260,13 +3657,10 @@ function AppointmentsContent() {
                           placeholder="Enter odometer reading"
                           type="number"
                         />
-                      </>
-                    )}
                   </div>
                 </div>
 
-                {/* Operational Details Section (Job Card) - Hidden when major issue */}
-                {!serviceIntakeForm.isMajorIssue && (
+                {/* Operational Details Section (Job Card) */}
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200">
                   <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-blue-600 rounded"></span>
@@ -3347,10 +3741,8 @@ function AppointmentsContent() {
                     </div>
                   </div>
                 </div>
-                )}
 
-                {/* Billing & Payment Section - Hidden when major issue */}
-                {!serviceIntakeForm.isMajorIssue && (
+                {/* Billing & Payment Section */}
                 <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
                   <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
                     <span className="w-1 h-6 bg-green-600 rounded"></span>
@@ -3398,9 +3790,8 @@ function AppointmentsContent() {
                     )}
                   </div>
                 </div>
-                )}
 
-                {/* Convert to Estimation/Quotation Button or Send to Service Manager Button */}
+                {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => {
@@ -3422,15 +3813,6 @@ function AppointmentsContent() {
                   >
                     Save as Draft
                   </button>
-                  {serviceIntakeForm.isMajorIssue ? (
-                    <button
-                      onClick={handleSendToServiceManager}
-                      className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
-                    >
-                      <AlertTriangle size={18} />
-                      Send to Service Manager
-                    </button>
-                  ) : (
                     <button
                       onClick={handleConvertToQuotation}
                       className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
@@ -3438,7 +3820,6 @@ function AppointmentsContent() {
                       <FileText size={18} />
                       Convert into Estimation/Quotation
                     </button>
-                  )}
                 </div>
               </div>
             )}

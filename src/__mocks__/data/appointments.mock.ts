@@ -55,7 +55,7 @@ export const defaultAppointments: Appointment[] = [
     status: "Confirmed",
     customerExternalId: priya.externalId,
     vehicleExternalId: priya.vehicles[0].externalId,
-    serviceCenterId: 2,
+    serviceCenterId: "sc-002",
     serviceCenterName: "Mumbai Metroplex",
   },
 ];

@@ -12,7 +12,7 @@ const priyaVehicle = priya.vehicles[0];
 const buildCustomer = (customer: typeof rajesh) => {
   const [firstName, ...rest] = customer.name.split(" ");
   return {
-    id: customer.externalId || customer.id.toString(),
+    id: customer.externalId || customer.id,
     firstName,
     lastName: rest.join(" ") || undefined,
     phone: customer.phone,
@@ -25,7 +25,7 @@ const buildCustomer = (customer: typeof rajesh) => {
 };
 
 const buildVehicle = (vehicle: typeof rajeshVehicle) => ({
-  id: vehicle.externalId || vehicle.id.toString(),
+  id: vehicle.externalId || vehicle.id,
   make: vehicle.vehicleMake,
   model: vehicle.vehicleModel,
   registration: vehicle.registration,

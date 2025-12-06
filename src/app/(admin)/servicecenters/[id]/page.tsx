@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { defaultServiceCenters, vehiclesData, serviceRequestsData, partRequestsData, serviceCenterInventoryData, jobsData, serviceHistoryData } from "@/__mocks__/data";
+import { defaultServiceCenters, vehiclesData, serviceRequestsData, partRequestsData, serviceCenterInventoryData, jobsData, serviceHistoryData, getServiceHistoryByVehicleId } from "@/__mocks__/data";
 import {
   BarChart3,
   Search,
@@ -735,8 +735,10 @@ export default function ServiceCenterDetailPage() {
                     <div id="service-history-section" className="mb-6">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4">Service History Timeline</h3>
                       <div className="space-y-4">
-                        {showVehicleDetails?.id && serviceHistoryData[showVehicleDetails.id] && serviceHistoryData[showVehicleDetails.id].length > 0 ? (
-                          serviceHistoryData[showVehicleDetails.id].map((service, index: number) => (
+                        {(() => {
+                          const vehicleHistory = showVehicleDetails?.id ? getServiceHistoryByVehicleId(showVehicleDetails.id) : [];
+                          return vehicleHistory.length > 0 ? (
+                            vehicleHistory.map((service, index: number) => (
                             <div key={service.id} className="border-l-4 border-blue-500 pl-4 pb-4 relative">
                               <div className="absolute -left-2 top-0 w-4 h-4 bg-blue-500 rounded-full"></div>
                               <div className="bg-gray-50 rounded-lg p-4">
@@ -796,7 +798,8 @@ export default function ServiceCenterDetailPage() {
                           <div className="bg-gray-50 rounded-lg p-6 text-center">
                             <p className="text-gray-500">No service history available for this vehicle</p>
                           </div>
-                        )}
+                        );
+                        })()}
                       </div>
                     </div>
 

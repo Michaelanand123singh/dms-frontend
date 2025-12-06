@@ -62,7 +62,7 @@ export const SC_MENU_ITEMS: Record<UserRole, MenuItem[]> = {
     { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
     { name: "Vehicle Search", icon: Search, href: "/sc/vehicle-search" },
     { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
-    { name: "Job Cards", icon: ClipboardList, href: "/sc/advisor-job-cards" },
+    { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
     { name: "Leads", icon: Users, href: "/sc/leads" },
     { name: "Quotations", icon: FileText, href: "/sc/quotations" },
   ],
