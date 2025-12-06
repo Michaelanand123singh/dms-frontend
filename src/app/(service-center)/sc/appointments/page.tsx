@@ -2,8 +2,9 @@
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2, Search, UserCheck } from "lucide-react";
+import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2, Search, UserCheck, Camera } from "lucide-react";
 import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
+import CameraModal from "../components/shared/CameraModal";
 import { useCustomerSearch } from "../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -903,6 +904,10 @@ function AppointmentsContent() {
   // Service Intake States (for service advisor)
   const [customerArrivalStatus, setCustomerArrivalStatus] = useState<CustomerArrivalStatus>(null);
   const [serviceIntakeForm, setServiceIntakeForm] = useState<ServiceIntakeForm>(INITIAL_SERVICE_INTAKE_FORM);
+  
+  // Camera Modal States
+  const [cameraModalOpen, setCameraModalOpen] = useState<boolean>(false);
+  const [cameraDocumentType, setCameraDocumentType] = useState<keyof Pick<ServiceIntakeForm, "customerIdProof" | "vehicleRCCopy" | "warrantyCardServiceBook" | "photosVideos"> | null>(null);
   const visibleAppointments = useMemo(() => {
     if (shouldFilterAppointments) {
       return filterByServiceCenter(appointments, serviceCenterContext);
@@ -1797,6 +1802,42 @@ function AppointmentsContent() {
     []
   );
 
+  // Camera Handlers
+  const handleOpenCamera = useCallback(
+    (documentType: keyof Pick<ServiceIntakeForm, "customerIdProof" | "vehicleRCCopy" | "warrantyCardServiceBook" | "photosVideos">) => {
+      setCameraDocumentType(documentType);
+      setCameraModalOpen(true);
+    },
+    []
+  );
+
+  const handleCameraCapture = useCallback(
+    (file: File) => {
+      if (!cameraDocumentType) return;
+
+      const newUrl = URL.createObjectURL(file);
+      setServiceIntakeForm((prev) => ({
+        ...prev,
+        [cameraDocumentType]: {
+          files: [...prev[cameraDocumentType].files, file],
+          urls: [...prev[cameraDocumentType].urls, newUrl],
+        },
+      }));
+      setCameraModalOpen(false);
+      setCameraDocumentType(null);
+      
+      // Show success message
+      const documentTypeNames: Record<typeof cameraDocumentType, string> = {
+        customerIdProof: "Customer ID Proof",
+        vehicleRCCopy: "Vehicle RC Copy",
+        warrantyCardServiceBook: "Warranty Card / Service Book",
+        photosVideos: "Vehicle Photo",
+      };
+      showToast(`Photo captured and added to ${documentTypeNames[cameraDocumentType]}`, "success");
+    },
+    [cameraDocumentType, showToast]
+  );
+
   // Router for navigation
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2112,6 +2153,26 @@ function AppointmentsContent() {
   return (
     <div className="bg-[#f9f9fb] min-h-screen">
       <Toast show={toast.show} message={toast.message} type={toast.type} />
+
+      <CameraModal
+        isOpen={cameraModalOpen}
+        onClose={() => {
+          setCameraModalOpen(false);
+          setCameraDocumentType(null);
+        }}
+        onCapture={handleCameraCapture}
+        title={
+          cameraDocumentType === "customerIdProof"
+            ? "Capture Customer ID Proof"
+            : cameraDocumentType === "vehicleRCCopy"
+            ? "Capture Vehicle RC Copy"
+            : cameraDocumentType === "warrantyCardServiceBook"
+            ? "Capture Warranty Card / Service Book"
+            : cameraDocumentType === "photosVideos"
+            ? "Capture Vehicle Photo"
+            : "Capture Photo"
+        }
+      />
 
       <div className="pt-6 pb-10">
         {/* Header */}
@@ -2704,9 +2765,10 @@ function AppointmentsContent() {
                   </div>
                 )}
               </div>
-              <FormInput
-                label="Time"
-                required
+              <div>
+                <FormInput
+                  label="Time"
+                  required
                   type="time"
                   value={appointmentForm.time}
                   onChange={(e) => {
@@ -2718,6 +2780,7 @@ function AppointmentsContent() {
                 />
               </div>
             </div>
+          </div>
 
           {/* Operational Details Section */}
           {(isCallCenter || isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && (
@@ -2922,7 +2985,7 @@ function AppointmentsContent() {
               Schedule Appointment
             </button>
             </div>
-        </div>
+          </div>
       </Modal>
 
       {/* Appointment Detail Modal */}
@@ -3385,20 +3448,31 @@ function AppointmentsContent() {
                         Customer ID Proof
                       </label>
                       <div className="space-y-3">
-                        <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
-                          <div className="flex flex-col items-center gap-2">
-                            <Upload className="text-indigo-600" size={24} />
-                            <span className="text-sm text-gray-600 font-medium">Click to upload or drag and drop</span>
-                            <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
-                          </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            multiple
-                            onChange={(e) => handleDocumentUpload("customerIdProof", e.target.files)}
-                          />
-                        </label>
+                        <div className="flex gap-2">
+                          <label className="flex-1 flex items-center justify-center h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                            <div className="flex flex-col items-center gap-2">
+                              <Upload className="text-indigo-600" size={24} />
+                              <span className="text-sm text-gray-600 font-medium">Click to upload</span>
+                              <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
+                            </div>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              multiple
+                              onChange={(e) => handleDocumentUpload("customerIdProof", e.target.files)}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCamera("customerIdProof")}
+                            className="h-32 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex flex-col items-center justify-center gap-2 min-w-[100px]"
+                            title="Capture from camera"
+                          >
+                            <Camera size={24} />
+                            <span className="text-xs font-medium">Camera</span>
+                          </button>
+                        </div>
                         {serviceIntakeForm.customerIdProof.files.length > 0 && (
                           <div className="space-y-2">
                             {serviceIntakeForm.customerIdProof.files.map((file, index) => (
@@ -3428,20 +3502,31 @@ function AppointmentsContent() {
                         Vehicle RC Copy
                       </label>
                       <div className="space-y-3">
-                        <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
-                          <div className="flex flex-col items-center gap-2">
-                            <Upload className="text-indigo-600" size={24} />
-                            <span className="text-sm text-gray-600 font-medium">Click to upload or drag and drop</span>
-                            <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
-                          </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            multiple
-                            onChange={(e) => handleDocumentUpload("vehicleRCCopy", e.target.files)}
-                          />
-                        </label>
+                        <div className="flex gap-2">
+                          <label className="flex-1 flex items-center justify-center h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                            <div className="flex flex-col items-center gap-2">
+                              <Upload className="text-indigo-600" size={24} />
+                              <span className="text-sm text-gray-600 font-medium">Click to upload</span>
+                              <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
+                            </div>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              multiple
+                              onChange={(e) => handleDocumentUpload("vehicleRCCopy", e.target.files)}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCamera("vehicleRCCopy")}
+                            className="h-32 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex flex-col items-center justify-center gap-2 min-w-[100px]"
+                            title="Capture from camera"
+                          >
+                            <Camera size={24} />
+                            <span className="text-xs font-medium">Camera</span>
+                          </button>
+                        </div>
                         {serviceIntakeForm.vehicleRCCopy.files.length > 0 && (
                           <div className="space-y-2">
                             {serviceIntakeForm.vehicleRCCopy.files.map((file, index) => (
@@ -3471,20 +3556,31 @@ function AppointmentsContent() {
                         Warranty Card / Service Book
                       </label>
                       <div className="space-y-3">
-                        <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
-                          <div className="flex flex-col items-center gap-2">
-                            <Upload className="text-indigo-600" size={24} />
-                            <span className="text-sm text-gray-600 font-medium">Click to upload or drag and drop</span>
-                            <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
-                          </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            multiple
-                            onChange={(e) => handleDocumentUpload("warrantyCardServiceBook", e.target.files)}
-                          />
-                        </label>
+                        <div className="flex gap-2">
+                          <label className="flex-1 flex items-center justify-center h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                            <div className="flex flex-col items-center gap-2">
+                              <Upload className="text-indigo-600" size={24} />
+                              <span className="text-sm text-gray-600 font-medium">Click to upload</span>
+                              <span className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</span>
+                            </div>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              multiple
+                              onChange={(e) => handleDocumentUpload("warrantyCardServiceBook", e.target.files)}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCamera("warrantyCardServiceBook")}
+                            className="h-32 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex flex-col items-center justify-center gap-2 min-w-[100px]"
+                            title="Capture from camera"
+                          >
+                            <Camera size={24} />
+                            <span className="text-xs font-medium">Camera</span>
+                          </button>
+                        </div>
                         {serviceIntakeForm.warrantyCardServiceBook.files.length > 0 && (
                           <div className="space-y-2">
                             {serviceIntakeForm.warrantyCardServiceBook.files.map((file, index) => (
@@ -3514,20 +3610,31 @@ function AppointmentsContent() {
                         Photos/Videos of Vehicle at Drop-off
                       </label>
                       <div className="space-y-3">
-                        <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
-                          <div className="flex flex-col items-center gap-2">
-                            <ImageIcon className="text-indigo-600" size={24} />
-                            <span className="text-sm text-gray-600 font-medium">Click to upload or drag and drop</span>
-                            <span className="text-xs text-gray-500">JPG, PNG, MP4, MOV (Max 50MB)</span>
-                          </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept=".jpg,.jpeg,.png,.mp4,.mov"
-                            multiple
-                            onChange={(e) => handleDocumentUpload("photosVideos", e.target.files)}
-                          />
-                        </label>
+                        <div className="flex gap-2">
+                          <label className="flex-1 flex items-center justify-center h-32 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                            <div className="flex flex-col items-center gap-2">
+                              <ImageIcon className="text-indigo-600" size={24} />
+                              <span className="text-sm text-gray-600 font-medium">Click to upload</span>
+                              <span className="text-xs text-gray-500">JPG, PNG, MP4, MOV (Max 50MB)</span>
+                            </div>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".jpg,.jpeg,.png,.mp4,.mov"
+                              multiple
+                              onChange={(e) => handleDocumentUpload("photosVideos", e.target.files)}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCamera("photosVideos")}
+                            className="h-32 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex flex-col items-center justify-center gap-2 min-w-[100px]"
+                            title="Capture from camera"
+                          >
+                            <Camera size={24} />
+                            <span className="text-xs font-medium">Camera</span>
+                          </button>
+                        </div>
                         {serviceIntakeForm.photosVideos.files.length > 0 && (
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             {serviceIntakeForm.photosVideos.files.map((file, index) => (

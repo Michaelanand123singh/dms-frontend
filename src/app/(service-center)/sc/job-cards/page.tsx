@@ -1,6 +1,6 @@
 "use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -36,6 +36,8 @@ import {
 } from "@/__mocks__/data/job-cards.mock";
 import { jobCardPartsRequestService } from "@/services/inventory/jobCardPartsRequest.service";
 import { partsMasterService } from "@/services/inventory/partsMaster.service";
+import { parseJobCardLinesToPart2, jobCardPart2ToJSON } from "@/shared/utils/jobCardData.util";
+import type { JobCardPart2Item } from "@/shared/types/job-card.types";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 import {
   filterByServiceCenter,
@@ -84,6 +86,30 @@ export default function JobCards() {
   const [partRequestInput, setPartRequestInput] = useState<string>("");
   const [selectedJobCardForRequest, setSelectedJobCardForRequest] = useState<string>("");
   const [partsRequestsData, setPartsRequestsData] = useState<Record<string, any>>({});
+  const [part2ItemsList, setPart2ItemsList] = useState<JobCardPart2Item[]>([]);
+  const [newItemForm, setNewItemForm] = useState<{
+    partWarrantyTag: string;
+    partName: string;
+    partCode: string;
+    qty: number;
+    amount: number;
+    technician: string;
+    itemType: "part" | "work_item";
+    labourCode: string;
+  }>({
+    partWarrantyTag: "",
+    partName: "",
+    partCode: "",
+    qty: 1,
+    amount: 0,
+    technician: "",
+    itemType: "part",
+    labourCode: "Auto Select With Part",
+  });
+  const [allParts, setAllParts] = useState<any[]>([]);
+  const [partSearchResults, setPartSearchResults] = useState<any[]>([]);
+  const [showPartDropdown, setShowPartDropdown] = useState<boolean>(false);
+  const partSearchRef = useRef<HTMLDivElement>(null);
   const [workCompletion, setWorkCompletion] = useState<Record<string, boolean>>({});
   const currentWorkCompletion = selectedJob ? workCompletion[selectedJob.id] : false;
 
@@ -225,6 +251,93 @@ export default function JobCards() {
     }
   }, [assignedJobCards, isClient, isTechnician]);
 
+  // Load parts when parts request modal opens
+  useEffect(() => {
+    if (showPartsRequestModal) {
+      const loadParts = async () => {
+        try {
+          const parts = await partsMasterService.getAll();
+          setAllParts(parts);
+        } catch (error) {
+          console.error("Failed to load parts:", error);
+        }
+      };
+      loadParts();
+    }
+  }, [showPartsRequestModal]);
+
+  // Search parts as user types
+  useEffect(() => {
+    if (newItemForm.partName.trim().length > 0) {
+      const query = newItemForm.partName.toLowerCase();
+      const filtered = allParts.filter(
+        (part) =>
+          part.partName?.toLowerCase().includes(query) ||
+          part.partNumber?.toLowerCase().includes(query) ||
+          part.partId?.toLowerCase().includes(query)
+      );
+      setPartSearchResults(filtered.slice(0, 10)); // Limit to 10 results
+      setShowPartDropdown(true);
+    } else {
+      setPartSearchResults([]);
+      setShowPartDropdown(false);
+    }
+  }, [newItemForm.partName, allParts]);
+
+  // Handle outside click to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (partSearchRef.current && !partSearchRef.current.contains(event.target as Node)) {
+        setShowPartDropdown(false);
+      }
+    };
+
+    if (showPartDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showPartDropdown]);
+
+  const handlePartSelect = (part: any) => {
+    // Extract part code - prefer partId, then partNumber, then extract from partName
+    let partCode = part.partId || part.partNumber || "";
+    if (!partCode && part.partName) {
+      const codeMatch = part.partName.match(/^([A-Z0-9_-]+)/i);
+      if (codeMatch) {
+        partCode = codeMatch[1];
+      }
+    }
+    
+    // Generate warranty tag - use partId if available, otherwise generate from part code
+    let warrantyTag = "";
+    if (part.partId) {
+      // Use partId as warranty tag (e.g., "RQL251113259818" format)
+      warrantyTag = part.partId;
+    } else if (partCode) {
+      // Generate warranty tag from part code (e.g., "RQL" + partCode)
+      warrantyTag = `RQL${partCode.replace(/[^0-9]/g, "").slice(-12)}` || partCode;
+    } else {
+      // Generate a unique warranty tag
+      warrantyTag = `RQL${Date.now().toString().slice(-12)}`;
+    }
+    
+    setNewItemForm({
+      partWarrantyTag: warrantyTag,
+      partName: part.partName || "",
+      partCode: partCode,
+      qty: 1,
+      amount: part.price || 0,
+      technician: "",
+      itemType: "part",
+      labourCode: "Auto Select With Part",
+    });
+    setShowPartDropdown(false);
+    setPartSearchResults([]);
+  };
+
   const handlePartRequestSubmit = async (jobId?: string) => {
     const jobCardId = jobId || selectedJobCardForRequest;
     if (!jobCardId) {
@@ -238,20 +351,27 @@ export default function JobCards() {
       return;
     }
 
-    const partNames = partRequestInput
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean);
-    if (partNames.length === 0) {
-      alert("Please enter at least one part.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      // Create parts with details
-      const partsWithDetails = partNames
+    // Use PART 2 items list if available, otherwise fall back to text input
+    let partsWithDetails: Array<{ partId: string; partName: string; quantity: number }> = [];
+    
+    if (part2ItemsList.length > 0) {
+      // Convert PART 2 items to parts request format
+      partsWithDetails = part2ItemsList.map((item) => ({
+        partId: item.partCode || `unknown-${item.partName.replace(/\s+/g, "-").toLowerCase()}`,
+        partName: item.partName,
+        quantity: item.qty,
+      }));
+    } else {
+      // Fallback to text input parsing
+      const partNames = partRequestInput
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (partNames.length === 0) {
+        alert("Please add at least one item to the list before submitting.");
+        return;
+      }
+      partsWithDetails = partNames
         .map((partName) => {
           if (!partName) return null;
           return {
@@ -260,8 +380,17 @@ export default function JobCards() {
             quantity: 1,
           };
         })
-        .filter((p) => p !== null);
+        .filter((p) => p !== null) as Array<{ partId: string; partName: string; quantity: number }>;
+    }
 
+    if (partsWithDetails.length === 0) {
+      alert("Please add at least one item to the list before submitting.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
       // Create the parts request using the service
       const requestedBy = userInfo?.name || "Service Engineer";
       
@@ -281,14 +410,71 @@ export default function JobCards() {
         return updated;
       });
       
+      // Reset form
       setPartRequestInput("");
-      alert(`Part request submitted for Job Card: ${selectedJobCard.jobCardNumber || selectedJobCard.id}\nParts: ${partNames.join(", ")}\nRequest sent to SC Manager and Inventory Manager.`);
+      setPart2ItemsList([]);
+      setNewItemForm({
+        partWarrantyTag: "",
+        partName: "",
+        partCode: "",
+        qty: 1,
+        amount: 0,
+        technician: "",
+        itemType: "part",
+        labourCode: "Auto Select With Part",
+      });
+      setShowPartDropdown(false);
+      setPartSearchResults([]);
+      
+      alert(`Part request submitted for Job Card: ${selectedJobCard.jobCardNumber || selectedJobCard.id}\nItems: ${partsWithDetails.length}\nRequest sent to SC Manager and Inventory Manager.`);
     } catch (error) {
       console.error("Failed to submit parts request:", error);
       alert("Failed to submit parts request. Please try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddItem = () => {
+    if (!newItemForm.partName.trim()) {
+      alert("Please enter a part name.");
+      return;
+    }
+
+    const newItem: JobCardPart2Item = {
+      srNo: part2ItemsList.length + 1,
+      partWarrantyTag: newItemForm.partWarrantyTag,
+      partName: newItemForm.partName,
+      partCode: newItemForm.partCode || (newItemForm.partName.match(/^([A-Z0-9_-]+)/i)?.[1] || ""),
+      qty: newItemForm.qty || 1,
+      amount: newItemForm.amount || 0,
+      technician: newItemForm.technician,
+      labourCode: newItemForm.itemType === "work_item" 
+        ? (newItemForm.labourCode || "R & R")
+        : "Auto Select With Part",
+      itemType: newItemForm.itemType,
+    };
+
+    setPart2ItemsList([...part2ItemsList, newItem]);
+    
+    // Reset form
+    setNewItemForm({
+      partWarrantyTag: "",
+      partName: "",
+      partCode: "",
+      qty: 1,
+      amount: 0,
+      technician: "",
+      itemType: "part",
+      labourCode: "Auto Select With Part",
+    });
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const updated = part2ItemsList.filter((_, i) => i !== index);
+    // Re-number SR NO
+    const renumbered = updated.map((item, i) => ({ ...item, srNo: i + 1 }));
+    setPart2ItemsList(renumbered);
   };
 
   const handleTechnicianNotifyManager = async () => {
@@ -1098,8 +1284,8 @@ export default function JobCards() {
 
           {/* Parts Request Modal */}
           {showPartsRequestModal && selectedJobCard && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 z-[10000] relative">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-gray-800">Parts Request</h2>
                   <button
@@ -1107,6 +1293,19 @@ export default function JobCards() {
                       setShowPartsRequestModal(false);
                       setSelectedJobCardForRequest("");
                       setPartRequestInput("");
+                      setPart2ItemsList([]);
+                      setNewItemForm({
+                        partWarrantyTag: "",
+                        partName: "",
+                        partCode: "",
+                        qty: 1,
+                        amount: 0,
+                        technician: "",
+                        itemType: "part",
+                        labourCode: "Auto Select With Part",
+                      });
+                      setShowPartDropdown(false);
+                      setPartSearchResults([]);
                     }}
                     className="text-gray-400 hover:text-gray-600"
                   >
@@ -1124,30 +1323,228 @@ export default function JobCards() {
                   </div>
                 </div>
 
-                {/* Parts Needed Input */}
+                {/* Add Item Form */}
+                <div className="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-4">Add Item to Request</h3>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="relative" ref={partSearchRef}>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Part Name *</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={newItemForm.partName}
+                            onChange={(e) => setNewItemForm({ ...newItemForm, partName: e.target.value })}
+                            onFocus={() => {
+                              if (newItemForm.partName.trim().length > 0 && partSearchResults.length > 0) {
+                                setShowPartDropdown(true);
+                              }
+                            }}
+                            placeholder="Type to search parts..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          {showPartDropdown && partSearchResults.length > 0 && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {partSearchResults.map((part, index) => (
+                                <div
+                                  key={part.id || index}
+                                  onClick={() => handlePartSelect(part)}
+                                  className="p-3 border-b border-gray-100 last:border-b-0 hover:bg-indigo-50 cursor-pointer transition-colors"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-gray-900 truncate">{part.partName}</p>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        {part.partNumber && (
+                                          <span className="text-xs text-gray-600 font-mono">{part.partNumber}</span>
+                                        )}
+                                        {part.partId && part.partId !== part.partNumber && (
+                                          <span className="text-xs text-gray-500 font-mono">({part.partId})</span>
+                                        )}
+                                        {part.price && (
+                                          <span className="text-xs text-green-600 font-medium">₹{part.price.toLocaleString("en-IN")}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <Package size={16} className="text-indigo-600 shrink-0 ml-2" />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Part Code</label>
+                        <input
+                          type="text"
+                          value={newItemForm.partCode}
+                          onChange={(e) => setNewItemForm({ ...newItemForm, partCode: e.target.value })}
+                          placeholder="e.g., 2W0000000027_011"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Part Warranty Tag</label>
+                        <input
+                          type="text"
+                          value={newItemForm.partWarrantyTag}
+                          onChange={(e) => setNewItemForm({ ...newItemForm, partWarrantyTag: e.target.value })}
+                          placeholder="e.g., RQL251113259818"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Item Type *</label>
+                        <select
+                          value={newItemForm.itemType}
+                          onChange={(e) => {
+                            const itemType = e.target.value as "part" | "work_item";
+                            setNewItemForm({
+                              ...newItemForm,
+                              itemType,
+                              labourCode: itemType === "work_item" ? "R & R" : "Auto Select With Part",
+                            });
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="part">Part</option>
+                          <option value="work_item">Work Item</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Quantity *</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={newItemForm.qty}
+                          onChange={(e) => setNewItemForm({ ...newItemForm, qty: parseInt(e.target.value) || 1 })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Amount (₹)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newItemForm.amount}
+                          onChange={(e) => setNewItemForm({ ...newItemForm, amount: parseFloat(e.target.value) || 0 })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Technician</label>
+                        <input
+                          type="text"
+                          value={newItemForm.technician}
+                          onChange={(e) => setNewItemForm({ ...newItemForm, technician: e.target.value })}
+                          placeholder="Technician name"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      {newItemForm.itemType === "work_item" && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Labour Code</label>
+                          <input
+                            type="text"
+                            value={newItemForm.labourCode}
+                            onChange={(e) => setNewItemForm({ ...newItemForm, labourCode: e.target.value })}
+                            placeholder="e.g., R & R"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition"
+                    >
+                      <PlusCircle size={16} className="inline mr-2" />
+                      Add to List
+                    </button>
+                  </div>
+                </div>
+
+                {/* Items List Table */}
+                {part2ItemsList.length > 0 && (
+                  <div className="mb-6">
+                    <label className="text-sm font-semibold text-gray-700 mb-3 block">
+                      Items Added ({part2ItemsList.length})
+                    </label>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-indigo-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">SR NO</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">PART WARRANTY TAG</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">PART NAME</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">PART CODE</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">QTY</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">AMOUNT</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">TECHNICIAN</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">LABOUR CODE</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {part2ItemsList.map((item, index) => (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-gray-700 font-medium">{item.srNo}</td>
+                                <td className="px-3 py-2 text-gray-700">{item.partWarrantyTag || "-"}</td>
+                                <td className="px-3 py-2 text-gray-700">{item.partName}</td>
+                                <td className="px-3 py-2 text-gray-700 font-mono text-xs">{item.partCode || "-"}</td>
+                                <td className="px-3 py-2 text-gray-700">{item.qty}</td>
+                                <td className="px-3 py-2 text-gray-700">₹{item.amount.toLocaleString("en-IN")}</td>
+                                <td className="px-3 py-2 text-gray-700">{item.technician || "-"}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`px-2 py-1 rounded text-xs ${
+                                    item.itemType === "work_item" 
+                                      ? "bg-blue-100 text-blue-700" 
+                                      : "bg-gray-100 text-gray-600"
+                                  }`}>
+                                    {item.labourCode}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItem(index)}
+                                    className="text-red-600 hover:text-red-700 p-1 rounded transition"
+                                    title="Remove item"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Button */}
                 <div className="mb-6">
-                  <label className="text-sm font-semibold text-gray-700 mb-2 block">
-                    Parts Needed (comma-separated)
-                  </label>
-                  <input
-                    type="text"
-                    value={partRequestInput}
-                    onChange={(e) => setPartRequestInput(e.target.value)}
-                    placeholder="Brake pads, Engine oil"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
                   <button
                     type="button"
                     onClick={async () => {
                       await handlePartRequestSubmit(selectedJobCardForRequest);
                       setShowPartsRequestModal(false);
-                      setPartRequestInput("");
                     }}
-                    disabled={loading || !partRequestInput.trim()}
-                    className="w-full mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={loading || part2ItemsList.length === 0}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg text-sm font-semibold shadow-sm hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? "Submitting..." : "Submit Parts Request"}
+                    {loading ? "Submitting..." : `Submit Parts Request (${part2ItemsList.length} items)`}
                   </button>
+                  {part2ItemsList.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Add at least one item to the list before submitting
+                    </p>
+                  )}
                 </div>
 
                 {/* Parts Request Status */}

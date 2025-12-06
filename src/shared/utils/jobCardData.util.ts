@@ -162,6 +162,97 @@ function extractPartCode(description: string): string {
 }
 
 /**
+ * Parse Job Card Line data into PART 2 items according to specifications
+ * @param jobCardLines - Array of job card line items with structure:
+ *   - name: Job Card Line Name (warranty tag reference)
+ *   - description: Item Description (e.g., "2W0000000027_011-FRONT FENDER, BODY JET BLACK")
+ *   - itemType: "Part" or "Work Item"
+ *   - quantity: Quantity value
+ *   - amount?: Service cost (optional)
+ *   - technician?: Technician name (optional)
+ */
+export function parseJobCardLinesToPart2(
+  jobCardLines: Array<{
+    name?: string;
+    description: string;
+    itemType: "Part" | "Work Item";
+    quantity: number;
+    amount?: number;
+    technician?: string;
+  }>
+): JobCardPart2Item[] {
+  return jobCardLines.map((line, index) => {
+    const srNo = index + 1;
+    
+    // PART WARRANTY TAG: Use Job Card Line Name if available
+    const partWarrantyTag = line.name || "";
+    
+    // PART CODE: Extract alphanumeric part code from description prefix
+    // Example: "2W0000000027_011-FRONT FENDER" → "2W0000000027_011"
+    const partCodeMatch = line.description.match(/^([A-Z0-9_-]+)/i);
+    const partCode = partCodeMatch ? partCodeMatch[1] : "";
+    
+    // PART NAME: Extract from Item Description before dash or comma, clean formatting
+    // Example: "2W0000000027_011-FRONT FENDER, BODY JET BLACK" → "Front Fender"
+    let partName = line.description;
+    
+    // Remove part code prefix if present
+    if (partCode) {
+      partName = partName.replace(new RegExp(`^${partCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[-_\\s]*`, "i"), "");
+    }
+    
+    // Extract name before dash or comma
+    const nameMatch = partName.match(/^([^-,\n]+)/);
+    if (nameMatch) {
+      partName = nameMatch[1].trim();
+    }
+    
+    // Clean formatting: Convert to title case, remove extra spaces
+    partName = partName
+      .split(/\s+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+    
+    // QTY: Use quantity from line
+    const qty = line.quantity || 1;
+    
+    // AMOUNT: Use service cost if available, otherwise 0
+    const amount = line.amount || 0;
+    
+    // TECHNICIAN: Use provided technician or leave blank
+    const technician = line.technician || "";
+    
+    // LABOUR CODE: Auto-select based on item type
+    let labourCode = "";
+    if (line.itemType === "Work Item") {
+      // Extract labour type from description (e.g., "Labour - R And R")
+      const labourMatch = line.description.match(/labour\s*[-–]\s*([^-,\n]+)/i);
+      if (labourMatch) {
+        labourCode = labourMatch[1].trim();
+      } else {
+        // Default for work items
+        labourCode = "R & R";
+      }
+    } else {
+      // For Parts, set to "Auto Select With Part"
+      labourCode = "Auto Select With Part";
+    }
+    
+    return {
+      srNo,
+      partWarrantyTag,
+      partName,
+      partCode,
+      qty,
+      amount,
+      technician,
+      labourCode,
+      itemType: line.itemType === "Work Item" ? "work_item" : "part",
+    };
+  });
+}
+
+/**
  * Auto-generate SR NO for PART 2 items
  */
 export function generateSrNoForPart2Items(items: JobCardPart2Item[]): JobCardPart2Item[] {
