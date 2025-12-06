@@ -99,7 +99,10 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    // Defer state update to avoid synchronous setState in effect
+    queueMicrotask(() => {
+      setIsMounted(true);
+    });
   }, []);
 
   // Use role from hook (most reliable) - it reads directly from localStorage

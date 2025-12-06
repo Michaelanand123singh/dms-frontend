@@ -4,6 +4,7 @@
 
 import type { Part, InventoryItem } from "@/shared/types/inventory.types";
 import type { JobCardPartsRequest } from "@/shared/types/jobcard-inventory.types";
+import { safeStorage } from "@/shared/lib/localStorage";
 
 /**
  * Mock Inventory Item type for Admin inventory page
@@ -325,8 +326,6 @@ export const serviceCenterInventoryData = defaultServiceCenterInventory.map((ite
  */
 export function initializeInventoryMockData() {
   if (typeof window === "undefined") return;
-
-  const { localStorage: safeStorage } = require("@/shared/lib/localStorage");
 
   // Initialize parts master if empty
   const existingParts = safeStorage.getItem<Part[]>("partsMaster", []);

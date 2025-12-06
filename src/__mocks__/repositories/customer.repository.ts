@@ -224,7 +224,7 @@ class CustomerRepository {
   }
 
   async addToRecent(id: number | string): Promise<void> {
-    const recentIds = safeStorage.getItem<number[]>("recentCustomerIds", []);
+    const recentIds = safeStorage.getItem<string[]>("recentCustomerIds", []);
     const stringId = String(id);
     
     // Remove if already exists

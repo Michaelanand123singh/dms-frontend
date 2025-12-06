@@ -178,6 +178,7 @@ export default function JobCards() {
 
   // Service Engineer specific state
   const [activeTab, setActiveTab] = useState<"assigned" | "in_progress" | "completed">("assigned");
+  const [showPartsRequestModal, setShowPartsRequestModal] = useState<boolean>(false);
 
   // Service Engineer job categories
   const assignedJobs = useMemo(() => 
@@ -810,16 +811,28 @@ export default function JobCards() {
                        activeTab === "in_progress" ? inProgressJobs : 
                        completedJobs;
 
-    const selectedJobCard = assignedJobCards.find(
-      (job: JobCard) => job.id === selectedJobCardForRequest || job.jobCardNumber === selectedJobCardForRequest
-    );
+    const selectedJobCard = selectedJobCardForRequest 
+      ? assignedJobCards.find(
+          (job: JobCard) => job.id === selectedJobCardForRequest || job.jobCardNumber === selectedJobCardForRequest
+        )
+      : null;
 
-    const activeRequest = selectedJobCardForRequest 
+    const activeRequest = selectedJobCardForRequest && selectedJobCard
       ? (partsRequestsData[selectedJobCardForRequest] || 
-         partsRequestsData[selectedJobCard?.id || ""] || 
-         partsRequestsData[selectedJobCard?.jobCardNumber || ""] || 
+         partsRequestsData[selectedJobCard.id || ""] || 
+         partsRequestsData[selectedJobCard.jobCardNumber || ""] || 
          null)
       : null;
+
+    const handleJobCardClick = (job: JobCard) => {
+      setSelectedJobCardForRequest(job.id);
+      setPartRequestInput("");
+      setShowPartsRequestModal(true);
+    };
+
+    const getJobsByStatusForTechnician = (status: JobCardStatus): JobCard[] => {
+      return currentJobs.filter((job) => job.status === status);
+    };
 
     return (
       <div className="bg-[#f9f9fb] min-h-screen p-4 sm:p-6">
@@ -830,170 +843,31 @@ export default function JobCards() {
             <p className="text-gray-500">Manage your assigned job cards and parts requests</p>
           </div>
 
-          {/* Parts Request Form - Matching Image Design */}
-          {assignedJobCards.length > 0 && (
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-gray-200">
-              <div className="mb-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-2">
-                  Technician–Manager–Inventory Collaboration
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Create part requests, notify the manager, and capture approvals before sending a quotation.
-                </p>
-              </div>
-
-              {/* Select Job Card Dropdown */}
-              <div className="mb-4">
-                <label className="text-sm font-semibold text-gray-700 mb-2 block">
-                  Select Job Card {assignedJobCards.length > 0 && `(${assignedJobCards.length} available)`}
-                </label>
-                <select
-                  value={selectedJobCardForRequest}
-                  onChange={(e) => {
-                    setSelectedJobCardForRequest(e.target.value);
-                    setPartRequestInput("");
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="">-- Select Job Card --</option>
-                  {assignedJobCards.map((job) => {
-                    const jobCardId = job.id || job.jobCardNumber;
-                    const request = partsRequestsData[jobCardId] || partsRequestsData[job.id] || partsRequestsData[job.jobCardNumber || ""];
-                    const hasPendingRequest = request && !request.inventoryManagerAssigned;
-                    return (
-                      <option 
-                        key={job.id} 
-                        value={job.id}
-                        disabled={hasPendingRequest}
-                      >
-                        {job.jobCardNumber || job.id} - {job.customerName} - {job.vehicle}
-                        {request && (
-                          request.inventoryManagerAssigned 
-                            ? " ✓ Parts Assigned" 
-                            : request.scManagerApproved 
-                              ? " - SC Approved, Pending IM" 
-                              : " - Parts Request Pending"
-                        )}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              {/* Job Card Information */}
-              {selectedJobCardForRequest && selectedJobCard && (
-                <>
-                  <div className="mb-4">
-                    <label className="text-sm font-semibold text-gray-700 mb-2 block">Job Card Information</label>
-                    <div className="p-3 bg-gray-50 rounded-lg text-xs space-y-1">
-                      <p><span className="font-medium text-gray-700">Job Card:</span> <span className="text-gray-900">{selectedJobCard.jobCardNumber || selectedJobCard.id}</span></p>
-                      <p><span className="font-medium text-gray-700">Customer:</span> <span className="text-gray-900">{selectedJobCard.customerName}</span></p>
-                      <p><span className="font-medium text-gray-700">Vehicle:</span> <span className="text-gray-900">{selectedJobCard.vehicle} ({selectedJobCard.registration})</span></p>
-                    </div>
-                  </div>
-
-                  {/* Parts Needed Input */}
-                  <div className="mb-4">
-                    <label className="text-sm font-semibold text-gray-700 mb-2 block">
-                      Parts Needed (comma-separated)
-                    </label>
-                    <input
-                      type="text"
-                      value={partRequestInput}
-                      onChange={(e) => setPartRequestInput(e.target.value)}
-                      placeholder="Brake pads, Engine oil"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await handlePartRequestSubmit(selectedJobCardForRequest);
-                      }}
-                      disabled={loading || !partRequestInput.trim()}
-                      className="w-full mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? "Submitting..." : "Submit Parts Request"}
-                    </button>
-                  </div>
-
-                  {/* Parts Request Status */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Parts Request Status</h4>
-                    {activeRequest ? (
-                      <div className="space-y-3">
-                        <div className="space-y-2">
-                          <p className="text-xs text-gray-600">
-                            <span className="font-medium">Requested Parts:</span>{" "}
-                            {activeRequest.parts && Array.isArray(activeRequest.parts)
-                              ? activeRequest.parts.map((p: any) => (typeof p === 'string' ? p : p.partName || '')).join(", ")
-                              : "—"}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            <span className="font-medium">Requested At:</span>{" "}
-                            {isClient && activeRequest.requestedAt
-                              ? new Date(activeRequest.requestedAt).toLocaleString()
-                              : activeRequest.requestedAt
-                              ? new Date(activeRequest.requestedAt).toISOString()
-                              : "—"}
-                          </p>
-                        </div>
-
-                        {/* SC Manager Approval */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-gray-700 min-w-[120px]">SC Manager:</span>
-                          <span className={`px-3 py-1.5 rounded text-xs font-semibold ${
-                            activeRequest.scManagerApproved
-                              ? "bg-green-500 text-white"
-                              : "bg-red-500 text-white"
-                          }`}>
-                            {activeRequest.scManagerApproved ? "✓ Approved" : "Pending"}
-                          </span>
-                          {activeRequest.scManagerApproved && activeRequest.scManagerApprovedBy && (
-                            <span className="text-xs text-gray-500">
-                              by {activeRequest.scManagerApprovedBy}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Inventory Manager Status */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-gray-700 min-w-[120px]">Inventory Manager:</span>
-                          <span className={`px-3 py-1.5 rounded text-xs font-semibold ${
-                            activeRequest.inventoryManagerAssigned
-                              ? "bg-green-500 text-white"
-                              : activeRequest.scManagerApproved
-                              ? "bg-yellow-500 text-white"
-                              : "bg-gray-400 text-white"
-                          }`}>
-                            {activeRequest.inventoryManagerAssigned
-                              ? "✓ Parts Assigned"
-                              : activeRequest.scManagerApproved
-                              ? "Pending"
-                              : "Waiting for SC Approval"}
-                          </span>
-                        </div>
-
-                        {/* Work Completion Button */}
-                        {activeRequest.inventoryManagerAssigned && (
-                          <button
-                            type="button"
-                            onClick={() => handleWorkCompletionNotification(selectedJobCardForRequest)}
-                            className="w-full mt-3 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
-                          >
-                            Notify Work Completion
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-500">
-                        No parts request submitted yet for this job card.
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
+          {/* View Toggle */}
+          <div className="mb-6 flex justify-end">
+            <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-300">
+              <button
+                onClick={() => setView("kanban")}
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded text-xs sm:text-sm font-medium transition ${
+                  view === "kanban"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                Kanban
+              </button>
+              <button
+                onClick={() => setView("list")}
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded text-xs sm:text-sm font-medium transition ${
+                  view === "list"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                List
+              </button>
             </div>
-          )}
+          </div>
 
           {/* Tabs */}
           <div className="bg-white rounded-xl shadow-md mb-6">
@@ -1030,44 +904,328 @@ export default function JobCards() {
               </button>
             </div>
 
-            {/* Jobs List */}
-            <div className="p-6">
-              {currentJobs.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="mx-auto text-gray-400 mb-3" size={48} />
-                  <p className="text-gray-500">No {activeTab.replace("_", " ")} jobs found</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {currentJobs.map((job) => (
-                    <div
-                      key={job.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-gray-900">
-                              {job.jobCardNumber || job.id}
-                            </h3>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
-                              {job.status}
-                            </span>
+            {/* Kanban View */}
+            {view === "kanban" && (
+              <div className="p-6">
+                <div className="w-full overflow-x-auto pb-6">
+                  <div className="inline-flex gap-4 min-w-max">
+                    {kanbanColumns
+                      .filter((col) => 
+                        activeTab === "assigned" ? col.status === "Assigned" :
+                        activeTab === "in_progress" ? col.status === "In Progress" :
+                        activeTab === "completed" ? col.status === "Completed" : false
+                      )
+                      .map((column) => {
+                        const columnJobs = getJobsByStatusForTechnician(column.status);
+                        const columnColorMap: Record<string, { bg: string; border: string; text: string }> = {
+                          created: { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-700" },
+                          assigned: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+                          in_progress: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" },
+                          parts_pending: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
+                          completed: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
+                        };
+                        const columnColor = columnColorMap[column.id] || columnColorMap.created;
+
+                        return (
+                          <div
+                            key={column.id}
+                            className={`shrink-0 w-72 sm:w-80 ${columnColor.bg} rounded-lg border-2 ${columnColor.border} shadow-sm`}
+                          >
+                            {/* Column Header */}
+                            <div className={`sticky top-0 ${columnColor.bg} rounded-t-lg border-b-2 ${columnColor.border} px-4 py-3 z-10`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <h3 className={`font-bold ${columnColor.text} text-base`}>
+                                    {column.title}
+                                  </h3>
+                                </div>
+                                <span className={`${columnColor.text} bg-white/80 px-2.5 py-1 rounded-full text-xs font-bold min-w-[24px] text-center`}>
+                                  {columnJobs.length}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Column Body - Scrollable */}
+                            <div className="px-3 py-3 space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto">
+                              {columnJobs.map((job) => {
+                                const jobCardId = job.id || job.jobCardNumber;
+                                const request = partsRequestsData[jobCardId] || partsRequestsData[job.id] || partsRequestsData[job.jobCardNumber || ""];
+                                const hasRequest = request && !request.inventoryManagerAssigned;
+                                
+                                return (
+                                  <div
+                                    key={job.id}
+                                    className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-lg hover:border-blue-300 transition-all duration-200 cursor-pointer group"
+                                    onClick={() => handleJobCardClick(job)}
+                                  >
+                                    {/* Card Header */}
+                                    <div className="flex items-start justify-between mb-3">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-gray-900 text-sm mb-1 truncate group-hover:text-blue-600 transition-colors">
+                                          {job.jobCardNumber || job.id}
+                                        </p>
+                                        <p className="text-xs text-gray-600 truncate">
+                                          {job.customerName}
+                                        </p>
+                                      </div>
+                                      <span
+                                        className={`w-3 h-3 rounded-full flex-shrink-0 ml-2 ${getPriorityColor(
+                                          job.priority
+                                        )} shadow-sm`}
+                                        title={job.priority}
+                                      ></span>
+                                    </div>
+
+                                    {/* Vehicle Info */}
+                                    <div className="flex items-center gap-2 text-xs text-gray-600 mb-3 pb-3 border-b border-gray-100">
+                                      <Car size={14} className="text-gray-400 flex-shrink-0" />
+                                      <span className="truncate font-medium">{job.vehicle}</span>
+                                    </div>
+
+                                    {/* Service Type */}
+                                    <div className="mb-3">
+                                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-medium">
+                                        <Wrench size={10} />
+                                        {job.serviceType}
+                                      </span>
+                                    </div>
+
+                                    {/* Parts Request Status Badge */}
+                                    {hasRequest && (
+                                      <div className="mt-2">
+                                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-medium">
+                                          Parts Request Pending
+                                        </span>
+                                      </div>
+                                    )}
+                                    {request?.inventoryManagerAssigned && (
+                                      <div className="mt-2">
+                                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                                          ✓ Parts Assigned
+                                        </span>
+                                      </div>
+                                    )}
+
+                                    {/* Click hint */}
+                                    <div className="mt-3 pt-3 border-t border-gray-100">
+                                      <p className="text-xs text-blue-600 font-medium">Click to request parts</p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Empty State */}
+                              {columnJobs.length === 0 && (
+                                <div className="text-center py-12 text-gray-400">
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                                      <FileText size={20} className="text-gray-300" />
+                                    </div>
+                                    <p className="text-sm font-medium">No jobs</p>
+                                    <p className="text-xs">Jobs will appear here</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
-                            <p><span className="font-medium">Customer:</span> {job.customerName}</p>
-                            <p><span className="font-medium">Vehicle:</span> {job.vehicle} ({job.registration})</p>
-                            <p><span className="font-medium">Service:</span> {job.serviceType}</p>
-                            <p><span className="font-medium">Priority:</span> {job.priority}</p>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* List View */}
+            {view === "list" && (
+              <div className="p-6">
+                {currentJobs.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="mx-auto text-gray-400 mb-3" size={48} />
+                    <p className="text-gray-500">No {activeTab.replace("_", " ")} jobs found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {currentJobs.map((job) => {
+                      const jobCardId = job.id || job.jobCardNumber;
+                      const request = partsRequestsData[jobCardId] || partsRequestsData[job.id] || partsRequestsData[job.jobCardNumber || ""];
+                      const hasRequest = request && !request.inventoryManagerAssigned;
+                      
+                      return (
+                        <div
+                          key={job.id}
+                          className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                          onClick={() => handleJobCardClick(job)}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="font-semibold text-gray-900">
+                                  {job.jobCardNumber || job.id}
+                                </h3>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
+                                  {job.status}
+                                </span>
+                                {hasRequest && (
+                                  <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-medium">
+                                    Parts Request Pending
+                                  </span>
+                                )}
+                                {request?.inventoryManagerAssigned && (
+                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                                    ✓ Parts Assigned
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+                                <p><span className="font-medium">Customer:</span> {job.customerName}</p>
+                                <p><span className="font-medium">Vehicle:</span> {job.vehicle} ({job.registration})</p>
+                                <p><span className="font-medium">Service:</span> {job.serviceType}</p>
+                                <p><span className="font-medium">Priority:</span> {job.priority}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-gray-100">
+                            <p className="text-xs text-blue-600 font-medium">Click to request parts</p>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Parts Request Modal */}
+          {showPartsRequestModal && selectedJobCard && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Parts Request</h2>
+                  <button
+                    onClick={() => {
+                      setShowPartsRequestModal(false);
+                      setSelectedJobCardForRequest("");
+                      setPartRequestInput("");
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                {/* Job Card Information */}
+                <div className="mb-6">
+                  <label className="text-sm font-semibold text-gray-700 mb-2 block">Job Card Information</label>
+                  <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+                    <p><span className="font-medium text-gray-700">Job Card:</span> <span className="text-gray-900">{selectedJobCard.jobCardNumber || selectedJobCard.id}</span></p>
+                    <p><span className="font-medium text-gray-700">Customer:</span> <span className="text-gray-900">{selectedJobCard.customerName}</span></p>
+                    <p><span className="font-medium text-gray-700">Vehicle:</span> <span className="text-gray-900">{selectedJobCard.vehicle} ({selectedJobCard.registration})</span></p>
+                  </div>
+                </div>
+
+                {/* Parts Needed Input */}
+                <div className="mb-6">
+                  <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                    Parts Needed (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={partRequestInput}
+                    onChange={(e) => setPartRequestInput(e.target.value)}
+                    placeholder="Brake pads, Engine oil"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handlePartRequestSubmit(selectedJobCardForRequest);
+                      setShowPartsRequestModal(false);
+                      setPartRequestInput("");
+                    }}
+                    disabled={loading || !partRequestInput.trim()}
+                    className="w-full mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? "Submitting..." : "Submit Parts Request"}
+                  </button>
+                </div>
+
+                {/* Parts Request Status */}
+                {activeRequest && (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-800 mb-3">Parts Request Status</h4>
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Requested Parts:</span>{" "}
+                          {activeRequest.parts && Array.isArray(activeRequest.parts)
+                            ? activeRequest.parts.map((p: any) => (typeof p === 'string' ? p : p.partName || '')).join(", ")
+                            : "—"}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Requested At:</span>{" "}
+                          {isClient && activeRequest.requestedAt
+                            ? new Date(activeRequest.requestedAt).toLocaleString()
+                            : activeRequest.requestedAt
+                            ? new Date(activeRequest.requestedAt).toISOString()
+                            : "—"}
+                        </p>
+                      </div>
+
+                      {/* SC Manager Approval */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-700 min-w-[120px]">SC Manager:</span>
+                        <span className={`px-3 py-1.5 rounded text-xs font-semibold ${
+                          activeRequest.scManagerApproved
+                            ? "bg-green-500 text-white"
+                            : "bg-red-500 text-white"
+                        }`}>
+                          {activeRequest.scManagerApproved ? "✓ Approved" : "Pending"}
+                        </span>
+                        {activeRequest.scManagerApproved && activeRequest.scManagerApprovedBy && (
+                          <span className="text-xs text-gray-500">
+                            by {activeRequest.scManagerApprovedBy}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Inventory Manager Status */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-700 min-w-[120px]">Inventory Manager:</span>
+                        <span className={`px-3 py-1.5 rounded text-xs font-semibold ${
+                          activeRequest.inventoryManagerAssigned
+                            ? "bg-green-500 text-white"
+                            : activeRequest.scManagerApproved
+                            ? "bg-yellow-500 text-white"
+                            : "bg-gray-400 text-white"
+                        }`}>
+                          {activeRequest.inventoryManagerAssigned
+                            ? "✓ Parts Assigned"
+                            : activeRequest.scManagerApproved
+                            ? "Pending"
+                            : "Waiting for SC Approval"}
+                        </span>
+                      </div>
+
+                      {/* Work Completion Button */}
+                      {activeRequest.inventoryManagerAssigned && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleWorkCompletionNotification(selectedJobCardForRequest);
+                            setShowPartsRequestModal(false);
+                          }}
+                          className="w-full mt-3 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
+                        >
+                          Notify Work Completion
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
