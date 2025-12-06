@@ -72,6 +72,7 @@ interface AppointmentRecord {
   feedbackRating?: number;
   nextServiceDueDate?: string;
   amcSubscriptionStatus?: string;
+  createdByRole?: "call_center" | "service_advisor" | "service_manager"; // Track who created the appointment
 }
 
 interface AppointmentForm {
@@ -159,7 +160,6 @@ interface ServiceIntakeForm {
   motorNumber: string;
   chargerSerialNumber: string;
   dateOfPurchase: string;
-  vehicleAge: string;
   warrantyStatus: string;
   insuranceStartDate: string;
   insuranceEndDate: string;
@@ -192,6 +192,23 @@ interface ServiceIntakeForm {
   checkInSlipNumber?: string;
   checkInDate?: string;
   checkInTime?: string;
+}
+
+interface ServiceIntakeRequest {
+  id: string;
+  appointmentId: number;
+  appointment: AppointmentRecord;
+  serviceIntakeForm: ServiceIntakeForm;
+  status: "pending" | "approved" | "rejected";
+  submittedAt: string;
+  submittedBy?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
+  serviceCenterId?: number | string;
+  serviceCenterName?: string;
 }
 
 type ToastType = "success" | "error";
@@ -323,7 +340,6 @@ const INITIAL_SERVICE_INTAKE_FORM: ServiceIntakeForm = {
   motorNumber: "",
   chargerSerialNumber: "",
   dateOfPurchase: "",
-  vehicleAge: "",
   warrantyStatus: "",
   insuranceStartDate: "",
   insuranceEndDate: "",
@@ -826,6 +842,15 @@ function AppointmentsContent() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [pickupAddressDifferent, setPickupAddressDifferent] = useState<boolean>(false);
+  
+  // Check if current appointment was created by call center (for service advisor view)
+  const isAppointmentCreatedByCallCenter = useMemo(() => {
+    return selectedAppointment?.createdByRole === "call_center";
+  }, [selectedAppointment]);
+  
+  // When service advisor views appointment created by call center, call center fields are read-only
+  // Call center fields: Customer Info, Vehicle Info, Service Type, Date/Time, Basic Service Details, Pickup/Drop, Communication Mode
+  const isCallCenterFieldReadOnly = isServiceAdvisor && isEditing && isAppointmentCreatedByCallCenter;
   const [detailCustomer, setDetailCustomer] = useState<CustomerWithVehicles | null>(null);
   const [currentJobCardId, setCurrentJobCardId] = useState<string | null>(null);
   const [currentJobCard, setCurrentJobCard] = useState<JobCard | null>(null);
@@ -1598,6 +1623,7 @@ function AppointmentsContent() {
         serviceCenterId: appointmentForm.serviceCenterId ?? contextServiceCenterId,
         serviceCenterName: selectedServiceCenter?.name ?? contextServiceCenterName,
         estimatedServiceTime: appointmentForm.estimatedServiceTime,
+        createdByRole: isCallCenter ? "call_center" : isServiceAdvisor ? "service_advisor" : undefined,
       };
       const updatedAppointments = [...appointments, newAppointment];
       setAppointments(updatedAppointments);
@@ -2244,16 +2270,16 @@ function AppointmentsContent() {
                   required
                     value={customerSearchQuery}
                     onChange={(e) => {
-                      // Only block when editing AND user doesn't have permission
+                      // Only block when editing AND user doesn't have permission OR appointment was created by call center
                       // Always allow search when creating (isEditing = false)
-                      if (isEditing && !canEditCustomerInformation) {
+                      if (isEditing && (!canEditCustomerInformation || isCallCenterFieldReadOnly)) {
                         return;
                       }
                       handleCustomerSearchChange(e.target.value);
                     }}
-                    placeholder={isEditing && !canEditCustomerInformation ? "Customer information cannot be edited" : "Start typing customer name..."}
-                    disabled={isEditing && !canEditCustomerInformation}
-                    readOnly={isEditing && !canEditCustomerInformation}
+                    placeholder={isEditing && (!canEditCustomerInformation || isCallCenterFieldReadOnly) ? "Customer information cannot be edited (pre-filled by call center)" : "Start typing customer name..."}
+                    disabled={isEditing && (!canEditCustomerInformation || isCallCenterFieldReadOnly)}
+                    readOnly={isEditing && (!canEditCustomerInformation || isCallCenterFieldReadOnly)}
                   />
                   {showCustomerDropdown && customerSearchResults.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -2261,11 +2287,11 @@ function AppointmentsContent() {
                         <div
                           key={customer.id}
                           onClick={() => {
-                            if (isEditing && !canEditCustomerInformation) return;
+                            if (isEditing && (!canEditCustomerInformation || isCallCenterFieldReadOnly)) return;
                             handleCustomerSelect(customer);
                           }}
                         className={`p-3 border-b border-gray-100 last:border-b-0 transition-colors ${
-                          isEditing && !canEditCustomerInformation 
+                          isEditing && (!canEditCustomerInformation || isCallCenterFieldReadOnly)
                             ? "cursor-not-allowed opacity-50" 
                             : "hover:bg-indigo-50 cursor-pointer"
                         }`}
@@ -2338,11 +2364,11 @@ function AppointmentsContent() {
                     required
                     value={appointmentForm.vehicle}
                     onChange={(e) => {
-                      if (isEditing && !canEditVehicleInformation) return;
+                      if (isEditing && (!canEditVehicleInformation || isCallCenterFieldReadOnly)) return;
                       setAppointmentForm({ ...appointmentForm, vehicle: e.target.value });
                     }}
-                  placeholder={isEditing && !canEditVehicleInformation ? "Vehicle information cannot be edited" : "Select vehicle"}
-                  disabled={isEditing && !canEditVehicleInformation}
+                  placeholder={isEditing && (!canEditVehicleInformation || isCallCenterFieldReadOnly) ? "Vehicle information cannot be edited (pre-filled by call center)" : "Select vehicle"}
+                  disabled={isEditing && (!canEditVehicleInformation || isCallCenterFieldReadOnly)}
                   options={selectedCustomer.vehicles.map((v) => ({
                     value: formatVehicleString(v),
                     label: `${formatVehicleString(v)}${v.registration ? ` - ${v.registration}` : ""}`,
@@ -2355,7 +2381,7 @@ function AppointmentsContent() {
                   value={appointmentForm.vehicle}
                   onChange={() => {}}
                   readOnly
-                  disabled={isEditing && !canEditVehicleInformation}
+                  disabled={isEditing && (!canEditVehicleInformation || isCallCenterFieldReadOnly)}
                 />
               )}
               {selectedCustomer && appointmentForm.vehicle && (() => {
@@ -2375,8 +2401,12 @@ function AppointmentsContent() {
               label="Service Type"
               required
               value={appointmentForm.serviceType}
-              onChange={(e) => setAppointmentForm({ ...appointmentForm, serviceType: e.target.value })}
-              placeholder="Select service type"
+              onChange={(e) => {
+                if (isCallCenterFieldReadOnly) return;
+                setAppointmentForm({ ...appointmentForm, serviceType: e.target.value });
+              }}
+              placeholder={isCallCenterFieldReadOnly ? "Service type (pre-filled by call center)" : "Select service type"}
+              disabled={isCallCenterFieldReadOnly}
               options={SERVICE_TYPES.map((type) => ({ value: type, label: type }))}
             />
 
@@ -2427,8 +2457,12 @@ function AppointmentsContent() {
               <FormSelect
                 label="Customer Type"
                 value={appointmentForm.customerType || ""}
-                onChange={(e) => setAppointmentForm({ ...appointmentForm, customerType: e.target.value as "B2C" | "B2B" | undefined })}
-                placeholder="Select customer type"
+                onChange={(e) => {
+                  if (isCallCenterFieldReadOnly) return;
+                  setAppointmentForm({ ...appointmentForm, customerType: e.target.value as "B2C" | "B2B" | undefined });
+                }}
+                placeholder={isCallCenterFieldReadOnly ? "Customer type (pre-filled by call center)" : "Select customer type"}
+                disabled={isCallCenterFieldReadOnly}
                 options={[
                   { value: "B2C", label: "B2C" },
                   { value: "B2B", label: "B2B" },
@@ -2451,17 +2485,17 @@ function AppointmentsContent() {
                     <textarea
                       value={appointmentForm.customerComplaintIssue || ""}
                       onChange={(e) => {
-                        if (isEditing && !canEditServiceDetailsSection) return;
+                        if (isEditing && (!canEditServiceDetailsSection || isCallCenterFieldReadOnly)) return;
                         setAppointmentForm({ ...appointmentForm, customerComplaintIssue: e.target.value });
                       }}
                       rows={3}
-                      placeholder="Describe the customer complaint or issue..."
+                      placeholder={isCallCenterFieldReadOnly ? "Customer complaint (pre-filled by call center)" : "Describe the customer complaint or issue..."}
                       className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none ${
-                        isEditing && !canEditServiceDetailsSection ? "cursor-not-allowed opacity-50" : ""
+                        isEditing && (!canEditServiceDetailsSection || isCallCenterFieldReadOnly) ? "cursor-not-allowed opacity-50" : ""
                       }`}
                       required={isCallCenter}
-                      disabled={isEditing && !canEditServiceDetailsSection}
-                      readOnly={isEditing && !canEditServiceDetailsSection}
+                      disabled={isEditing && (!canEditServiceDetailsSection || isCallCenterFieldReadOnly)}
+                      readOnly={isEditing && (!canEditServiceDetailsSection || isCallCenterFieldReadOnly)}
                     />
                   </div>
                   {/* Additional fields */}
@@ -2687,62 +2721,66 @@ function AppointmentsContent() {
               </div>
             )}
 
-            {/* Schedule Section */}
-            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <Calendar className="text-indigo-600" size={20} />
-                Schedule Appointment
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <FormInput
-                    label="Date"
-                    required
-                    type="date"
-                    value={appointmentForm.date}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, date: e.target.value })}
-                    // @ts-ignore
-                    min={new Date().toISOString().split("T")[0]}
-                  />
-                  {appointmentForm.date && (
-                    <div className="mt-2 text-xs">
-                      {(() => {
-                        const maxAppointments = getMaxAppointmentsPerDay(serviceCenterName);
-                        const currentCount = countAppointmentsForDate(
-                          isEditing && selectedAppointment
-                        ? visibleAppointments.filter((apt) => apt.id !== selectedAppointment.id)
-                        : visibleAppointments,
-                          appointmentForm.date
-                        );
-                        const remaining = maxAppointments - currentCount;
-                        const isNearLimit = remaining <= 3;
-                        const isAtLimit = remaining <= 0;
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <FormInput
+                  label="Date"
+                  required
+                  type="date"
+                  value={appointmentForm.date}
+                  onChange={(e) => {
+                    if (isCallCenterFieldReadOnly) return;
+                    setAppointmentForm({ ...appointmentForm, date: e.target.value });
+                  }}
+                  disabled={isCallCenterFieldReadOnly}
+                  readOnly={isCallCenterFieldReadOnly}
+                  // @ts-ignore
+                  min={new Date().toISOString().split("T")[0]}
+                />
+                {appointmentForm.date && (
+                  <div className="mt-2 text-xs">
+                    {(() => {
+                      const maxAppointments = getMaxAppointmentsPerDay(serviceCenterName);
+                      const currentCount = countAppointmentsForDate(
+                        isEditing && selectedAppointment
+                      ? visibleAppointments.filter((apt) => apt.id !== selectedAppointment.id)
+                      : visibleAppointments,
+                        appointmentForm.date
+                      );
+                      const remaining = maxAppointments - currentCount;
+                      const isNearLimit = remaining <= 3;
+                      const isAtLimit = remaining <= 0;
 
-                        return (
-                          <div className={`flex items-center gap-2 ${isAtLimit ? "text-red-600" : isNearLimit ? "text-orange-600" : "text-gray-600"}`}>
-                            <Calendar size={12} />
-                            <span className="font-medium">
-                              {currentCount} / {maxAppointments} appointments
-                              {remaining > 0 && ` (${remaining} remaining)`}
-                              {isAtLimit && " - Limit reached"}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <FormInput
-                    label="Time"
-                    required
-                    type="time"
-                    value={appointmentForm.time}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, time: e.target.value })}
-                  />
-                </div>
+                      return (
+                        <div className={`flex items-center gap-2 ${isAtLimit ? "text-red-600" : isNearLimit ? "text-orange-600" : "text-gray-600"}`}>
+                          <Calendar size={12} />
+                          <span className="font-medium">
+                            {currentCount} / {maxAppointments} appointments
+                            {remaining > 0 && ` (${remaining} remaining)`}
+                            {isAtLimit && " - Limit reached"}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+              <div>
+                <FormInput
+                  label="Time"
+                  required
+                  type="time"
+                  value={appointmentForm.time}
+                  onChange={(e) => {
+                    if (isCallCenterFieldReadOnly) return;
+                    setAppointmentForm({ ...appointmentForm, time: e.target.value });
+                  }}
+                  disabled={isCallCenterFieldReadOnly}
+                  readOnly={isCallCenterFieldReadOnly}
+                />
               </div>
             </div>
+          </div>
 
           {/* Operational Details Section */}
           {(isCallCenter || isServiceAdvisor || (isEditing && canEditOperationalDetailsSection)) && (
@@ -2805,7 +2843,7 @@ function AppointmentsContent() {
                                 type="checkbox"
                                 checked={appointmentForm.pickupDropRequired || false}
                                 onChange={(e) => {
-                                  if (isEditing && !canEditOperationalDetailsSection) return;
+                                  if (isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)) return;
                                   const checked = e.target.checked;
                                   setAppointmentForm({
                                     ...appointmentForm,
@@ -2821,7 +2859,7 @@ function AppointmentsContent() {
                                     setPickupAddressDifferent(false);
                                   }
                                 }}
-                                disabled={isEditing && !canEditOperationalDetailsSection}
+                                disabled={isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)}
                                 className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 ${
                                   isEditing && !canEditOperationalDetailsSection ? "cursor-not-allowed opacity-50" : ""
                                 }`}
@@ -2837,7 +2875,7 @@ function AppointmentsContent() {
                                     type="checkbox"
                                     checked={pickupAddressDifferent}
                                     onChange={(e) => {
-                                      if (isEditing && !canEditOperationalDetailsSection) return;
+                                      if (isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)) return;
                                       const checked = e.target.checked;
                                       setPickupAddressDifferent(checked);
                                       if (!checked) {
@@ -2848,7 +2886,7 @@ function AppointmentsContent() {
                                         });
                                       }
                                     }}
-                                    disabled={isEditing && !canEditOperationalDetailsSection}
+                                    disabled={isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)}
                                     className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 ${
                                       isEditing && !canEditOperationalDetailsSection ? "cursor-not-allowed opacity-50" : ""
                                     }`}
@@ -2864,24 +2902,24 @@ function AppointmentsContent() {
                                       label="Pickup Address"
                                       value={appointmentForm.pickupAddress || ""}
                                       onChange={(e) => {
-                                        if (isEditing && !canEditOperationalDetailsSection) return;
+                                        if (isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)) return;
                                         setAppointmentForm({ ...appointmentForm, pickupAddress: e.target.value });
                                       }}
-                                      placeholder="Enter pickup address"
-                                      disabled={isEditing && !canEditOperationalDetailsSection}
-                                      readOnly={isEditing && !canEditOperationalDetailsSection}
+                                      placeholder={isCallCenterFieldReadOnly ? "Pickup address (pre-filled by call center)" : "Enter pickup address"}
+                                      disabled={isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)}
+                                      readOnly={isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)}
                                     />
 
                                     <FormInput
                                       label="Drop Address"
                                       value={appointmentForm.dropAddress || ""}
                                       onChange={(e) => {
-                                        if (isEditing && !canEditOperationalDetailsSection) return;
+                                        if (isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)) return;
                                         setAppointmentForm({ ...appointmentForm, dropAddress: e.target.value });
                                       }}
-                                      placeholder="Enter drop address"
-                                      disabled={isEditing && !canEditOperationalDetailsSection}
-                                      readOnly={isEditing && !canEditOperationalDetailsSection}
+                                      placeholder={isCallCenterFieldReadOnly ? "Drop address (pre-filled by call center)" : "Enter drop address"}
+                                      disabled={isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)}
+                                      readOnly={isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)}
                                     />
                                   </>
                                 )}
@@ -2896,11 +2934,11 @@ function AppointmentsContent() {
                     label="Preferred Communication Mode"
                     value={appointmentForm.preferredCommunicationMode || ""}
                     onChange={(e) => {
-                      if (isEditing && !canEditOperationalDetailsSection) return;
+                      if (isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)) return;
                       setAppointmentForm({ ...appointmentForm, preferredCommunicationMode: e.target.value as "Phone" | "Email" | "SMS" | "WhatsApp" | undefined });
                     }}
-                    placeholder="Select communication mode"
-                    disabled={isEditing && !canEditOperationalDetailsSection}
+                    placeholder={isCallCenterFieldReadOnly ? "Communication mode (pre-filled by call center)" : "Select communication mode"}
+                    disabled={isEditing && (!canEditOperationalDetailsSection || isCallCenterFieldReadOnly)}
                     options={[
                       { value: "Phone", label: "Phone" },
                       { value: "Email", label: "Email" },
@@ -2948,7 +2986,6 @@ function AppointmentsContent() {
             </button>
             </div>
           </div>
-        </div>
       </Modal>
 
       {/* Appointment Detail Modal */}
@@ -3245,8 +3282,28 @@ function AppointmentsContent() {
                     <button
                       type="button"
                       onClick={() => {
-                        // Pass to manager
+                        // Pass to manager with service intake data
                         if (!selectedAppointment) return;
+                        
+                        // Create service intake request
+                        const serviceIntakeRequest: ServiceIntakeRequest = {
+                          id: `SIR-${Date.now()}`,
+                          appointmentId: selectedAppointment.id,
+                          appointment: selectedAppointment,
+                          serviceIntakeForm: serviceIntakeForm,
+                          status: "pending",
+                          submittedAt: new Date().toISOString(),
+                          submittedBy: userInfo?.name || userInfo?.id || "Service Advisor",
+                          serviceCenterId: selectedAppointment.serviceCenterId || (serviceCenterContext.serviceCenterId !== null ? serviceCenterContext.serviceCenterId : undefined),
+                          serviceCenterName: selectedAppointment.serviceCenterName || (serviceCenterContext.serviceCenterName !== null ? serviceCenterContext.serviceCenterName : undefined),
+                        };
+                        
+                        // Save service intake request
+                        const existingRequests = safeStorage.getItem<ServiceIntakeRequest[]>("serviceIntakeRequests", []);
+                        const updatedRequests = [...existingRequests, serviceIntakeRequest];
+                        safeStorage.setItem("serviceIntakeRequests", updatedRequests);
+                        
+                        // Update appointment status
                         const updatedAppointments = appointments.map((apt) =>
                           apt.id === selectedAppointment.id
                             ? { ...apt, status: "Sent to Manager" }
@@ -3255,7 +3312,8 @@ function AppointmentsContent() {
                         setAppointments(updatedAppointments);
                         safeStorage.setItem("appointments", updatedAppointments);
                         setSelectedAppointment({ ...selectedAppointment, status: "Sent to Manager" });
-                        showToast("Appointment passed to manager for review.", "success");
+                        
+                        showToast("Service intake request sent to manager for approval.", "success");
                       }}
                       className="px-4 py-3 rounded-lg border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 font-medium text-sm text-blue-700 transition flex items-center justify-center gap-2"
                     >
@@ -3669,18 +3727,37 @@ function AppointmentsContent() {
                       onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, chargerSerialNumber: e.target.value })}
                       placeholder="Enter charger serial number"
                     />
-                    <FormInput
-                      label="Date of Purchase / Vehicle Age"
-                      value={serviceIntakeForm.dateOfPurchase}
-                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, dateOfPurchase: e.target.value })}
-                      type="date"
-                    />
-                    <FormInput
-                      label="Vehicle Age"
-                      value={serviceIntakeForm.vehicleAge}
-                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, vehicleAge: e.target.value })}
-                      placeholder="Enter vehicle age"
-                    />
+                    <div>
+                      <FormInput
+                        label="Date of Purchase"
+                        value={serviceIntakeForm.dateOfPurchase}
+                        onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, dateOfPurchase: e.target.value })}
+                        type="date"
+                      />
+                      {serviceIntakeForm.dateOfPurchase && (() => {
+                        const purchaseDate = new Date(serviceIntakeForm.dateOfPurchase);
+                        const today = new Date();
+                        const yearsDiff = today.getFullYear() - purchaseDate.getFullYear();
+                        const monthsDiff = today.getMonth() - purchaseDate.getMonth();
+                        let vehicleAge = "";
+                        if (yearsDiff > 0) {
+                          vehicleAge = monthsDiff >= 0 
+                            ? `${yearsDiff} year${yearsDiff > 1 ? 's' : ''}`
+                            : `${yearsDiff - 1} year${yearsDiff - 1 > 1 ? 's' : ''}`;
+                        } else if (monthsDiff > 0) {
+                          vehicleAge = `${monthsDiff} month${monthsDiff > 1 ? 's' : ''}`;
+                        } else {
+                          vehicleAge = "Less than 1 month";
+                        }
+                        return (
+                          <div className="mt-2">
+                            <p className="text-sm text-gray-600">
+                              <span className="font-medium">Vehicle Age:</span> {vehicleAge}
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </div>
                     <FormSelect
                       label="Warranty Status"
                       value={serviceIntakeForm.warrantyStatus}
