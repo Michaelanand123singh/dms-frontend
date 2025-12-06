@@ -866,15 +866,34 @@ const handleCreateAndSendToCustomer = async () => {
       // Convert to job card
       const jobCard = convertQuotationToJobCard(quotation);
       
-      // Show notification to advisor
-      alert(`✅ Customer Approved!\n\nQuotation ${quotation.quotationNumber} has been approved by the customer.\n\nJob Card Created: ${jobCard.jobCardNumber}\n\nYou can now proceed with the service.`);
+      // Automatically send job card to manager for technician assignment and parts monitoring
+      const updatedJobCards = safeStorage.getItem<any[]>("jobCards", []);
+      const jobCardIndex = updatedJobCards.findIndex((jc) => jc.id === jobCard.id);
+      if (jobCardIndex !== -1) {
+        updatedJobCards[jobCardIndex] = {
+          ...updatedJobCards[jobCardIndex],
+          status: "Created",
+          submittedToManager: true,
+          submittedAt: new Date().toISOString(),
+        };
+        safeStorage.setItem("jobCards", updatedJobCards);
+      }
       
-      // In production, you would send a notification/email to the advisor here
+      // Show notification to advisor
+      alert(`✅ Customer Approved!\n\nQuotation ${quotation.quotationNumber} has been approved by the customer.\n\nJob Card Created: ${jobCard.jobCardNumber}\n\nJob card has been automatically sent to Service Manager for technician assignment and parts monitoring.`);
+      
+      // In production, you would send a notification/email to the advisor and manager here
       console.log("Notification to advisor:", {
         advisorId: quotation.serviceAdvisorId,
-        message: `Quotation ${quotation.quotationNumber} approved by customer. Job Card ${jobCard.jobCardNumber} created.`,
+        message: `Quotation ${quotation.quotationNumber} approved by customer. Job Card ${jobCard.jobCardNumber} created and sent to manager.`,
         quotationId: quotation.id,
         jobCardId: jobCard.id,
+      });
+      
+      console.log("Notification to manager:", {
+        message: `New job card ${jobCard.jobCardNumber} requires technician assignment and parts monitoring.`,
+        jobCardId: jobCard.id,
+        jobCardNumber: jobCard.jobCardNumber,
       });
       
     } catch (error) {

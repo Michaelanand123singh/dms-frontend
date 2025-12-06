@@ -561,52 +561,24 @@ export const AppointmentModal = ({
               </div>
             </div>
           )}
-          {(isCallCenter || isServiceAdvisor) && !appointmentForm.isMajorIssue && (
+          {/* Cost Estimation (Billing & Payment fields removed - only available during invoice creation) */}
+          {(isCallCenter || isServiceAdvisor) && appointmentForm.estimatedCost && (
             <div className="bg-white p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <FileText className="text-indigo-600" size={20} />
-                Billing & Payment
+                Cost Estimation
               </h3>
               <div className="space-y-4">
-                <FormSelect
-                  label="Payment Mode"
-                  value={appointmentForm.paymentMethod || ""}
-                  onChange={(e) =>
-                    setAppointmentForm({
-                      ...appointmentForm,
-                      paymentMethod: e.target.value as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | undefined,
-                    })
-                  }
-                  placeholder="Select payment mode"
-                  options={[
-                    { value: "Cash", label: "Cash" },
-                    { value: "Card", label: "Card" },
-                    { value: "UPI", label: "UPI" },
-                    { value: "Online", label: "Online" },
-                    { value: "Cheque", label: "Cheque" },
-                  ]}
-                />
                 <FormInput
-                  label="Business Name for Invoice"
-                  value={appointmentForm.businessNameForInvoice || ""}
-                  onChange={(e) => setAppointmentForm({ ...appointmentForm, businessNameForInvoice: e.target.value })}
-                  placeholder="Enter business name for invoice"
-                />
-                <FormInput
-                  label="Cost Estimation"
+                  label="Estimated Cost"
                   value={appointmentForm.estimatedCost ? `₹${appointmentForm.estimatedCost}` : ""}
                   onChange={() => {}}
                   readOnly
+                  placeholder="Cost will be determined during service"
                 />
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={!!appointmentForm.gstRequirement}
-                    onChange={(e) => setAppointmentForm({ ...appointmentForm, gstRequirement: e.target.checked })}
-                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">GST Requirement</span>
-                </label>
+                <p className="text-xs text-gray-500">
+                  Note: Payment method and billing details will be collected when creating the invoice during vehicle delivery.
+                </p>
               </div>
             </div>
           )}

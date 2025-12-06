@@ -39,6 +39,9 @@ function InvoicesContent() {
     date: new Date().toISOString().split("T")[0],
     dueDate: "",
     items: [{ name: "", qty: 1, price: "" }] as InvoiceItem[],
+    paymentMethod: "" as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | "",
+    gstRequirement: false,
+    businessNameForInvoice: "",
   });
   const { userRole } = useRole();
   const isServiceAdvisor = userRole === "service_advisor";
@@ -205,7 +208,7 @@ function InvoicesContent() {
       paidAmount: "₹0",
       balance: `₹${totalAmount.toLocaleString("en-IN")}`,
       status: "Unpaid",
-      paymentMethod: null,
+      paymentMethod: invoiceForm.paymentMethod || null,
       serviceCenterId: contextServiceCenterId,
       serviceCenterName: contextServiceCenterName,
       items: invoiceForm.items,
@@ -227,6 +230,9 @@ function InvoicesContent() {
       date: new Date().toISOString().split("T")[0],
       dueDate: "",
       items: [{ name: "", qty: 1, price: "" }],
+      paymentMethod: "",
+      gstRequirement: false,
+      businessNameForInvoice: "",
     });
     setShowGenerateModal(false);
 
@@ -252,6 +258,9 @@ function InvoicesContent() {
                 date: new Date().toISOString().split("T")[0],
                 dueDate: "",
                 items: [{ name: "", qty: 1, price: "" }],
+                paymentMethod: "",
+                gstRequirement: false,
+                businessNameForInvoice: "",
               });
             }}
             className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
@@ -712,6 +721,9 @@ function InvoicesContent() {
                     date: new Date().toISOString().split("T")[0],
                     dueDate: "",
                     items: [{ name: "", qty: 1, price: "" }],
+                    paymentMethod: "",
+                    gstRequirement: false,
+                    businessNameForInvoice: "",
                   });
                 }}
                 className="text-gray-400 hover:text-gray-600 transition p-2 rounded-lg hover:bg-gray-100"
@@ -798,6 +810,58 @@ function InvoicesContent() {
                 </div>
               </div>
 
+              {/* Billing & Payment Section */}
+              <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200">
+                <h3 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                  <FileText className="text-indigo-600" size={20} />
+                  Billing & Payment
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Payment Method
+                    </label>
+                    <select
+                      value={invoiceForm.paymentMethod}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, paymentMethod: e.target.value as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | "" })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+                    >
+                      <option value="">Select payment method</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Card">Card</option>
+                      <option value="UPI">UPI</option>
+                      <option value="Online">Online</option>
+                      <option value="Cheque">Cheque</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer h-full">
+                      <input
+                        type="checkbox"
+                        checked={invoiceForm.gstRequirement}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, gstRequirement: e.target.checked })}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">GST Requirement</span>
+                    </label>
+                  </div>
+                  {invoiceForm.gstRequirement && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Business Name for Invoice
+                      </label>
+                      <input
+                        type="text"
+                        value={invoiceForm.businessNameForInvoice}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, businessNameForInvoice: e.target.value })}
+                        placeholder="Enter business name for invoice"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Invoice Items */}
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <div className="flex items-center justify-between mb-4">
@@ -879,6 +943,9 @@ function InvoicesContent() {
                       date: new Date().toISOString().split("T")[0],
                       dueDate: "",
                       items: [{ name: "", qty: 1, price: "" }],
+                      paymentMethod: "",
+                      gstRequirement: false,
+                      businessNameForInvoice: "",
                     });
                   }}
                   className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition"

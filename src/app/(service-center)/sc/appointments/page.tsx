@@ -2,7 +2,7 @@
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2, Search } from "lucide-react";
+import { Calendar, Clock, User, Car, PlusCircle, X, Edit, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2, Search, UserCheck } from "lucide-react";
 import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
 import { useCustomerSearch } from "../../../../hooks/api";
 import { useRole } from "@/shared/hooks";
@@ -762,6 +762,23 @@ function AppointmentsContent() {
 
   const [appointments, setAppointments] = useState<AppointmentRecord[]>(initializeAppointments);
 
+  // Initialize workflow mock data on first load
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Only initialize once - check if already initialized
+      const initialized = localStorage.getItem("workflowMockDataInitialized");
+      if (!initialized) {
+        try {
+          const { initializeWorkflowMockData } = require("@/__mocks__/data/workflow-mock-data");
+          initializeWorkflowMockData();
+          localStorage.setItem("workflowMockDataInitialized", "true");
+        } catch (error) {
+          console.warn("Failed to initialize workflow mock data:", error);
+        }
+      }
+    }
+  }, []);
+
   // Reload appointments from localStorage when component mounts or when serviceCenterContext changes
   useEffect(() => {
     const loadAppointments = () => {
@@ -940,7 +957,7 @@ function AppointmentsContent() {
 
   const closeAppointmentModal = useCallback(() => {
     setShowAppointmentModal(false);
-    setIsEditing(false);
+    setIsEditing(false); // Ensure isEditing is false when modal closes
     setSelectedAppointment(null);
     resetAppointmentForm();
   }, [resetAppointmentForm]);
@@ -1054,6 +1071,12 @@ function AppointmentsContent() {
 
   const handleCustomerSearchChange = useCallback(
     (value: string) => {
+      // Only block search when editing AND user doesn't have permission
+      // Allow search when creating (not editing) for all roles
+      if (isEditing && !canEditCustomerInformation) {
+        return;
+      }
+      
       setCustomerSearchQuery(value);
       setAppointmentForm((prev) => ({ ...prev, customerName: value }));
 
@@ -1072,7 +1095,7 @@ function AppointmentsContent() {
         }));
       }
     },
-    [searchCustomer, clearCustomerSearch]
+    [searchCustomer, clearCustomerSearch, isEditing, canEditCustomerInformation]
   );
 
   const handleCustomerSelect = useCallback(
@@ -1590,6 +1613,7 @@ function AppointmentsContent() {
       showToast("You do not have permission to create new appointments.", "error");
       return;
     }
+    setIsEditing(false); // Ensure isEditing is false when creating new appointment (allows search to work)
     setShowAppointmentModal(true);
     resetAppointmentForm();
   }, [canCreateNewAppointment, resetAppointmentForm, showToast]);
@@ -2159,7 +2183,11 @@ function AppointmentsContent() {
                   required
                     value={customerSearchQuery}
                     onChange={(e) => {
-                      if (isEditing && !canEditCustomerInformation) return;
+                      // Only block when editing AND user doesn't have permission
+                      // Always allow search when creating (isEditing = false)
+                      if (isEditing && !canEditCustomerInformation) {
+                        return;
+                      }
                       handleCustomerSearchChange(e.target.value);
                     }}
                     placeholder={isEditing && !canEditCustomerInformation ? "Customer information cannot be edited" : "Start typing customer name..."}
@@ -2816,70 +2844,24 @@ function AppointmentsContent() {
             </div>
           )}
 
-          {/* Billing & Payment Section */}
-          {(canAccessBillingSection || (isEditing && canEditBillingPaymentSection)) && (
+          {/* Cost Estimation (Billing & Payment fields removed - only available during invoice creation) */}
+          {canViewCostEstimation && (
             <div className="bg-white p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <FileText className="text-indigo-600" size={20} />
-                Billing & Payment
+                Cost Estimation
               </h3>
               <div className="space-y-4">
-                <FormSelect
-                  label="Payment Mode"
-                  value={appointmentForm.paymentMethod || ""}
-                  onChange={(e) => {
-                    if (isEditing && !canEditBillingPaymentSection) return;
-                    setAppointmentForm({
-                      ...appointmentForm,
-                      paymentMethod: e.target.value as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | undefined,
-                    });
-                  }}
-                  placeholder="Select payment mode"
-                  disabled={isEditing && !canEditBillingPaymentSection}
-                  options={[
-                    { value: "Cash", label: "Cash" },
-                    { value: "Card", label: "Card" },
-                    { value: "UPI", label: "UPI" },
-                    { value: "Online", label: "Online" },
-                    { value: "Cheque", label: "Cheque" },
-                  ]}
+                <FormInput
+                  label="Estimated Cost"
+                  value={appointmentForm.estimatedCost ? `₹${appointmentForm.estimatedCost}` : ""}
+                  onChange={() => {}}
+                  readOnly
+                  placeholder="Cost will be determined during service"
                 />
-                {canAccessBusinessName && (
-                  <FormInput
-                    label="Business Name for Invoice"
-                    value={appointmentForm.businessNameForInvoice || ""}
-                    onChange={(e) => {
-                      if (isEditing && !canEditBillingPaymentSection) return;
-                      setAppointmentForm({ ...appointmentForm, businessNameForInvoice: e.target.value });
-                    }}
-                    placeholder="Enter business name for invoice"
-                    disabled={isEditing && !canEditBillingPaymentSection}
-                    readOnly={isEditing && !canEditBillingPaymentSection}
-                  />
-                )}
-                {canViewCostEstimation && (
-                  <FormInput
-                    label="Cost Estimation"
-                    value={appointmentForm.estimatedCost ? `₹${appointmentForm.estimatedCost}` : ""}
-                    onChange={() => {}}
-                    readOnly
-                  />
-                )}
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={!!appointmentForm.gstRequirement}
-                    onChange={(e) => {
-                      if (isEditing && !canEditBillingPaymentSection) return;
-                      setAppointmentForm({ ...appointmentForm, gstRequirement: e.target.checked });
-                    }}
-                    disabled={isEditing && !canEditBillingPaymentSection}
-                    className={`w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 ${
-                      isEditing && !canEditBillingPaymentSection ? "cursor-not-allowed opacity-50" : ""
-                    }`}
-                  />
-                  <span className="text-sm font-medium text-gray-700">GST Requirement</span>
-                </label>
+                <p className="text-xs text-gray-500">
+                  Note: Payment method and billing details will be collected when creating the invoice during vehicle delivery.
+                </p>
               </div>
             </div>
           )}
@@ -3044,12 +3026,38 @@ function AppointmentsContent() {
                     onClick={() => {
                       if (!selectedAppointment) return;
                       
-                      // Automatically create job card when customer arrives
-                      (async () => {
                       try {
-                          const jobCard = await convertAppointmentToJobCard(selectedAppointment);
+                        // Check if pickup/drop service was selected
+                        const hasPickupDropService = selectedAppointment.pickupDropRequired && 
+                          (selectedAppointment.pickupAddress || selectedAppointment.dropAddress);
                         
-                          // Update appointment status to "In Progress"
+                        if (hasPickupDropService) {
+                          // Create pickup/drop charges and send to customer
+                          const pickupDropCharges = {
+                            id: `PDC-${Date.now()}`,
+                            appointmentId: selectedAppointment.id,
+                            customerName: selectedAppointment.customerName,
+                            phone: selectedAppointment.phone,
+                            pickupAddress: selectedAppointment.pickupAddress,
+                            dropAddress: selectedAppointment.dropAddress,
+                            amount: 500, // Default pickup/drop charge (can be configurable)
+                            status: "pending",
+                            createdAt: new Date().toISOString(),
+                          };
+                          
+                          // Store pickup/drop charges
+                          const existingCharges = safeStorage.getItem<any[]>("pickupDropCharges", []);
+                          safeStorage.setItem("pickupDropCharges", [...existingCharges, pickupDropCharges]);
+                          
+                          // Send charges to customer via WhatsApp
+                          const message = `Hello ${selectedAppointment.customerName}, your pickup/drop service charges are ₹${pickupDropCharges.amount}.\n\nPickup Address: ${selectedAppointment.pickupAddress || "N/A"}\nDrop Address: ${selectedAppointment.dropAddress || "N/A"}\n\nPlease confirm to proceed.`;
+                          const whatsappUrl = `https://wa.me/${selectedAppointment.phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
+                          window.open(whatsappUrl, "_blank");
+                          
+                          showToast("Pickup/drop charges created and sent to customer via WhatsApp.", "success");
+                        }
+                        
+                        // Update appointment status to "In Progress"
                         const updatedAppointments = appointments.map((apt) =>
                           apt.id === selectedAppointment.id
                             ? { ...apt, status: "In Progress" }
@@ -3057,44 +3065,28 @@ function AppointmentsContent() {
                         );
                         setAppointments(updatedAppointments);
                         safeStorage.setItem("appointments", updatedAppointments);
-
-                          // Update selectedAppointment state to reflect status change
-                          setSelectedAppointment({ ...selectedAppointment, status: "In Progress" });
-
-                        // Show success message
-                        showToast(
-                            `Job Card Created: ${jobCard.jobCardNumber}. Customer arrival recorded. Appointment status updated to "In Progress".`,
-                          "success"
-                        );
                         
-                          // Pre-fill form with appointment and job card PART 1 data
+                        // Update selectedAppointment state
+                        setSelectedAppointment({ ...selectedAppointment, status: "In Progress" });
+                        
+                        // Set arrival status (NO JOB CARD CREATED YET)
+                        setCustomerArrivalStatus("arrived");
+                        
+                        // Pre-fill form with appointment data (no job card yet)
                         setServiceIntakeForm({
                           ...INITIAL_SERVICE_INTAKE_FORM,
-                            serviceType: selectedAppointment.serviceType || jobCard.part1?.vehicleBrand || "",
-                            vehicleBrand: jobCard.part1?.vehicleBrand || selectedAppointment.vehicle.split(" ")[0] || "",
-                            vehicleModel: jobCard.part1?.vehicleModel || selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
-                            registrationNumber: jobCard.part1?.registrationNumber || "",
-                            vinChassisNumber: jobCard.part1?.vinChassisNumber || "",
-                            variantBatteryCapacity: jobCard.part1?.variantBatteryCapacity || "",
-                            warrantyStatus: jobCard.part1?.warrantyStatus || "",
-                            estimatedDeliveryDate: jobCard.part1?.estimatedDeliveryDate || selectedAppointment.estimatedDeliveryDate || "",
-                            insuranceStartDate: jobCard.part1?.insuranceStartDate || "",
-                            insuranceEndDate: jobCard.part1?.insuranceEndDate || "",
-                            insuranceCompanyName: jobCard.part1?.insuranceCompanyName || "",
-                            customerComplaintIssue: jobCard.part1?.customerFeedback || selectedAppointment.customerComplaintIssue || "",
-                            jobCardId: jobCard.id,
+                          serviceType: selectedAppointment.serviceType || "",
+                          vehicleBrand: selectedAppointment.vehicle.split(" ")[0] || "",
+                          vehicleModel: selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
+                          estimatedDeliveryDate: selectedAppointment.estimatedDeliveryDate || "",
+                          customerComplaintIssue: selectedAppointment.customerComplaintIssue || "",
                         });
-
-                        // Set arrival status
-                        setCustomerArrivalStatus("arrived");
-                          setCurrentJobCardId(jobCard.id);
-                        // Ensure detail modal stays open so advisor can fill intake
-                        setShowDetailModal(true);
+                        
+                        showToast("Customer arrival recorded. Please select an action: Create Quotation, Pass to Manager, or Generate Check-in Slip.", "success");
                       } catch (error) {
-                        console.error("Error creating job card:", error);
-                        showToast("Failed to create job card. Please try again.", "error");
+                        console.error("Error recording customer arrival:", error);
+                        showToast("Failed to record customer arrival. Please try again.", "error");
                       }
-                      })();
                     }}
                     className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-white text-gray-700 border border-gray-300 hover:bg-green-50"
                   >
@@ -3145,109 +3137,119 @@ function AppointmentsContent() {
             )}
             {isServiceAdvisor && customerArrivalStatus === "arrived" && (
               <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-5 shadow-sm">
-                <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                <div className="flex flex-col gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-gray-700">Arrival Mode</p>
-                    <p className="text-xs text-gray-500">Select whether the vehicle is present or pending arrival.</p>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">Select Action</p>
+                    <p className="text-xs text-gray-500">Choose how to proceed with this customer arrival.</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <button
                       type="button"
-                      onClick={() => handleArrivalModeSelect("vehicle_present")}
-                      className={`px-4 py-2 rounded-lg border font-medium text-sm ${
-                        arrivalMode === "vehicle_present"
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white text-gray-700 border-gray-300 hover:border-indigo-500"
-                      }`}
+                      onClick={() => {
+                        // Navigate to quotations page to create quotation/estimation
+                        const serviceIntakeData = {
+                          appointmentId: selectedAppointment?.id,
+                          customerName: selectedAppointment?.customerName,
+                          phone: selectedAppointment?.phone,
+                          vehicle: selectedAppointment?.vehicle,
+                          customerId: selectedCustomer?.id?.toString() || detailCustomer?.id?.toString() || selectedAppointment?.customerExternalId,
+                          serviceCenterId: selectedAppointment?.serviceCenterId?.toString() || serviceCenterContext.serviceCenterId,
+                          serviceCenterName: selectedAppointment?.serviceCenterName || serviceCenterContext.serviceCenterName,
+                          serviceIntakeForm: {
+                            ...serviceIntakeForm,
+                            customerIdProof: { files: [], urls: serviceIntakeForm.customerIdProof.urls },
+                            vehicleRCCopy: { files: [], urls: serviceIntakeForm.vehicleRCCopy.urls },
+                            warrantyCardServiceBook: { files: [], urls: serviceIntakeForm.warrantyCardServiceBook.urls },
+                            photosVideos: { files: [], urls: serviceIntakeForm.photosVideos.urls },
+                          },
+                        };
+                        safeStorage.setItem("pendingQuotationFromAppointment", serviceIntakeData);
+                        router.push("/sc/quotations?fromAppointment=true");
+                        closeDetailModal();
+                      }}
+                      className="px-4 py-3 rounded-lg border-2 border-indigo-300 bg-indigo-50 hover:bg-indigo-100 font-medium text-sm text-indigo-700 transition flex items-center justify-center gap-2"
                     >
-                      Vehicle Present
+                      <FileText size={18} />
+                      Create Quotation/Estimation
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleArrivalModeSelect("vehicle_absent")}
-                      className={`px-4 py-2 rounded-lg border font-medium text-sm ${
-                        arrivalMode === "vehicle_absent"
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white text-gray-700 border-gray-300 hover:border-indigo-500"
-                      }`}
+                      onClick={() => {
+                        // Pass to manager
+                        if (!selectedAppointment) return;
+                        const updatedAppointments = appointments.map((apt) =>
+                          apt.id === selectedAppointment.id
+                            ? { ...apt, status: "Sent to Manager" }
+                            : apt
+                        );
+                        setAppointments(updatedAppointments);
+                        safeStorage.setItem("appointments", updatedAppointments);
+                        setSelectedAppointment({ ...selectedAppointment, status: "Sent to Manager" });
+                        showToast("Appointment passed to manager for review.", "success");
+                      }}
+                      className="px-4 py-3 rounded-lg border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 font-medium text-sm text-blue-700 transition flex items-center justify-center gap-2"
                     >
-                      Vehicle Absent
+                      <User size={18} />
+                      Pass to Manager
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Generate check-in slip
+                        if (!selectedAppointment) return;
+                        const slipData = generateCheckInSlipData();
+                        if (slipData) {
+                          setCheckInSlipData(slipData);
+                          setServiceIntakeForm((prev) => ({
+                            ...prev,
+                            checkInSlipNumber: slipData.slipNumber,
+                            checkInDate: slipData.checkInDate,
+                            checkInTime: slipData.checkInTime,
+                          }));
+                          setShowCheckInSlipModal(true);
+                          showToast("Check-in slip generated successfully.", "success");
+                        }
+                      }}
+                      className="px-4 py-3 rounded-lg border-2 border-green-300 bg-green-50 hover:bg-green-100 font-medium text-sm text-green-700 transition flex items-center justify-center gap-2"
+                    >
+                      <FileText size={18} />
+                      Generate Check-in Slip
                     </button>
                   </div>
                 </div>
 
-                {/* Arrival Mode Status Messages */}
-                {arrivalMode === "vehicle_present" && checkInSlipData && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                {/* Check-in Slip Status */}
+                {checkInSlipData && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle className="text-green-600" size={20} />
-                      <p className="font-semibold text-green-800">Vehicle Present - Check-in Slip Generated</p>
+                      <p className="font-semibold text-green-800">Check-in Slip Generated</p>
                     </div>
-                    <p className="text-sm text-green-700">
-                      The vehicle is confirmed at the service center. Check-in slip has been generated and can be sent to the customer.
-                      You can now proceed to create a quotation/estimation.
+                    <p className="text-sm text-green-700 mb-3">
+                      Check-in slip has been generated. You can view or print it below.
                     </p>
-                  </div>
-                )}
-
-                {arrivalMode === "vehicle_absent" && selectedAppointment?.pickupDropRequired && 
-                 (selectedAppointment.pickupAddress || selectedAppointment.dropAddress) && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="text-amber-600" size={20} />
-                      <p className="font-semibold text-amber-800">Vehicle Will Be Picked Up</p>
-                    </div>
-                    <p className="text-sm text-amber-700 mb-3">
-                      Vehicle will be picked up from: <span className="font-medium">{selectedAppointment.pickupAddress || selectedAppointment.dropAddress}</span>
-                    </p>
-                    {!checkInSlipData && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!currentJobCardId) {
-                            showToast("Please wait for job card to be created first.", "error");
-                            return;
-                          }
-                          const slipData = generateCheckInSlipData();
-                          if (slipData) {
-                            setCheckInSlipData(slipData);
-                            setServiceIntakeForm((prev) => ({
-                              ...prev,
-                              checkInSlipNumber: slipData.slipNumber,
-                              checkInDate: slipData.checkInDate,
-                              checkInTime: slipData.checkInTime,
-                            }));
-                            setShowCheckInSlipModal(true);
-                            showToast("Check-in slip generated. Vehicle is now at service center.", "success");
-                          }
-                        }}
-                        className="bg-amber-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-amber-700 transition text-sm flex items-center gap-2"
-                      >
-                        <FileText size={16} />
-                        Generate Check-in Slip (Vehicle Picked Up)
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowCheckInSlipModal(true)}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition text-sm flex items-center gap-2"
+                    >
+                      <FileText size={16} />
+                      View / Print Check-in Slip
+                    </button>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-3 space-y-2">
-                    <p className="text-xs font-semibold text-gray-500">Job Card</p>
+                    <p className="text-xs font-semibold text-gray-500">Job Card Status</p>
                     <p className="text-lg font-semibold text-gray-900">
-                      {currentJobCard ? currentJobCard.jobCardNumber : "Awaiting arrival mode"}
+                      {currentJobCard ? currentJobCard.jobCardNumber : "Not Created Yet"}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Status: {currentJobCard?.status || "Created"}
+                      {currentJobCard 
+                        ? `Status: ${currentJobCard.status}` 
+                        : "Job card will be created after quotation approval"}
                     </p>
-                    {checkInSlipData && (
-                      <button
-                        type="button"
-                        onClick={() => setShowCheckInSlipModal(true)}
-                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 mt-2"
-                      >
-                        View / Print Check-in Slip
-                      </button>
-                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-gray-700">Check-in Notes</label>
@@ -3742,54 +3744,25 @@ function AppointmentsContent() {
                   </div>
                 </div>
 
-                {/* Billing & Payment Section */}
-                <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
-                  <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
-                    <span className="w-1 h-6 bg-green-600 rounded"></span>
-                    Billing & Payment
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Payment Method (Service Advisor & Service Manager) */}
-                    <FormSelect
-                      label="Payment Method"
-                      value={serviceIntakeForm.paymentMethod}
-                      onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, paymentMethod: e.target.value as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | "" })}
-                      placeholder="Select payment method"
-                      options={[
-                        { value: "Cash", label: "Cash" },
-                        { value: "Card", label: "Card" },
-                        { value: "UPI", label: "UPI" },
-                        { value: "Online", label: "Online" },
-                        { value: "Cheque", label: "Cheque" },
-                      ]}
+                {/* Cost Estimation Note (Billing & Payment fields removed - only available during invoice creation) */}
+                {canViewCostEstimation && (
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200">
+                    <h4 className="text-lg font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                      <span className="w-1 h-6 bg-blue-600 rounded"></span>
+                      Cost Estimation
+                    </h4>
+                    <FormInput
+                      label="Estimated Cost"
+                      value={serviceIntakeForm.estimatedCost ? `₹${serviceIntakeForm.estimatedCost}` : appointmentForm.estimatedCost ? `₹${appointmentForm.estimatedCost}` : ""}
+                      onChange={() => {}}
+                      readOnly
+                      placeholder="Cost will be determined during service"
                     />
-                    
-                    {/* GST Requirement (Service Advisor & Service Manager) */}
-                    <div>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={serviceIntakeForm.gstRequirement}
-                          onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, gstRequirement: e.target.checked })}
-                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">GST Requirement</span>
-                      </label>
-                    </div>
-                    
-                    {/* Business Name for Invoice (Service Advisor & Service Manager) */}
-                    {serviceIntakeForm.gstRequirement && (
-                      <div className="md:col-span-2">
-                        <FormInput
-                          label="Business Name for Invoice"
-                          value={serviceIntakeForm.businessNameForInvoice}
-                          onChange={(e) => setServiceIntakeForm({ ...serviceIntakeForm, businessNameForInvoice: e.target.value })}
-                          placeholder="Enter business name for invoice"
-                        />
-                      </div>
-                    )}
+                    <p className="text-xs text-gray-600 mt-2">
+                      Note: Payment method, GST requirement, and billing details will be collected when creating the invoice during vehicle delivery.
+                    </p>
                   </div>
-                </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">

@@ -21,7 +21,9 @@ class CustomerRepository {
 
   private applyServiceCenterFilter(customers: CustomerWithVehicles[]): CustomerWithVehicles[] {
     const context = this.loadUserContext();
-    if (context.userRole === "call_center" || !context.serviceCenterId) {
+    // Allow call center and service advisor to see all customers (for search functionality)
+    // Other roles (like SC Manager) may be filtered by service center
+    if (context.userRole === "call_center" || context.userRole === "service_advisor" || !context.serviceCenterId) {
       return customers;
     }
     return customers.filter((customer) => String(customer.serviceCenterId) === String(context.serviceCenterId));
