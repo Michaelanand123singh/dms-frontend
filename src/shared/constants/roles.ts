@@ -7,11 +7,11 @@ export const USER_ROLES: UserRole[] = [
   "admin",
   "super_admin",
   "sc_manager",
-  "sc_staff",
   "service_engineer",
   "service_advisor",
   "call_center",
   "inventory_manager",
+  "central_inventory_manager",
 ];
 
 /**
@@ -24,7 +24,6 @@ export const ADMIN_ROLES: UserRole[] = ["admin", "super_admin"];
  */
 export const SC_ROLES: UserRole[] = [
   "sc_manager",
-  "sc_staff",
   "service_engineer",
   "service_advisor",
   "call_center",
@@ -36,17 +35,22 @@ export const SC_ROLES: UserRole[] = [
 export const INVENTORY_ROLES: UserRole[] = ["inventory_manager"];
 
 /**
+ * Central Inventory Manager roles
+ */
+export const CENTRAL_INVENTORY_ROLES: UserRole[] = ["central_inventory_manager"];
+
+/**
  * Role display names
  */
 export const ROLE_DISPLAY_NAMES: Record<UserRole, string> = {
   admin: "Admin",
   super_admin: "Super Admin",
   sc_manager: "SC Manager",
-  sc_staff: "SC Staff",
   service_engineer: "Service Engineer",
   service_advisor: "Service Advisor",
   call_center: "Call Center",
   inventory_manager: "Inventory Manager",
+  central_inventory_manager: "Central Inventory Manager",
 };
 
 /**
@@ -58,7 +62,6 @@ export const ROLES_CAN_CREATE_CUSTOMER: UserRole[] = [
   "super_admin",
   "call_center",
   "service_advisor",
-  "sc_staff",
 ];
 
 /**
@@ -77,7 +80,6 @@ export const ROLES_CAN_CREATE_APPOINTMENT: UserRole[] = [
   "super_admin",
   "call_center",
   "service_advisor",
-  "sc_staff",
 ];
 
 /**
@@ -189,7 +191,6 @@ export const ROLES_CAN_EDIT_BILLING_PAYMENT: UserRole[] = [
   "super_admin",
   "service_advisor",
   "sc_manager",
-  "sc_staff",
 ];
 
 /**

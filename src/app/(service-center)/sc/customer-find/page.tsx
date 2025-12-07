@@ -223,7 +223,7 @@ export default function CustomerFind() {
   const isServiceAdvisor = userRole === "service_advisor";
   const isServiceManager = userRole === "sc_manager";
   const isTechnician = userRole === "service_engineer";
-  const isInventoryManager = userRole === "sc_staff";
+  const isInventoryManager = userRole === "inventory_manager";
   const isAdminRole = userRole === "admin" || userRole === "super_admin";
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
 
@@ -231,7 +231,7 @@ export default function CustomerFind() {
     return isAdminRole || roles.includes(userRole);
   };
 
-  const canAccessCustomerType = hasRoleAccess(["call_center", "service_advisor", "sc_staff"]);
+  const canAccessCustomerType = hasRoleAccess(["call_center", "service_advisor"]);
   const canAccessServiceDetails = hasRoleAccess(["call_center", "service_advisor", "sc_manager", "service_engineer"]);
   const canAccessEstimatedCost = hasRoleAccess(["service_advisor", "sc_manager"]);
   const canAccessOdometer = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
@@ -240,7 +240,6 @@ export default function CustomerFind() {
     "call_center",
     "service_advisor",
     "sc_manager",
-    "sc_staff",
   ]);
   const canAccessOperationalDetails = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
   const canAssignTechnician = hasRoleAccess(["service_advisor", "sc_manager", "service_engineer"]);
@@ -258,8 +257,8 @@ export default function CustomerFind() {
   const canAccessAMCStatus = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
   const canAccessPickupAddress = hasRoleAccess(["call_center", "service_advisor"]);
   const canAccessVehicleInfo = hasRoleAccess(["call_center", "service_advisor"]);
-  const canAccessBillingSection = hasRoleAccess(["service_advisor", "sc_manager", "sc_staff"]);
-  const canAccessBusinessName = hasRoleAccess(["service_advisor", "sc_manager", "sc_staff"]);
+  const canAccessBillingSection = hasRoleAccess(["service_advisor", "sc_manager"]);
+  const canAccessBusinessName = hasRoleAccess(["service_advisor", "sc_manager"]);
   const canAccessServiceStatus = hasRoleAccess(["call_center", "service_advisor", "sc_manager", "service_engineer"]);
   const canViewCostEstimation = canAccessEstimatedCost || isInventoryManager;
   const canAssignServiceCenter = canAccessOperationalDetails;

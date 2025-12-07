@@ -10,7 +10,6 @@ export interface ServiceCenterContext {
 const DEFAULT_CENTER_MAP: Record<string, string> = {
   service_advisor: "1",
   sc_manager: "1",
-  sc_staff: "1",
   service_engineer: "1",
 };
 

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { Sidebar, SCSidebar, InventoryManagerSidebar, Navbar } from "@/components/layout";
+import { Sidebar, SCSidebar, InventoryManagerSidebar, CentralInventorySidebar, Navbar } from "@/components/layout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useRole } from "@/shared/hooks";
 import type { UserRole } from "@/shared/types";
@@ -25,9 +25,11 @@ export default function RootLayout({ children }: RootLayoutProps) {
   // Service Center routes: /sc/*
   // Admin routes: /dashboard, /servicecenters, /user&roles, /finance, /reports, /complaints, /audit-logs
   // Inventory Manager routes: /inventory-manager/*
+  // Central Inventory Manager routes: /central-inventory/*
   // Note: /inventory and /approvals can be accessed by both, so we check role for those
   const isServiceCenterPage = pathname?.startsWith("/sc");
   const isInventoryManagerPage = pathname?.startsWith("/inventory-manager");
+  const isCentralInventoryPage = pathname?.startsWith("/central-inventory");
 
   // Admin-specific routes
   const isAdminRoute = pathname === "/dashboard" ||
@@ -43,12 +45,15 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const isAdminOnSharedRoute = isSharedRoute && (userRole === "admin" || userRole === "super_admin");
 
   // Use Inventory Manager sidebar if on inventory manager page
-  const useInventoryManagerSidebar = isInventoryManagerPage;
+  const useInventoryManagerSidebar = isInventoryManagerPage && !isCentralInventoryPage;
 
-  // Use SC sidebar if: on SC page OR on shared route as non-admin OR not on admin route and not admin/super_admin and not inventory manager
+  // Use Central Inventory sidebar if on central inventory page
+  const useCentralInventorySidebar = isCentralInventoryPage;
+
+  // Use SC sidebar if: on SC page OR on shared route as non-admin OR not on admin route and not admin/super_admin and not inventory manager and not central inventory manager
   const useSCSidebar = (isServiceCenterPage ||
     (isSharedRoute && !isAdminOnSharedRoute) ||
-    (!isAdminRoute && !isSharedRoute && userRole !== "admin" && userRole !== "super_admin" && userRole !== "inventory_manager")) && !isInventoryManagerPage;
+    (!isAdminRoute && !isSharedRoute && userRole !== "admin" && userRole !== "super_admin" && userRole !== "inventory_manager" && userRole !== "central_inventory_manager")) && !isInventoryManagerPage && !isCentralInventoryPage;
 
   // Show loader during navigation (track pathname changes)
   useEffect(() => {
@@ -70,7 +75,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body className="antialiased bg-[#f9f9fb] flex" suppressHydrationWarning>
         <ErrorBoundary>
           {isLoggedIn &&
-            (useInventoryManagerSidebar ? (
+            (useCentralInventorySidebar ? (
+              <CentralInventorySidebar open={open} setOpen={setOpen} />
+            ) : useInventoryManagerSidebar ? (
               <InventoryManagerSidebar open={open} setOpen={setOpen} />
             ) : useSCSidebar ? (
               <SCSidebar open={open} setOpen={setOpen} role={userRole} />

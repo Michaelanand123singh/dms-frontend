@@ -40,17 +40,6 @@ export const SC_MENU_ITEMS: Record<UserRole, MenuItem[]> = {
     { name: "Approvals", icon: FileText, href: "/sc/approvals" },
     { name: "Settings", icon: Settings, href: "/sc/settings" },
   ],
-  sc_staff: [
-    { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
-    { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Vehicle Search", icon: Search, href: "/sc/vehicle-search" },
-    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
-    { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
-    { name: "Workshop", icon: Wrench, href: "/sc/workshop" },
-    { name: "Inventory", icon: Package, href: "/sc/inventory" },
-    { name: "OTC Orders", icon: ShoppingCart, href: "/sc/otc-orders" },
-    { name: "Invoices", icon: DollarSign, href: "/sc/invoices" },
-  ],
   service_engineer: [
     { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
     { name: "My Jobs", icon: ClipboardList, href: "/sc/job-cards" },
@@ -75,6 +64,7 @@ export const SC_MENU_ITEMS: Record<UserRole, MenuItem[]> = {
   admin: [],
   super_admin: [],
   inventory_manager: [],
+  central_inventory_manager: [],
 };
 
 export const MENU_CONFIG = {

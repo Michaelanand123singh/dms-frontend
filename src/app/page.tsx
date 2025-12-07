@@ -187,12 +187,6 @@ export default function LoginPage() {
                   SC Manager
                 </button>
                 <button
-                  onClick={() => quickLogin("sc_staff")}
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
-                >
-                  SC Staff
-                </button>
-                <button
                   onClick={() => quickLogin("service_engineer")}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
                 >
@@ -215,6 +209,16 @@ export default function LoginPage() {
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
                 >
                   Inventory Manager
+                </button>
+
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-2 mt-3 mb-1">
+                  Central Inventory
+                </p>
+                <button
+                  onClick={() => quickLogin("central_inventory_manager")}
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors duration-150 font-medium"
+                >
+                  Central Inventory Manager
                 </button>
               </div>
             </div>

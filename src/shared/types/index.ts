@@ -25,6 +25,9 @@ export * from './workshop.types';
 // Inventory types
 export * from './inventory.types';
 
+// Central Inventory types
+export * from './central-inventory.types';
+
 // OTC types
 export * from './otc.types';
 

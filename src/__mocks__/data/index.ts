@@ -20,4 +20,5 @@ export * from "./job-cards.mock";
 export * from "./workshop.mock";
 export * from "./users.mock";
 export * from "./dashboard.mock";
+export * from "./central-inventory.mock";
 

@@ -20,6 +20,9 @@ import {
   Eye,
   ShoppingCart,
   ListChecks,
+  Warehouse,
+  FileCheck,
+  ArrowRightCircle,
 } from "lucide-react";
 
 export interface MenuItem {
@@ -53,5 +56,15 @@ export const INVENTORY_MANAGER_MENU_ITEMS: MenuItem[] = [
   { name: "Parts Entry", icon: PlusCircle, href: "/inventory-manager/parts-entry" },
   { name: "Order Entry", icon: ShoppingCart, href: "/inventory-manager/parts-order-entry" },
   { name: "Approvals", icon: CheckCircle, href: "/inventory-manager/approvals" },
+];
+
+/**
+ * Central Inventory Manager menu items
+ */
+export const CENTRAL_INVENTORY_MANAGER_MENU_ITEMS: MenuItem[] = [
+  { name: "Dashboard", icon: Home, href: "/central-inventory/dashboard" },
+  { name: "Purchase Orders", icon: FileCheck, href: "/central-inventory/purchase-orders" },
+  { name: "Central Stock", icon: Warehouse, href: "/central-inventory/stock" },
+  { name: "Issue Parts", icon: ArrowRightCircle, href: "/central-inventory/stock/issue" },
 ];
 

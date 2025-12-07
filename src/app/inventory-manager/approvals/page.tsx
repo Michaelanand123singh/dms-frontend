@@ -10,7 +10,7 @@ import type { JobCardPartsRequest } from "@/shared/types/jobcard-inventory.types
 
 export default function ApprovalsPage() {
   const { userInfo, userRole } = useRole();
-  const isInventoryManager = userRole === "inventory_manager" || userRole === "sc_staff";
+  const isInventoryManager = userRole === "inventory_manager";
   const isScManager = userRole === "sc_manager";
   const [newRequests, setNewRequests] = useState<JobCardPartsRequest[]>([]);
   const [scApprovedRequests, setScApprovedRequests] = useState<JobCardPartsRequest[]>([]);

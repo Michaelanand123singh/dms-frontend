@@ -79,7 +79,7 @@ export default function JobCards() {
   const isCallCenter = userRole === "call_center";
   const isServiceAdvisor = userRole === "service_advisor";
   const isServiceManager = userRole === "sc_manager";
-  const isInventoryManager = userRole === "inventory_manager" || userRole === "sc_staff";
+  const isInventoryManager = userRole === "inventory_manager";
   const isTechnician = userRole === "service_engineer";
   const [technicianApproved, setTechnicianApproved] = useState<boolean>(false);
   const [partsApproved, setPartsApproved] = useState<boolean>(false);

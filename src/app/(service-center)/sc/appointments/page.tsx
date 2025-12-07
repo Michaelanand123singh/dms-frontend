@@ -718,7 +718,7 @@ function AppointmentsContent() {
   const isCallCenter = userRole === "call_center";
   const isServiceAdvisor = userRole === "service_advisor";
   const isServiceManager = userRole === "sc_manager";
-  const isInventoryManager = userRole === "sc_staff";
+  const isInventoryManager = userRole === "inventory_manager";
   const canViewCostEstimation = isServiceAdvisor || isServiceManager || isInventoryManager;
   const canAccessBillingSection = isServiceAdvisor || isServiceManager || isInventoryManager;
   const canAccessBusinessName = canAccessBillingSection;

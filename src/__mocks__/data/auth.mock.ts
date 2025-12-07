@@ -37,15 +37,6 @@ export const mockUsers: MockUser[] = [
     serviceCenterId: "sc-001",
   },
   {
-    email: "scstaff@service.com",
-    password: "staff123",
-    role: "sc_staff",
-    name: "SC Staff",
-    initials: "SCS",
-    serviceCenter: "Delhi Central Hub",
-    serviceCenterId: "sc-001",
-  },
-  {
     email: "engineer@service.com",
     password: "eng123",
     role: "service_engineer",
@@ -78,6 +69,14 @@ export const mockUsers: MockUser[] = [
     name: "Inventory Manager",
     initials: "IM",
     serviceCenter: null, // Inventory manager manages inventory across all service centers
+  },
+  {
+    email: "central@service.com",
+    password: "central123",
+    role: "central_inventory_manager",
+    name: "Central Inventory Manager",
+    initials: "CIM",
+    serviceCenter: null, // Central inventory manager manages central warehouse
   },
 ];
 

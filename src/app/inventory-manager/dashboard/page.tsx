@@ -106,7 +106,7 @@ export default function InventoryManagerDashboard() {
       label: "View All Parts",
       icon: Eye,
       bg: "bg-gradient-to-r from-blue-500 to-indigo-500",
-      link: "/inventory-manager/parts-view",
+      link: "/inventory-manager/parts-master",
     },
     {
       label: "Create Order",

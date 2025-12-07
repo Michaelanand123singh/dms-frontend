@@ -252,55 +252,6 @@ export default function SCDashboard() {
           revenueThisMonth: "₹8,90,000",
         },
       },
-      sc_staff: {
-        cards: [
-          {
-            title: "Today's Jobs",
-            value: "8",
-            change: "+2",
-            icon: ClipboardList,
-            color: "from-blue-400/20 to-blue-100",
-            text: "text-blue-600",
-          },
-          {
-            title: "Pending Invoices",
-            value: "5",
-            change: "₹45,000",
-            icon: FileText,
-            color: "from-yellow-400/20 to-yellow-100",
-            text: "text-yellow-600",
-          },
-          {
-            title: "OTC Orders Today",
-            value: "12",
-            change: "+3",
-            icon: ShoppingCart,
-            color: "from-green-400/20 to-green-100",
-            text: "text-green-600",
-          },
-        ],
-        alerts: [],
-        quickActions: [
-          {
-            label: "Create Job Card",
-            icon: PlusCircle,
-            bg: "bg-gradient-to-r from-green-500 to-green-700",
-            link: "/sc/job-cards?action=create",
-          },
-          {
-            label: "Search Vehicle",
-            icon: Package,
-            bg: "bg-gradient-to-r from-blue-500 to-indigo-500",
-            link: "/sc/vehicle-search",
-          },
-          {
-            label: "OTC Order",
-            icon: ShoppingCart,
-            bg: "bg-gradient-to-r from-orange-500 to-yellow-500",
-            link: "/sc/otc-orders?action=create",
-          },
-        ],
-      },
       service_engineer: {
         cards: [
           {
@@ -433,6 +384,11 @@ export default function SCDashboard() {
         quickActions: [],
       },
       inventory_manager: {
+        cards: [],
+        alerts: [],
+        quickActions: [],
+      },
+      central_inventory_manager: {
         cards: [],
         alerts: [],
         quickActions: [],

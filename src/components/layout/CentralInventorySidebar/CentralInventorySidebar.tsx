@@ -1,116 +1,37 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Home,
-  Search,
-  FileText,
-  ClipboardList,
-  Wrench,
-  Package,
-  ShoppingCart,
-  DollarSign,
-  Calendar,
-  Users,
-  MessageSquare,
-  Settings,
+  FileCheck,
+  Warehouse,
+  ArrowRightCircle,
   LogOut,
-  Truck,
-  BarChart3,
-  UserCircle,
-  LucideIcon,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
-import type { UserRole } from "@/shared/types";
 import { useRole } from "@/shared/hooks";
 import { safeStorage } from "@/shared/lib/localStorage";
+import { CENTRAL_INVENTORY_MANAGER_MENU_ITEMS } from "@/shared/constants/menu-items";
 
-interface MenuItem {
-  name: string;
-  icon: LucideIcon;
-  href: string;
-}
-
-export interface SCSidebarProps {
+export interface CentralInventorySidebarProps {
   open: boolean;
   setOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
-  role?: UserRole;
 }
 
-const roleMenus: Record<UserRole, MenuItem[]> = {
-  sc_manager: [
-    { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
-    { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
-    { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
-    { name: "Workshop", icon: Wrench, href: "/sc/workshop" },
-    { name: "Inventory", icon: Package, href: "/sc/inventory" },
-    { name: "OTC Orders", icon: ShoppingCart, href: "/sc/otc-orders" },
-    { name: "Home Service", icon: Truck, href: "/sc/home-service" },
-    { name: "Invoices", icon: DollarSign, href: "/sc/invoices" },
-    { name: "Technicians", icon: Users, href: "/sc/technicians" },
-    { name: "Complaints", icon: MessageSquare, href: "/sc/complaints" },
-    { name: "Reports", icon: BarChart3, href: "/sc/reports" },
-    { name: "Approvals", icon: FileText, href: "/sc/approvals" },
-    { name: "Settings", icon: Settings, href: "/sc/settings" },
-  ],
-  service_engineer: [
-    { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
-    { name: "My Jobs", icon: ClipboardList, href: "/sc/job-cards" },
-    { name: "Home Service", icon: Truck, href: "/sc/home-service" },
-    { name: "Parts Request", icon: Package, href: "/sc/parts-request" },
-  ],
-  service_advisor: [
-    { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
-    { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
-    { name: "Job Cards", icon: ClipboardList, href: "/sc/job-cards" },
-    { name: "Leads", icon: Users, href: "/sc/leads" },
-    { name: "Quotations", icon: FileText, href: "/sc/quotations" },
-    { name: "Invoices", icon: DollarSign, href: "/sc/invoices" },
-  ],
-  call_center: [
-    { name: "Dashboard", icon: Home, href: "/sc/dashboard" },
-    { name: "Customer Find", icon: UserCircle, href: "/sc/customer-find" },
-    { name: "Appointments", icon: Calendar, href: "/sc/appointments" },
-    { name: "Complaints", icon: MessageSquare, href: "/sc/complaints" },
-  ],
-  admin: [],
-  super_admin: [],
-  inventory_manager: [],
-  central_inventory_manager: [],
-};
-
-export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
+export function CentralInventorySidebar({ open, setOpen }: CentralInventorySidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { userInfo, userRole, isLoading } = useRole();
-  // Track if component has mounted to avoid hydration mismatch
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    // Defer state update to avoid synchronous setState in effect
-    queueMicrotask(() => {
-      setIsMounted(true);
-    });
-  }, []);
-
-  // Use role from hook (most reliable) - it reads directly from localStorage
-  // Use consistent role during SSR to avoid hydration mismatch
-  // Default to sc_manager during SSR, then use actual role after mount
-  const effectiveRole = (isMounted && userRole && userRole !== "admin" && userRole !== "super_admin")
-    ? userRole
-    : (roleProp || "sc_manager");
-  // Always use the same menu structure - roleProp should be provided from parent
-  const menu = roleMenus[effectiveRole] || roleMenus.sc_manager;
+  const { userInfo } = useRole();
+  // Use lazy initializer to check if we're on the client side
+  const [isMounted] = useState(() => typeof window !== "undefined");
 
   // Compute user info with consistent defaults for SSR and client
   // Use consistent defaults during SSR to avoid hydration mismatch
   const user = {
-    name: (isMounted && userInfo?.name) ? userInfo.name : "SC Manager",
-    role: (isMounted && userInfo?.role) ? userInfo.role : "SC Manager",
-    initials: (isMounted && userInfo?.initials) ? userInfo.initials : "SC",
+    name: (isMounted && userInfo?.name) ? userInfo.name : "Central Inventory Manager",
+    role: (isMounted && userInfo?.role) ? userInfo.role : "Central Inventory Manager",
+    initials: (isMounted && userInfo?.initials) ? userInfo.initials : "CIM",
   };
 
   const handleLogout = () => {
@@ -130,10 +51,31 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
       )}
     >
       <nav className="mt-2 flex flex-col flex-grow overflow-y-auto px-2 py-2">
-        {menu.length > 0 && menu.map((item) => {
+        {CENTRAL_INVENTORY_MANAGER_MENU_ITEMS.map((item) => {
           const Icon = item.icon;
-          // Check active state - pathname is available on both server and client
-          const active = pathname === item.href;
+          // Check active state with precise matching
+          // Exact match always works
+          let active = pathname === item.href;
+          
+          // For routes that have sub-routes, check if pathname is a sub-route
+          // But exclude parent routes when we're on a sibling route
+          if (!active) {
+            // Special handling for routes with siblings
+            if (item.href === "/central-inventory/stock") {
+              // Central Stock should be active for /stock (exact) and /stock/update, but NOT for /stock/issue
+              active = (pathname === "/central-inventory/stock" || 
+                       (pathname?.startsWith("/central-inventory/stock/") && 
+                        !pathname?.startsWith("/central-inventory/stock/issue")));
+            } else if (item.href === "/central-inventory/stock/issue") {
+              // Issue Parts should be active for /stock/issue and its sub-routes
+              active = pathname?.startsWith("/central-inventory/stock/issue");
+            } else if (item.href === "/central-inventory/purchase-orders") {
+              // Purchase Orders should be active for /purchase-orders and its sub-routes
+              active = pathname?.startsWith("/central-inventory/purchase-orders");
+            }
+            // Dashboard only matches exactly (already handled above)
+          }
+          
           return (
             <Link
               key={item.name}

@@ -5,11 +5,11 @@ export type UserRole =
   | "admin" 
   | "super_admin" 
   | "sc_manager" 
-  | "sc_staff" 
   | "service_engineer" 
   | "service_advisor" 
   | "call_center"
-  | "inventory_manager";
+  | "inventory_manager"
+  | "central_inventory_manager";
 
 /**
  * User information interface
