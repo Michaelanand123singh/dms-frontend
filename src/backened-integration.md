@@ -99,7 +99,7 @@ CREATE TABLE users (
     id VARCHAR(255) PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL, -- bcrypt/argon2 hash (never plain text)
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100),
     phone VARCHAR(20),
@@ -115,15 +115,42 @@ CREATE TABLE users (
     service_center_id VARCHAR(255),
     is_active BOOLEAN DEFAULT TRUE,
     last_login TIMESTAMP NULL,
+    last_login_ip VARCHAR(45) NULL,
+    last_login_device TEXT NULL,
+    
+    -- Password Security
+    password_changed_at TIMESTAMP NULL,
+    password_reset_token VARCHAR(255) NULL,
+    password_reset_expires TIMESTAMP NULL,
+    failed_login_attempts INT DEFAULT 0,
+    locked_until TIMESTAMP NULL,
+    
+    -- Multi-Factor Authentication (Optional)
+    mfa_enabled BOOLEAN DEFAULT FALSE,
+    mfa_secret VARCHAR(255) NULL, -- Encrypted TOTP secret
+    mfa_backup_codes TEXT NULL, -- Encrypted JSON array
+    
+    -- Session Management
+    max_concurrent_sessions INT DEFAULT 5,
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     FOREIGN KEY (service_center_id) REFERENCES service_centers(id),
     INDEX idx_email (email),
     INDEX idx_role (role),
-    INDEX idx_service_center (service_center_id)
+    INDEX idx_service_center (service_center_id),
+    INDEX idx_email_active (email, is_active),
+    INDEX idx_locked (locked_until) WHERE locked_until IS NOT NULL
 );
 ```
+
+**Security Notes:**
+- `password_hash`: Always use bcrypt (12+ rounds) or argon2. Never store plain text passwords.
+- `failed_login_attempts`: Incremented on failed login, reset on success.
+- `locked_until`: Account locked after 5 failed attempts. Lock duration: 15min, 30min, 1hr, 24hr (incremental).
+- `mfa_secret` and `mfa_backup_codes`: Should be encrypted at rest.
+- `password_reset_token`: Generate secure random token (32 chars), expire after 1 hour.
 
 #### 3. customers
 
@@ -249,7 +276,7 @@ CREATE TABLE vehicles (
 
 ```sql
 CREATE TABLE appointments (
-    id INT AUTO_INCREMENT PRIMARY KEY, 
+    id VARCHAR(255) PRIMARY KEY,
     customer_id VARCHAR(255) NOT NULL,
     vehicle_id VARCHAR(255),
     service_center_id VARCHAR(255) NOT NULL,
@@ -282,7 +309,9 @@ CREATE TABLE appointments (
     INDEX idx_customer (customer_id),
     INDEX idx_service_center (service_center_id),
     INDEX idx_date (appointment_date),
-    INDEX idx_status (status)
+    INDEX idx_status (status),
+    INDEX idx_assigned_advisor (assigned_service_advisor),
+    INDEX idx_assigned_technician (assigned_technician)
 );
 ```
 
@@ -291,7 +320,7 @@ CREATE TABLE appointments (
 ```sql
 CREATE TABLE service_intake_requests (
     id VARCHAR(255) PRIMARY KEY,
-    appointment_id INT NOT NULL,
+    appointment_id VARCHAR(255) NOT NULL,
     service_center_id VARCHAR(255) NOT NULL,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
     submitted_at TIMESTAMP NOT NULL,
@@ -376,7 +405,11 @@ CREATE TABLE service_intake_forms (
     
     FOREIGN KEY (service_intake_request_id) REFERENCES service_intake_requests(id) ON DELETE CASCADE,
     FOREIGN KEY (job_card_id) REFERENCES job_cards(id),
-    INDEX idx_request (service_intake_request_id)
+    FOREIGN KEY (assigned_service_advisor) REFERENCES users(id),
+    FOREIGN KEY (assigned_technician) REFERENCES users(id),
+    INDEX idx_request (service_intake_request_id),
+    INDEX idx_assigned_advisor (assigned_service_advisor),
+    INDEX idx_assigned_technician (assigned_technician)
 );
 ```
 
@@ -604,7 +637,7 @@ CREATE TABLE job_cards (
     warranty_details TEXT,
     
     -- Source
-    source_appointment_id INT,
+    source_appointment_id VARCHAR(255),
     is_temporary BOOLEAN DEFAULT FALSE,
     customer_arrival_timestamp TIMESTAMP NULL,
     
@@ -702,8 +735,10 @@ CREATE TABLE job_card_part2 (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     FOREIGN KEY (job_card_id) REFERENCES job_cards(id) ON DELETE CASCADE,
+    FOREIGN KEY (technician) REFERENCES users(id),
     INDEX idx_job_card (job_card_id),
-    INDEX idx_sr_no (sr_no)
+    INDEX idx_sr_no (sr_no),
+    INDEX idx_technician (technician)
 );
 ```
 
@@ -713,10 +748,10 @@ CREATE TABLE job_card_part2 (
 CREATE TABLE job_card_part2a (
     id VARCHAR(255) PRIMARY KEY,
     job_card_id VARCHAR(255) NOT NULL,
-    video_evidence ENUM('Yes', 'No', ''),
-    vin_image ENUM('Yes', 'No', ''),
-    odo_image ENUM('Yes', 'No', ''),
-    damage_images ENUM('Yes', 'No', ''),
+    video_evidence ENUM('Yes', 'No', '') DEFAULT '',
+    vin_image ENUM('Yes', 'No', '') DEFAULT '',
+    odo_image ENUM('Yes', 'No', '') DEFAULT '',
+    damage_images ENUM('Yes', 'No', '') DEFAULT '',
     issue_description TEXT,
     number_of_observations VARCHAR(50),
     symptom TEXT,
@@ -731,7 +766,33 @@ CREATE TABLE job_card_part2a (
 );
 ```
 
-#### 15. job_card_part3
+**Note:** File URLs for video evidence, VIN image, odometer image, and damage images are stored in the `job_card_part2a_documentation` table (see below).
+
+#### 15. job_card_part2a_documentation
+
+```sql
+CREATE TABLE job_card_part2a_documentation (
+    id VARCHAR(255) PRIMARY KEY,
+    job_card_part2a_id VARCHAR(255) NOT NULL,
+    document_type ENUM(
+        'video_evidence',
+        'vin_image',
+        'odo_image',
+        'damage_images'
+    ) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_url TEXT NOT NULL,
+    file_size BIGINT,
+    mime_type VARCHAR(100),
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (job_card_part2a_id) REFERENCES job_card_part2a(id) ON DELETE CASCADE,
+    INDEX idx_part2a (job_card_part2a_id),
+    INDEX idx_document_type (document_type)
+);
+```
+
+#### 16. job_card_part3
 
 ```sql
 CREATE TABLE job_card_part3 (
@@ -759,7 +820,7 @@ CREATE TABLE job_card_part3 (
 );
 ```
 
-#### 16. parts_master
+#### 17. parts_master
 
 ```sql
 CREATE TABLE parts_master (
@@ -789,11 +850,11 @@ CREATE TABLE parts_master (
 );
 ```
 
-#### 17. inventory_items
+#### 18. inventory_items
 
 ```sql
 CREATE TABLE inventory_items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,
     part_id VARCHAR(255) NOT NULL,
     service_center_id VARCHAR(255) NOT NULL,
     current_qty INT DEFAULT 0,
@@ -813,7 +874,7 @@ CREATE TABLE inventory_items (
 );
 ```
 
-#### 18. parts_orders
+#### 19. parts_orders
 
 ```sql
 CREATE TABLE parts_orders (
@@ -840,7 +901,7 @@ CREATE TABLE parts_orders (
 );
 ```
 
-#### 19. parts_issues
+#### 20. parts_issues
 
 ```sql
 CREATE TABLE parts_issues (
@@ -862,7 +923,7 @@ CREATE TABLE parts_issues (
 );
 ```
 
-#### 20. invoices
+#### 21. invoices
 
 ```sql
 CREATE TABLE invoices (
@@ -913,7 +974,7 @@ CREATE TABLE invoices (
 );
 ```
 
-#### 21. invoice_items
+#### 22. invoice_items
 
 ```sql
 CREATE TABLE invoice_items (
@@ -930,7 +991,7 @@ CREATE TABLE invoice_items (
 );
 ```
 
-#### 22. insurers
+#### 23. insurers
 
 ```sql
 CREATE TABLE insurers (
@@ -948,7 +1009,7 @@ CREATE TABLE insurers (
 );
 ```
 
-#### 23. leads
+#### 24. leads
 
 ```sql
 CREATE TABLE leads (
@@ -977,7 +1038,7 @@ CREATE TABLE leads (
 );
 ```
 
-#### 24. complaints
+#### 25. complaints
 
 ```sql
 CREATE TABLE complaints (
@@ -1011,11 +1072,11 @@ CREATE TABLE complaints (
 );
 ```
 
-#### 25. audit_logs
+#### 26. audit_logs
 
 ```sql
 CREATE TABLE audit_logs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255),
     action VARCHAR(100) NOT NULL,
     entity_type VARCHAR(100) NOT NULL,
@@ -1033,7 +1094,7 @@ CREATE TABLE audit_logs (
 );
 ```
 
-#### 26. notifications
+#### 27. notifications
 
 ```sql
 CREATE TABLE notifications (
@@ -1050,6 +1111,166 @@ CREATE TABLE notifications (
     INDEX idx_user (user_id),
     INDEX idx_is_read (is_read),
     INDEX idx_created_at (created_at)
+);
+```
+
+#### 28. login_attempts
+
+```sql
+CREATE TABLE login_attempts (
+    id VARCHAR(255) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    user_agent TEXT,
+    success BOOLEAN NOT NULL,
+    failure_reason VARCHAR(100), -- 'invalid_password', 'account_locked', 'account_inactive'
+    attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_email (email),
+    INDEX idx_ip (ip_address),
+    INDEX idx_attempted_at (attempted_at),
+    INDEX idx_email_attempted (email, attempted_at)
+);
+```
+
+#### 29. refresh_tokens
+
+```sql
+CREATE TABLE refresh_tokens (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    token VARCHAR(500) NOT NULL UNIQUE,
+    device_fingerprint VARCHAR(255),
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    expires_at TIMESTAMP NOT NULL,
+    revoked BOOLEAN DEFAULT FALSE,
+    revoked_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_token (token),
+    INDEX idx_expires (expires_at),
+    INDEX idx_user_active (user_id, revoked, expires_at)
+);
+```
+
+#### 30. user_sessions
+
+```sql
+CREATE TABLE user_sessions (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    refresh_token_id VARCHAR(255) NOT NULL,
+    device_fingerprint VARCHAR(255),
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    location JSON, -- { country, city, region }
+    is_active BOOLEAN DEFAULT TRUE,
+    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (refresh_token_id) REFERENCES refresh_tokens(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_active (user_id, is_active),
+    INDEX idx_expires (expires_at)
+);
+```
+
+#### 31. device_fingerprints
+
+```sql
+CREATE TABLE device_fingerprints (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    fingerprint_hash VARCHAR(255) NOT NULL UNIQUE,
+    device_name VARCHAR(255),
+    device_type ENUM('desktop', 'mobile', 'tablet') NOT NULL,
+    browser_name VARCHAR(100),
+    browser_version VARCHAR(50),
+    os_name VARCHAR(100),
+    os_version VARCHAR(50),
+    is_trusted BOOLEAN DEFAULT FALSE,
+    trust_expires_at TIMESTAMP NULL,
+    first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_fingerprint (fingerprint_hash),
+    INDEX idx_trusted (user_id, is_trusted, trust_expires_at)
+);
+```
+
+#### 32. login_anomalies
+
+```sql
+CREATE TABLE login_anomalies (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    anomaly_type ENUM(
+        'unusual_location',
+        'unusual_time',
+        'unusual_device',
+        'rapid_succession',
+        'multiple_failures',
+        'suspicious_ip'
+    ) NOT NULL,
+    severity ENUM('low', 'medium', 'high', 'critical') NOT NULL,
+    details JSON,
+    detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved BOOLEAN DEFAULT FALSE,
+    resolved_at TIMESTAMP NULL,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id),
+    INDEX idx_severity (severity, resolved),
+    INDEX idx_detected (detected_at)
+);
+```
+
+#### 33. security_events
+
+```sql
+CREATE TABLE security_events (
+    id VARCHAR(255) PRIMARY KEY,
+    event_type ENUM(
+        'LOGIN_SUCCESS',
+        'LOGIN_FAILURE',
+        'LOGIN_LOCKED',
+        'PASSWORD_RESET_REQUESTED',
+        'PASSWORD_RESET_COMPLETED',
+        'PASSWORD_CHANGED',
+        'TOKEN_REFRESHED',
+        'TOKEN_REVOKED',
+        'SESSION_CREATED',
+        'SESSION_TERMINATED',
+        'MFA_ENABLED',
+        'MFA_DISABLED',
+        'MFA_VERIFIED',
+        'ANOMALY_DETECTED',
+        'IP_BLOCKED',
+        'ACCOUNT_LOCKED',
+        'ACCOUNT_UNLOCKED'
+    ) NOT NULL,
+    user_id VARCHAR(255),
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    device_fingerprint VARCHAR(255),
+    location JSON,
+    severity ENUM('low', 'medium', 'high', 'critical') NOT NULL,
+    details JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_event_type (event_type),
+    INDEX idx_user (user_id),
+    INDEX idx_severity (severity),
+    INDEX idx_created (created_at),
+    INDEX idx_user_event (user_id, event_type, created_at)
 );
 ```
 
@@ -1367,7 +1588,7 @@ Authorization: Bearer <access_token>
 **Request:**
 ```json
 {
-  "appointmentId": 1001,
+  "appointmentId": "appt-001",
   "serviceIntakeForm": {
     "vehicleBrand": "Tata",
     "vehicleModel": "Nexon EV Max",

@@ -1177,3 +1177,4 @@ CREATE INDEX idx_job_cards_status_service_center ON job_cards(status, service_ce
 7. **Concurrency:** Handle concurrent approval attempts (optimistic locking)
 
 
+
