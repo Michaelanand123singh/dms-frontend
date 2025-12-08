@@ -114,9 +114,8 @@ const initialAppointmentForm = {
   previousServiceHistory: undefined as string | undefined,
   estimatedServiceTime: undefined as string | undefined,
   estimatedCost: undefined as string | undefined,
+  estimationCost: undefined as string | undefined,
   odometerReading: undefined as string | undefined,
-  engineNumber: undefined as string | undefined,
-  insuranceExpiry: undefined as string | undefined,
   // Documentation
   customerIdProof: undefined as DocumentationFiles | undefined,
   vehicleRCCopy: undefined as DocumentationFiles | undefined,
@@ -236,7 +235,7 @@ export default function CustomerFind() {
   const canAccessCustomerType = hasRoleAccess(["call_center", "service_advisor"]);
   const canAccessServiceDetails = hasRoleAccess(["call_center", "service_advisor", "sc_manager", "service_engineer"]);
   const canAccessEstimatedCost = hasRoleAccess(["service_advisor", "sc_manager"]);
-  const canAccessOdometer = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
+  const canAccessOdometer = hasRoleAccess(["service_advisor"]);
   const hasDocUploadAccess = hasRoleAccess(["call_center", "service_advisor"]);
   const hasDropoffMediaAccess = hasRoleAccess([
     "call_center",
@@ -2324,105 +2323,140 @@ export default function CustomerFind() {
           <Modal title="Schedule Appointment" onClose={closeAppointmentForm} maxWidth="max-w-3xl">
             <div className="p-6 space-y-6">
                 {canAccessCustomerType && (
-                  <div className="space-y-4">
-                    <CustomerInfoCard customer={selectedCustomer} title="Customer Information (Pre-filled)" />
-                    <div className="space-y-4">
+                  <CustomerInfoCard customer={selectedCustomer} title="Customer Information (Pre-filled)" />
+                )}
+
+                {/* Vehicle Information - Right after Customer Details */}
+                {selectedVehicle && canAccessVehicleInfo && (
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <Car className="text-indigo-600" size={20} />
+                      Vehicle Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormInput
-                        label="Customer Name"
-                        required
-                        value={appointmentForm.customerName}
+                        label="Vehicle Brand"
+                        value={selectedVehicle.vehicleMake}
                         onChange={() => {}}
                         readOnly
-                        error={appointmentFieldErrors.customerName}
                       />
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormInput
+                        label="Vehicle Model"
+                        value={selectedVehicle.vehicleModel}
+                        onChange={() => {}}
+                        readOnly
+                      />
+                      <FormInput
+                        label="Registration Number"
+                        value={selectedVehicle.registration || ""}
+                        onChange={() => {}}
+                        readOnly
+                      />
+                      <FormInput
+                        label="VIN / Chassis Number"
+                        value={selectedVehicle.vin}
+                        onChange={() => {}}
+                        readOnly
+                        className="font-mono"
+                      />
+                      <FormInput
+                        label="Year of Manufacture"
+                        value={selectedVehicle.vehicleYear?.toString() || ""}
+                        onChange={() => {}}
+                        readOnly
+                      />
+                      {selectedVehicle.vehicleColor && (
                         <FormInput
-                          label="Phone Number"
-                          required
-                          type="tel"
-                          value={appointmentForm.phone}
-                          onChange={() => {}}
-                          maxLength={10}
-                          readOnly
-                          error={appointmentFieldErrors.phone}
-                        />
-                        <FormInput
-                          label="WhatsApp Number"
-                          required
-                          type="tel"
-                          value={selectedCustomer.whatsappNumber || selectedCustomer.phone}
-                          onChange={() => {}}
-                          maxLength={10}
-                          readOnly
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormInput
-                          label="Alternate Mobile"
-                          type="tel"
-                          value={appointmentForm.alternateMobile || ""}
-                          onChange={(e) =>
-                            setAppointmentForm({ ...appointmentForm, alternateMobile: e.target.value.replace(/\D/g, "").slice(0, 10) })
-                          }
-                          placeholder="Optional alternate contact"
-                          maxLength={10}
-                        />
-                        <FormInput
-                          label="Email ID"
-                          type="email"
-                          value={selectedCustomer.email || ""}
+                          label="Vehicle Color"
+                          value={selectedVehicle.vehicleColor}
                           onChange={() => {}}
                           readOnly
                         />
-                      </div>
-                      {(selectedCustomer.address || selectedCustomer.cityState || selectedCustomer.pincode) && (
-                        <div className="space-y-4">
-                          {selectedCustomer.address && (
+                      )}
+                      {selectedVehicle.variant && (
+                        <FormInput
+                          label="Variant / Battery Capacity"
+                          value={selectedVehicle.variant}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                      )}
+                      {selectedVehicle.motorNumber && (
+                        <FormInput
+                          label="Motor Number"
+                          value={selectedVehicle.motorNumber}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                      )}
+                      {selectedVehicle.chargerSerialNumber && (
+                        <FormInput
+                          label="Charger Serial Number"
+                          value={selectedVehicle.chargerSerialNumber}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                      )}
+                      {selectedVehicle.purchaseDate && (
+                        <FormInput
+                          label="Date of Purchase"
+                          value={new Date(selectedVehicle.purchaseDate).toLocaleDateString()}
+                          onChange={() => {}}
+                          readOnly
+                        />
+                      )}
+                      {selectedVehicle.warrantyStatus && (
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Warranty Status</label>
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                            selectedVehicle.warrantyStatus === "Active"
+                              ? "bg-green-100 text-green-700"
+                              : selectedVehicle.warrantyStatus === "Expired"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}>
+                            {selectedVehicle.warrantyStatus}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Insurance Information Section */}
+                    {(selectedVehicle.insuranceStartDate || selectedVehicle.insuranceEndDate || selectedVehicle.insuranceCompanyName) && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                          <FileText className="text-indigo-600" size={18} />
+                          Insurance Information
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {selectedVehicle.insuranceStartDate && (
                             <FormInput
-                              label="Full Address"
-                              value={selectedCustomer.address}
+                              label="Insurance Start Date"
+                              value={new Date(selectedVehicle.insuranceStartDate).toLocaleDateString()}
                               onChange={() => {}}
                               readOnly
                             />
                           )}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {selectedCustomer.cityState && (
-                              <FormInput
-                                label="City / State"
-                                value={selectedCustomer.cityState || ""}
-                                onChange={() => {}}
-                                readOnly
-                              />
-                            )}
-                            {selectedCustomer.pincode && (
-                              <FormInput
-                                label="Pincode"
-                                value={selectedCustomer.pincode || ""}
-                                onChange={() => {}}
-                                readOnly
-                              />
-                            )}
-                          </div>
+                          {selectedVehicle.insuranceEndDate && (
+                            <FormInput
+                              label="Insurance End Date"
+                              value={new Date(selectedVehicle.insuranceEndDate).toLocaleDateString()}
+                              onChange={() => {}}
+                              readOnly
+                            />
+                          )}
+                          {selectedVehicle.insuranceCompanyName && (
+                            <FormInput
+                              label="Insurance Company Name"
+                              value={selectedVehicle.insuranceCompanyName}
+                              onChange={() => {}}
+                              readOnly
+                            />
+                          )}
                         </div>
-                      )}
-                      <div className="flex flex-wrap gap-3 text-sm text-gray-600">
-                        {selectedCustomer.customerType && (
-                          <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
-                            Customer Type: {selectedCustomer.customerType}
-                          </span>
-                        )}
-                        {selectedCustomer.serviceType && (
-                          <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
-                            Service Type: {selectedCustomer.serviceType}
-                          </span>
-                        )}
-                        {selectedCustomer.addressType && (
-                          <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
-                            Address Type: {selectedCustomer.addressType === "home" ? "Home" : "Work"}
-                          </span>
-                        )}
                       </div>
-                    </div>
+                    )}
+
                   </div>
                 )}
 
@@ -2517,79 +2551,7 @@ export default function CustomerFind() {
                     </div>
                   )}
 
-                  {/* Customer Type */}
-                  {canAccessCustomerType && (
-                    <FormSelect
-                      label="Customer Type"
-                      value={appointmentForm.customerType || ""}
-                      onChange={(e) => setAppointmentForm({ ...appointmentForm, customerType: e.target.value as "B2C" | "B2B" | undefined })}
-                      placeholder="Select customer type"
-                    options={[
-                        { value: "B2C", label: "B2C" },
-                        { value: "B2B", label: "B2B" },
-                      ]}
-                    />
-                  )}
 
-                  {selectedVehicle && canAccessVehicleInfo && (
-                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <Car className="text-indigo-600" size={20} />
-                        Vehicle Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormInput
-                          label="Vehicle Brand"
-                          value={selectedVehicle.vehicleMake}
-                          onChange={() => {}}
-                          readOnly
-                        />
-                        <FormInput
-                          label="Vehicle Model"
-                          value={selectedVehicle.vehicleModel}
-                          onChange={() => {}}
-                          readOnly
-                        />
-                        <FormInput
-                          label="Registration Number"
-                          value={selectedVehicle.registration || ""}
-                          onChange={() => {}}
-                          readOnly
-                        />
-                        <FormInput
-                          label="VIN / Chassis"
-                          value={selectedVehicle.vin}
-                          onChange={() => {}}
-                          readOnly
-                          className="font-mono"
-                        />
-                        <FormInput
-                          label="Owner Name"
-                          value={selectedVehicle.customerName}
-                          onChange={() => {}}
-                          readOnly
-                        />
-                        <FormInput
-                          label="Year of Manufacture"
-                          value={selectedVehicle.vehicleYear?.toString() || ""}
-                          onChange={() => {}}
-                          readOnly
-                        />
-                        <FormInput
-                          label="Engine Number"
-                          value={appointmentForm.engineNumber || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, engineNumber: e.target.value })}
-                          placeholder="Enter engine number"
-                        />
-                        <FormInput
-                          label="Insurance Expiry"
-                          type="date"
-                          value={appointmentForm.insuranceExpiry || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, insuranceExpiry: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   {/* Service Details Section */}
                   {canAccessServiceDetails && (
@@ -2656,6 +2618,12 @@ export default function CustomerFind() {
                             />
                           )}
                         </div>
+                        <FormInput
+                          label="Estimation Cost"
+                          value={appointmentForm.estimationCost || ""}
+                          onChange={(e) => setAppointmentForm({ ...appointmentForm, estimationCost: e.target.value })}
+                          placeholder="Enter estimation cost"
+                        />
                         {canAccessOdometer && (
                           <FormInput
                             label="Odometer Reading"
@@ -2857,24 +2825,6 @@ export default function CustomerFind() {
                         Operational Details
                       </h3>
                       <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormInput
-                            label="Date"
-                            required
-                            type="date"
-                            value={appointmentForm.date}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, date: e.target.value })}
-                            // @ts-ignore
-                            min={new Date().toISOString().split("T")[0]}
-                          />
-                          <FormInput
-                            label="Time"
-                            required
-                            type="time"
-                            value={appointmentForm.time}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, time: e.target.value })}
-                          />
-                        </div>
 
                         {(isServiceAdvisor || isServiceManager) && (
                           <FormInput
@@ -3115,15 +3065,14 @@ export default function CustomerFind() {
                         time: formatTime(appointmentForm.time),
                         duration: `${appointmentForm.duration} hours`,
                         status: "Confirmed",
-                        customerType: appointmentForm.customerType,
+                        customerType: selectedCustomer.customerType,
                       alternateMobile: appointmentForm.alternateMobile,
                         customerComplaintIssue: appointmentForm.customerComplaintIssue,
                         previousServiceHistory: appointmentForm.previousServiceHistory,
                         estimatedServiceTime: appointmentForm.estimatedServiceTime,
                         estimatedCost: appointmentForm.estimatedCost,
+                        estimationCost: appointmentForm.estimationCost,
                         odometerReading: appointmentForm.odometerReading,
-                      engineNumber: appointmentForm.engineNumber,
-                      insuranceExpiry: appointmentForm.insuranceExpiry,
                         estimatedDeliveryDate: appointmentForm.estimatedDeliveryDate,
                         assignedServiceAdvisor: appointmentForm.assignedServiceAdvisor,
                         assignedTechnician: appointmentForm.assignedTechnician,
