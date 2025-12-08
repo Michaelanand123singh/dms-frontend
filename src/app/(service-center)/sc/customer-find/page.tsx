@@ -354,6 +354,7 @@ export default function CustomerFind() {
   // State for vehicle form customer info (separate from create customer form)
   const [vehicleFormState, setVehicleFormState] = useState<string>("");
   const [vehicleFormCity, setVehicleFormCity] = useState<string>("");
+  const [hasInsurance, setHasInsurance] = useState<boolean>(false);
   
   // Toast notification state
   const [toast, setToast] = useState<{ show: boolean; message: string; type?: "success" | "error" }>({
@@ -520,6 +521,7 @@ export default function CustomerFind() {
     setNewVehicleForm({ ...initialVehicleForm });
     setVehicleFormState("");
     setVehicleFormCity("");
+    setHasInsurance(false);
   }, [setNewVehicleForm]);
 
   const resetAppointmentForm = useCallback(() => {
@@ -1798,6 +1800,12 @@ export default function CustomerFind() {
                       value={newVehicleForm.purchaseDate || ""}
                       onChange={(e) => setNewVehicleForm({ ...newVehicleForm, purchaseDate: e.target.value })}
                     />
+                    <FormInput
+                      label="Vehicle Color"
+                      value={newVehicleForm.vehicleColor || ""}
+                      onChange={(e) => setNewVehicleForm({ ...newVehicleForm, vehicleColor: e.target.value })}
+                      placeholder="e.g., Red, Blue, White, Black"
+                    />
                   </div>
 
                   <FormSelect
@@ -1812,30 +1820,60 @@ export default function CustomerFind() {
                     ]}
                   />
 
-                  <div className="pt-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Insurance Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormInput
-                        label="Insurance Start Date"
-                        type="date"
-                        value={newVehicleForm.insuranceStartDate || ""}
-                        onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceStartDate: e.target.value })}
+                  {/* Has Insurance Toggle */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="flex items-center gap-3 mb-4">
+                      <input
+                        type="checkbox"
+                        id="hasInsurance"
+                        checked={hasInsurance}
+                        onChange={(e) => {
+                          setHasInsurance(e.target.checked);
+                          // Clear insurance fields when unchecked
+                          if (!e.target.checked) {
+                            setNewVehicleForm({
+                              ...newVehicleForm,
+                              insuranceStartDate: "",
+                              insuranceEndDate: "",
+                              insuranceCompanyName: "",
+                            });
+                          }
+                        }}
+                        className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
                       />
-                      <FormInput
-                        label="Insurance End Date"
-                        type="date"
-                        value={newVehicleForm.insuranceEndDate || ""}
-                        onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceEndDate: e.target.value })}
-                      />
+                      <label htmlFor="hasInsurance" className="text-sm font-semibold text-gray-800 cursor-pointer">
+                        Has Insurance
+                      </label>
                     </div>
-                    <div className="mt-4">
-                      <FormInput
-                        label="Insurance Company Name"
-                        value={newVehicleForm.insuranceCompanyName || ""}
-                        onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceCompanyName: e.target.value })}
-                        placeholder="Enter insurance company name"
-                      />
-                    </div>
+
+                    {/* Insurance Information - Only show when hasInsurance is true */}
+                    {hasInsurance && (
+                      <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Insurance Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormInput
+                            label="Insurance Start Date"
+                            type="date"
+                            value={newVehicleForm.insuranceStartDate || ""}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceStartDate: e.target.value })}
+                          />
+                          <FormInput
+                            label="Insurance End Date"
+                            type="date"
+                            value={newVehicleForm.insuranceEndDate || ""}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceEndDate: e.target.value })}
+                          />
+                        </div>
+                        <div className="mt-4">
+                          <FormInput
+                            label="Insurance Company Name"
+                            value={newVehicleForm.insuranceCompanyName || ""}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceCompanyName: e.target.value })}
+                            placeholder="Enter insurance company name"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1867,8 +1905,8 @@ export default function CustomerFind() {
                         return;
                       }
 
-                      // Validate insurance dates if provided
-                      if (newVehicleForm.insuranceStartDate && newVehicleForm.insuranceEndDate) {
+                      // Validate insurance dates if provided and hasInsurance is checked
+                      if (hasInsurance && newVehicleForm.insuranceStartDate && newVehicleForm.insuranceEndDate) {
                         const startDate = new Date(newVehicleForm.insuranceStartDate);
                         const endDate = new Date(newVehicleForm.insuranceEndDate);
                         if (endDate <= startDate) {
@@ -1895,7 +1933,7 @@ export default function CustomerFind() {
                         vehicleYear: newVehicleForm.purchaseDate 
                           ? new Date(newVehicleForm.purchaseDate).getFullYear()
                           : new Date().getFullYear(),
-                        vehicleColor: "", // Not in form, can be added later
+                        vehicleColor: newVehicleForm.vehicleColor || "",
                         lastServiceDate: "",
                         totalServices: 0,
                         totalSpent: "₹0",

@@ -297,19 +297,19 @@ export default function JobCardFormModal({
           // Step 4: Search customers and filter by approved quotation customers
           let customerResults: CustomerWithVehicles[] = [];
           
-          // Try searching by name first
-          let results = await customerService.search(searchQuery, "name");
+        // Try searching by name first
+        let results = await customerService.search(searchQuery, "name");
           customerResults = results.filter(c => approvedCustomerIds.has(c.id.toString()));
-          
-          // If no results, try searching by VIN
+        
+        // If no results, try searching by VIN
           if (customerResults.length === 0) {
-            results = await customerService.search(searchQuery, "vin");
+          results = await customerService.search(searchQuery, "vin");
             customerResults = results.filter(c => approvedCustomerIds.has(c.id.toString()));
-          }
-          
-          // Also try vehicle number
+        }
+        
+        // Also try vehicle number
           if (customerResults.length === 0) {
-            results = await customerService.search(searchQuery, "vehicleNumber");
+          results = await customerService.search(searchQuery, "vehicleNumber");
             customerResults = results.filter(c => approvedCustomerIds.has(c.id.toString()));
           }
           
@@ -963,7 +963,7 @@ export default function JobCardFormModal({
               <CheckCircle className="text-green-600" size={18} />
               <label className="block text-sm font-semibold text-gray-700">
                 Search Customer with Approved Quotation
-              </label>
+            </label>
             </div>
             <p className="text-xs text-gray-600 mb-3">
               Only customers who have approved quotations are available for job card creation.
@@ -1025,10 +1025,10 @@ export default function JobCardFormModal({
                       
                       return (
                         <div key={uniqueKey} className="border-b border-gray-100 last:border-b-0">
-                          <div
+                      <div
                             className="p-3 hover:bg-green-50 cursor-pointer transition"
                             onClick={() => handleSelectCustomer(customer, quotation, vehicle)}
-                          >
+                      >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <UserPlus size={16} className="text-green-600" />
@@ -1039,7 +1039,7 @@ export default function JobCardFormModal({
                                   <CheckCircle size={12} />
                                   Approved
                                 </span>
-                              </div>
+                        </div>
                               <div className="text-xs text-gray-500">
                                 <FileCheck size={14} className="inline mr-1" />
                                 {quotation.quotationNumber || "N/A"}
@@ -1080,8 +1080,8 @@ export default function JobCardFormModal({
                                     {quotation.items.slice(0, 3).map((item, idx) => (
                                       <div key={idx} className="text-xs">
                                         • {item.partName || "Unknown Part"} (Qty: {item.quantity || 0}) - ₹{(item.amount || 0).toLocaleString("en-IN")}
-                                      </div>
-                                    ))}
+                                </div>
+                              ))}
                                     {quotation.items.length > 3 && (
                                       <div className="text-xs text-gray-500">+ {quotation.items.length - 3} more items</div>
                                     )}
@@ -1089,11 +1089,11 @@ export default function JobCardFormModal({
                                   <div className="mt-1 text-xs font-semibold text-green-700">
                                     Total: ₹{(quotation.totalAmount || 0).toLocaleString("en-IN")}
                                   </div>
-                                </div>
-                              )}
                             </div>
-                          </div>
+                          )}
                         </div>
+                      </div>
+                    </div>
                       );
                     })}
                 </div>
@@ -1127,9 +1127,9 @@ export default function JobCardFormModal({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle className="text-green-600" size={18} />
-                      <p className="text-sm font-semibold text-green-800">
-                        Selected: {selectedCustomer.name}
-                      </p>
+                    <p className="text-sm font-semibold text-green-800">
+                      Selected: {selectedCustomer.name}
+                    </p>
                       <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
                         Approved Quotation
                       </span>
@@ -1191,8 +1191,8 @@ export default function JobCardFormModal({
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">1</span>
-                Customer & Vehicle Information
-              </h3>
+              Customer & Vehicle Information
+            </h3>
               {/* Job Card Number (will be auto-generated) */}
               <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg font-semibold text-sm border border-blue-200">
                 Job Card: {previewJobCardNumber || "Generating..."}
@@ -1752,12 +1752,12 @@ export default function JobCardFormModal({
             {/* Video/Photos Upload Section - Grid Layout */}
             <div className="mb-6">
               <h4 className="text-sm font-semibold text-gray-700 mb-4">Evidence Upload</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Video Evidence */}
-                <div>
+            <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Video Evidence
-                  </label>
+              </label>
                   <label className="block cursor-pointer">
                     <input
                       type="file"
@@ -1779,7 +1779,7 @@ export default function JobCardFormModal({
                       <div className="flex items-center gap-3">
                         <div className="bg-amber-100 p-2 rounded-lg">
                           <Video className="text-amber-600" size={20} />
-                        </div>
+            </div>
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-700">Upload Video</p>
                           <p className="text-xs text-gray-500">MP4, AVI, MOV</p>
@@ -1795,10 +1795,10 @@ export default function JobCardFormModal({
                 </div>
 
                 {/* VIN Image */}
-                <div>
+            <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     VIN Image
-                  </label>
+              </label>
                   <label className="block cursor-pointer">
                     <input
                       type="file"
@@ -1820,7 +1820,7 @@ export default function JobCardFormModal({
                       <div className="flex items-center gap-3">
                         <div className="bg-amber-100 p-2 rounded-lg">
                           <ImageIcon className="text-amber-600" size={20} />
-                        </div>
+            </div>
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-700">Upload VIN Image</p>
                           <p className="text-xs text-gray-500">JPG, PNG, HEIC</p>
@@ -1923,46 +1923,46 @@ export default function JobCardFormModal({
             <div className="bg-white rounded-lg p-4 border border-amber-200">
               <h4 className="text-sm font-semibold text-gray-700 mb-4">Case Details</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                     Issue Description
-                  </label>
-                  <textarea
+                </label>
+                <textarea
                     value={form.issueDescription}
                     onChange={(e) => setForm({ ...form, issueDescription: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     rows={3}
                     placeholder="Describe the issue in detail"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                />
+              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                     Number of Observations
-                  </label>
-                  <input
-                    type="text"
+              </label>
+              <input
+                type="text"
                     value={form.numberOfObservations}
                     onChange={(e) => setForm({ ...form, numberOfObservations: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     placeholder="e.g., 3"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                     Defect Part
-                  </label>
-                  <input
-                    type="text"
+              </label>
+              <input
+                type="text"
                     value={form.defectPart}
                     onChange={(e) => setForm({ ...form, defectPart: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     placeholder="e.g., Battery, Motor, Charger"
-                  />
-                </div>
+              />
+            </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                     Symptom
-                  </label>
+              </label>
                   <textarea
                     value={form.symptom}
                     onChange={(e) => setForm({ ...form, symptom: e.target.value })}
@@ -1971,8 +1971,8 @@ export default function JobCardFormModal({
                     placeholder="Describe the symptoms observed"
                   />
                 </div>
-              </div>
             </div>
+          </div>
           </div>
 
           {/* Action Buttons */}
