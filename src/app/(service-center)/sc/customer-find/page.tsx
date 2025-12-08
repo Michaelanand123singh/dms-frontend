@@ -48,6 +48,7 @@ import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
 import { mockCustomers } from "@/__mocks__/data/customers.mock";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
+import { INDIAN_STATES, getCitiesByState } from "@/shared/constants/indian-states-cities";
 import { FormInput, FormSelect, Modal } from "../components/shared/FormElements";
 import { CustomerInfoCard, InfoCard, ErrorAlert } from "../components/shared/InfoComponents";
 import { formatVehicleString } from "../components/shared/vehicle-utils";
@@ -69,6 +70,7 @@ const initialCustomerForm: NewCustomerForm = {
   addressType: undefined,
   workAddress: "",
 };
+
 
 const initialVehicleForm: Partial<NewVehicleForm> = {
   vehicleBrand: "",
@@ -347,6 +349,8 @@ export default function CustomerFind() {
 
   const [whatsappSameAsMobile, setWhatsappSameAsMobile] = useState<boolean>(false);
   const [pickupAddressDifferent, setPickupAddressDifferent] = useState<boolean>(false);
+  const [selectedState, setSelectedState] = useState<string>("");
+  const [selectedCity, setSelectedCity] = useState<string>("");
   
   // Toast notification state
   const [toast, setToast] = useState<{ show: boolean; message: string; type?: "success" | "error" }>({
@@ -499,6 +503,8 @@ export default function CustomerFind() {
 
   // Form reset functions
   const resetCustomerForm = useCallback(() => {
+    setSelectedState("");
+    setSelectedCity("");
     setNewCustomerForm({ 
       ...initialCustomerForm,
       addressType: undefined,
@@ -586,16 +592,6 @@ export default function CustomerFind() {
     resetCustomerForm();
   }, [canCreateNewCustomer, resetCustomerForm, clearSearch, showToast]);
 
-  // Handle service type selection (now integrated in form)
-  const handleServiceTypeSelect = useCallback((serviceType: ServiceType): void => {
-    setNewCustomerForm((prev) => ({ 
-      ...prev, 
-      serviceType,
-      // Reset address type when switching from home-service to walk-in
-      addressType: serviceType === "home-service" ? prev.addressType : undefined,
-      workAddress: serviceType === "home-service" ? prev.workAddress : "",
-    }));
-  }, [setNewCustomerForm]);
 
   // Save new customer
   const handleSaveNewCustomer = useCallback(async (): Promise<void> => {
@@ -646,9 +642,15 @@ export default function CustomerFind() {
       hasErrors = true;
     }
 
-    // Validate service type
-    if (!newCustomerForm.serviceType) {
-      errors.serviceType = "Please select a service type (Walk-in or Home Service)";
+    // Validate state
+    if (!selectedState) {
+      errors.state = "Please select a state";
+      hasErrors = true;
+    }
+
+    // Validate city
+    if (!selectedCity) {
+      errors.city = "Please select a city";
       hasErrors = true;
     }
 
@@ -682,8 +684,12 @@ export default function CustomerFind() {
       serviceCenterContext.serviceCenterName ??
       staticServiceCenters.find((center) => center.id === serviceCenterFilterId)?.name;
 
+    // Combine city and state into cityState for backend compatibility
+    const cityState = selectedCity && selectedState ? `${selectedCity}, ${selectedState}` : "";
+
     const customer = await createCustomer({
       ...newCustomerForm,
+      cityState,
       phone: cleanPhone(newCustomerForm.phone),
       alternateMobile: newCustomerForm.alternateMobile ? cleanPhone(newCustomerForm.alternateMobile) : undefined,
       serviceCenterId: preferredServiceCenterId,
@@ -698,7 +704,7 @@ export default function CustomerFind() {
       // Reset form
       resetCustomerForm();
 
-      showToast(`Customer created successfully! Customer Number: ${customer.customerNumber} | Service Type: ${newCustomerForm.serviceType === "walk-in" ? "Walk-in" : "Home Service"}`, "success");
+      showToast(`Customer created successfully! Customer Number: ${customer.customerNumber}`, "success");
       safeStorage.setItem("lastCreatedCustomerMeta", {
         customerId: customer.id?.toString() || "",
         serviceCenterId: preferredServiceCenterId ?? null,
@@ -1200,13 +1206,75 @@ export default function CustomerFind() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormInput
-                  label="City / State"
-                  value={newCustomerForm.cityState || ""}
-                  onChange={(e) => setNewCustomerForm({ ...newCustomerForm, cityState: e.target.value })}
-                  placeholder="Enter city and state"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    State <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedState}
+                    onChange={(e) => {
+                      setSelectedState(e.target.value);
+                      setSelectedCity(""); // Reset city when state changes
+                      if (fieldErrors.state) {
+                        setFieldErrors({ ...fieldErrors, state: "" });
+                      }
+                    }}
+                    className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 ${
+                      fieldErrors.state 
+                        ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500" 
+                        : "bg-gray-50/50 focus:ring-indigo-500/20 border border-gray-200"
+                    }`}
+                  >
+                    <option value="">Select State</option>
+                    {INDIAN_STATES.map((state) => (
+                      <option key={state.code} value={state.name}>
+                        {state.name}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.state && (
+                    <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+                      <span className="text-red-500">•</span>
+                      {fieldErrors.state}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    City <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedCity}
+                    onChange={(e) => {
+                      setSelectedCity(e.target.value);
+                      if (fieldErrors.city) {
+                        setFieldErrors({ ...fieldErrors, city: "" });
+                      }
+                    }}
+                    disabled={!selectedState}
+                    className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 ${
+                      !selectedState
+                        ? "bg-gray-100 border border-gray-200 cursor-not-allowed text-gray-400"
+                        : fieldErrors.city
+                        ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500"
+                        : "bg-gray-50/50 focus:ring-indigo-500/20 border border-gray-200"
+                    }`}
+                  >
+                    <option value="">{selectedState ? "Select City" : "Select State First"}</option>
+                    {selectedState && getCitiesByState(selectedState).map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.city && (
+                    <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+                      <span className="text-red-500">•</span>
+                      {fieldErrors.city}
+                    </p>
+                  )}
+                </div>
                 <FormInput
                   label="Pincode"
                   value={newCustomerForm.pincode || ""}
@@ -1222,76 +1290,22 @@ export default function CustomerFind() {
                 />
               </div>
 
-              {/* Service Type */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Customer Type
-                  </label>
-                  <select
-                    value={newCustomerForm.customerType || ""}
-                    onChange={(e) =>
-                      setNewCustomerForm({ ...newCustomerForm, customerType: e.target.value as CustomerType | undefined })
-                    }
-                    className="w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200"
-                  >
-                    <option value="">Select Customer Type</option>
-                    <option value="B2C">B2C</option>
-                    <option value="B2B">B2B</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Service Type <span className="text-red-500">*</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleServiceTypeSelect("walk-in");
-                        if (fieldErrors.serviceType) {
-                          setFieldErrors({ ...fieldErrors, serviceType: "" });
-                        }
-                      }}
-                      className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
-                        newCustomerForm.serviceType === "walk-in"
-                          ? "bg-indigo-50 border-2 border-indigo-500"
-                          : fieldErrors.serviceType
-                          ? "hover:bg-indigo-50/30 border-2 border-red-300"
-                          : "hover:bg-indigo-50/30 border border-gray-200"
-                      }`}
-                    >
-                      <Building2 className={`${newCustomerForm.serviceType === "walk-in" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
-                      <span className={`text-sm font-medium ${newCustomerForm.serviceType === "walk-in" ? "text-indigo-700" : "text-gray-600"}`}>Walk-in</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleServiceTypeSelect("home-service");
-                        if (fieldErrors.serviceType) {
-                          setFieldErrors({ ...fieldErrors, serviceType: "" });
-                        }
-                      }}
-                      className={`p-4 rounded-lg transition-all duration-200 flex flex-col items-center gap-2 ${
-                        newCustomerForm.serviceType === "home-service"
-                          ? "bg-indigo-50 border-2 border-indigo-500"
-                          : fieldErrors.serviceType
-                          ? "hover:bg-indigo-50/30 border-2 border-red-300"
-                          : "hover:bg-indigo-50/30 border border-gray-200"
-                      }`}
-                    >
-                      <Home className={`${newCustomerForm.serviceType === "home-service" ? "text-indigo-600" : "text-gray-400"}`} size={24} strokeWidth={2} />
-                      <span className={`text-sm font-medium ${newCustomerForm.serviceType === "home-service" ? "text-indigo-700" : "text-gray-600"}`}>Home Service</span>
-                    </button>
-                  </div>
-                  {fieldErrors.serviceType && (
-                    <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
-                      <span className="text-red-500">•</span>
-                      {fieldErrors.serviceType}
-                    </p>
-                  )}
-                </div>
+              {/* Customer Type */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Customer Type
+                </label>
+                <select
+                  value={newCustomerForm.customerType || ""}
+                  onChange={(e) =>
+                    setNewCustomerForm({ ...newCustomerForm, customerType: e.target.value as CustomerType | undefined })
+                  }
+                  className="w-full px-4 py-2.5 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 border border-gray-200"
+                >
+                  <option value="">Select Customer Type</option>
+                  <option value="B2C">B2C</option>
+                  <option value="B2B">B2B</option>
+                </select>
               </div>
 
               {validationError && <ErrorAlert message={validationError} />}
