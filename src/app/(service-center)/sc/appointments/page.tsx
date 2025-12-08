@@ -660,7 +660,7 @@ const Modal = ({ show, onClose, title, subtitle, children, maxWidth = "2xl" }: M
   }[maxWidth];
 
   return (
-    <div className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-[100] p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
       <div
         className={`bg-white rounded-xl md:rounded-2xl shadow-2xl w-full ${maxWidthClass} mx-2 max-h-[90vh] overflow-y-auto p-4 md:p-6 z-[101]`}
       >

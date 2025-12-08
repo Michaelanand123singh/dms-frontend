@@ -302,7 +302,7 @@ export default function ServiceCenterDetailPage() {
       
       {/* Mobile Menu Overlay */}
       {showMobileMenu && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md z-40 lg:hidden">
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden">
           <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Actions</h2>
@@ -574,7 +574,7 @@ export default function ServiceCenterDetailPage() {
               
               {/* Vehicle Details Modal */}
               {showVehicleDetails && (
-                <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
                   <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl p-6 relative max-h-[95vh] overflow-y-auto">
                     <button
                       className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"
@@ -1092,7 +1092,7 @@ export default function ServiceCenterDetailPage() {
 
               {/* Show Job Card Form */}
               {showJobCardForm && (
-                <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
                   <div className="bg-white rounded-lg border border-gray-200 shadow-xl p-4 sm:p-6 lg:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-800">Job Card Form</h3>
@@ -2326,7 +2326,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Vehicle Selection Popup */}
       {showVehiclePopup && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-black hover:text-gray-700"
@@ -2387,7 +2387,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Add New Vehicle Popup */}
       {showAddVehiclePopup && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2515,7 +2515,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Engineer Search Popup */}
       {showEngineerPopup && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2563,7 +2563,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Part Search Popup */}
       {showPartPopup && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2619,7 +2619,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Add Custom Part Popup */}
       {showAddPartPopup && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2680,7 +2680,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Invoice Search Popup */}
       {showInvoiceSearchPopup && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -2728,7 +2728,7 @@ export default function ServiceCenterDetailPage() {
 
       {/* Inventory Add/Edit Popup */}
       {showInventoryAddEdit && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"

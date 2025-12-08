@@ -604,7 +604,7 @@ export default function UsersAndRolesPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-md p-6">
             <h2 className="text-xl font-semibold mb-4">
               {editingUser ? "Edit User" : "Create New User"}
@@ -746,7 +746,7 @@ export default function UsersAndRolesPage() {
 
       {/* User Details Modal */}
       {showUserDetails && selectedUser && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-lg p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-semibold text-gray-800">User Details</h2>
@@ -871,7 +871,7 @@ export default function UsersAndRolesPage() {
 
       {/* Password Reset Modal */}
       {showPasswordReset && selectedUser && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-800">Reset Password</h2>
@@ -923,7 +923,7 @@ export default function UsersAndRolesPage() {
 
       {/* Activity Logs Modal */}
       {showActivityLogs && selectedUser && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-800">Activity Logs</h2>
@@ -972,7 +972,7 @@ export default function UsersAndRolesPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && userToDelete && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-md p-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Confirm Delete</h2>
             <p className="text-gray-600 mb-6">

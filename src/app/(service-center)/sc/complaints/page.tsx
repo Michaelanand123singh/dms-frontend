@@ -41,7 +41,7 @@ const Modal = ({
   maxWidth?: string;
 }) => (
   <div
-    className="fixed inset-0 backdrop-blur-md bg-black/10 flex items-start justify-center z-9999 p-4 pt-8"
+    className="fixed inset-0 bg-black/50 flex items-start justify-center z-[9999] p-4 pt-8"
     style={{ animation: "fadeIn 0.2s ease-out" }}
   >
     <div
