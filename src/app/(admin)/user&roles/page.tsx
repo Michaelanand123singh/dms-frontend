@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { Trash, Key, History, UserCog, Edit, Power, Eye } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Trash, Key, History, UserCog, Edit, Power, Eye, ArrowLeft, Users } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { defaultUsers } from "@/__mocks__/data/users.mock";
 
@@ -30,6 +30,8 @@ interface UserFormData {
 
 export default function UsersAndRolesPage() {
   const [showModal, setShowModal] = useState(false);
+  const [selectedServiceCenter, setSelectedServiceCenter] = useState<ServiceCenter | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
   // Use mock data from __mocks__ folder
   const [users, setUsers] = useState<User[]>(() => {
@@ -42,7 +44,6 @@ export default function UsersAndRolesPage() {
     return defaultUsers;
   });
 
-  const [filteredUsers, setFilteredUsers] = useState<User[]>(users);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -111,49 +112,135 @@ export default function UsersAndRolesPage() {
     return centerNames.join(", ");
   };
 
+  // Get users for selected service center
+  const getUsersForServiceCenter = (serviceCenterName: string): User[] => {
+    return users.filter(user => {
+      const assigned = getServiceCenterName(user.assigned);
+      return assigned === serviceCenterName || assigned.includes(serviceCenterName);
+    });
+  };
+
+  // Get service centers with user counts
+  const serviceCentersWithCounts = useMemo(() => {
+    return centers.map(center => {
+      const centerUsers = getUsersForServiceCenter(center.name);
+      return {
+        ...center,
+        userCount: centerUsers.length
+      };
+    });
+  }, [centers, users]);
+
+  // Filtered users for selected service center
+  const filteredUsersForCenter = useMemo(() => {
+    if (!selectedServiceCenter) return [];
+    
+    let centerUsers = getUsersForServiceCenter(selectedServiceCenter.name);
+    
+    if (searchTerm.trim() !== "") {
+      centerUsers = centerUsers.filter(
+        (u) =>
+          u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          u.email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (roleFilter !== "All") {
+      centerUsers = centerUsers.filter((u) => u.role === roleFilter);
+    }
+
+    if (statusFilter !== "All") {
+      centerUsers = centerUsers.filter((u) => u.status === statusFilter);
+    }
+
+    return centerUsers;
+  }, [selectedServiceCenter, users, searchTerm, roleFilter, statusFilter]);
+
   // Handle Filters
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    applyFilters(value, roleFilter, statusFilter);
   };
 
   const handleRoleChange = (value: string) => {
     setRoleFilter(value);
-    applyFilters(searchTerm, value, statusFilter);
   };
 
   const handleStatusChange = (value: string) => {
     setStatusFilter(value);
-    applyFilters(searchTerm, roleFilter, value);
   };
 
   const resetFilters = () => {
     setSearchTerm("");
     setRoleFilter("All");
     setStatusFilter("All");
-    setFilteredUsers(users);
   };
 
-  const applyFilters = (search: string, role: string, status: string) => {
-    let filtered = [...users];
+  // Handle service center selection
+  const handleServiceCenterClick = (center: ServiceCenter) => {
+    setSelectedServiceCenter(center);
+    resetFilters();
+  };
 
-    if (search.trim() !== "") {
-      filtered = filtered.filter(
-        (u) =>
-          u.name.toLowerCase().includes(search.toLowerCase()) ||
-          u.email.toLowerCase().includes(search.toLowerCase())
-      );
-    }
+  // Handle back to service centers
+  const handleBackToCenters = () => {
+    setSelectedServiceCenter(null);
+    resetFilters();
+  };
 
-    if (role !== "All") {
-      filtered = filtered.filter((u) => u.role === role);
-    }
+  // Handle edit user
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setFormData({
+      fullName: user.name,
+      email: user.email,
+      password: "",
+      role: user.role,
+      status: user.status,
+      serviceCenter: selectedServiceCenter?.id.toString() || "",
+    });
+    setShowModal(true);
+  };
 
-    if (status !== "All") {
-      filtered = filtered.filter((u) => u.status === status);
-    }
+  // Handle update user
+  const handleUpdateUser = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingUser) return;
 
-    setFilteredUsers(filtered);
+    const initials = formData.fullName
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase();
+
+    const assignedSC = formData.role === "Call Center" 
+      ? "All Service Centers" 
+      : (centers.find(c => c.id === parseInt(formData.serviceCenter))?.name || selectedServiceCenter?.name || "Not Assigned");
+
+    const updatedUsers = users.map(u => 
+      u.email === editingUser.email 
+        ? {
+            ...u,
+            initials,
+            name: formData.fullName,
+            email: formData.email,
+            role: formData.role,
+            assigned: assignedSC,
+            status: formData.status,
+          }
+        : u
+    );
+
+    setUsers(updatedUsers);
+    setShowModal(false);
+    setEditingUser(null);
+    setFormData({
+      fullName: "",
+      email: "",
+      password: "",
+      role: "Super Admin",
+      status: "Active",
+      serviceCenter: "",
+    });
   };
 
   // Handle New User
@@ -163,6 +250,11 @@ export default function UsersAndRolesPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (editingUser) {
+      handleUpdateUser(e);
+      return;
+    }
 
     const initials = formData.fullName
       .split(" ")
@@ -174,7 +266,7 @@ export default function UsersAndRolesPage() {
     // Call center doesn't need a service center assignment
     const assignedSC = formData.role === "Call Center" 
       ? "All Service Centers" 
-      : (centers.find(c => c.id === parseInt(formData.serviceCenter))?.name || "Not Assigned");
+      : (centers.find(c => c.id === parseInt(formData.serviceCenter))?.name || selectedServiceCenter?.name || "Not Assigned");
 
     const newUser: User = {
       initials,
@@ -187,7 +279,6 @@ export default function UsersAndRolesPage() {
 
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
-    setFilteredUsers(updatedUsers);
     setShowModal(false);
 
     setFormData({
@@ -215,27 +306,6 @@ export default function UsersAndRolesPage() {
         (u) => !(u.email === userToDelete.email && u.name === userToDelete.name)
       );
       setUsers(updatedUsers);
-      
-      // Apply filters to the updated users list
-      let filtered = [...updatedUsers];
-
-      if (searchTerm.trim() !== "") {
-        filtered = filtered.filter(
-          (u) =>
-            u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            u.email.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      }
-
-      if (roleFilter !== "All") {
-        filtered = filtered.filter((u) => u.role === roleFilter);
-      }
-
-      if (statusFilter !== "All") {
-        filtered = filtered.filter((u) => u.status === statusFilter);
-      }
-
-      setFilteredUsers(filtered);
       
       // Close modals if open
       if (showUserDetails && selectedUser && selectedUser.email === userToDelete.email) {
@@ -278,7 +348,6 @@ export default function UsersAndRolesPage() {
       u.email === user.email ? { ...u, status: newStatus } : u
     );
     setUsers(updatedUsers);
-    setFilteredUsers(updatedUsers);
     if (selectedUser && selectedUser.email === user.email) {
       setSelectedUser({ ...selectedUser, status: newStatus });
     }
@@ -301,124 +370,245 @@ export default function UsersAndRolesPage() {
     <div className="min-h-screen bg-white text-gray-900 p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Users & Roles</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-md hover:opacity-90 transition"
-        >
-          Add New User
-        </button>
+        <div className="flex items-center gap-4">
+          {selectedServiceCenter && (
+            <button
+              onClick={handleBackToCenters}
+              className="p-2 hover:bg-gray-100 rounded-lg transition"
+              title="Back to Service Centers"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+          <h1 className="text-3xl font-bold text-gray-800">
+            {selectedServiceCenter ? `${selectedServiceCenter.name} - Users` : "Users & Roles"}
+          </h1>
+        </div>
+        {selectedServiceCenter && (
+          <button
+            onClick={() => {
+              setEditingUser(null);
+              setFormData({
+                fullName: "",
+                email: "",
+                password: "",
+                role: "Super Admin",
+                status: "Active",
+                serviceCenter: selectedServiceCenter.id.toString(),
+              });
+              setShowModal(true);
+            }}
+            className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-md hover:opacity-90 transition"
+          >
+            Add New User
+          </button>
+        )}
       </div>
 
       <p className="text-gray-500 mb-6">
-        Manage system users and permissions
+        {selectedServiceCenter 
+          ? `Manage users for ${selectedServiceCenter.name}` 
+          : "Select a service center to view and manage its users"}
       </p>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchTerm}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="border rounded-md px-4 py-2 flex-1 min-w-[200px] focus:ring-2 focus:ring-blue-400 outline-none"
-        />
-        <select
-          value={roleFilter}
-          onChange={(e) => handleRoleChange(e.target.value)}
-          className="border rounded-md px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
-        >
-          <option>All</option>
-          <option>Super Admin</option>
-          <option>SC Manager</option>
-          <option>Finance Manager</option>
-          <option>Call Center</option>
-          <option>Technician Engineer</option>
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => handleStatusChange(e.target.value)}
-          className="border rounded-md px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
-        >
-          <option>All</option>
-          <option>Active</option>
-          <option>Inactive</option>
-        </select>
-        <button
-          onClick={resetFilters}
-          className="border rounded-md px-4 py-2 hover:bg-gray-100 transition"
-        >
-          Reset Filters
-        </button>
-      </div>
-
-      {/* Cards Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredUsers.length > 0 ? (
-          filteredUsers.map((user, index) => (
-            <div
-              key={index}
-              onClick={() => {
-                setSelectedUser(user);
-                setShowUserDetails(true);
-              }}
-              className="rounded-xl border bg-white shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition cursor-pointer relative"
-            >
-              <button
-                onClick={(e) => handleDeleteClick(user, e)}
-                className="absolute top-3 right-3 p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                title="Delete User"
-              >
-                <Trash size={18} />
-              </button>
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-r from-pink-500 to-purple-500 text-white font-semibold rounded-full w-14 h-14 flex items-center justify-center text-lg">
-                  {user.initials}
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold">{user.name}</h2>
-                  <p className="text-gray-500 text-sm">{user.email}</p>
-                </div>
-              </div>
-
-              <div className="mt-2">
-                <p className="text-sm text-gray-600">
-                  <span className="font-semibold">Role:</span>{" "}
-                  <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-md text-xs">
-                    {user.role}
-                  </span>
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  <span className="font-semibold">Service Center:</span>{" "}
-                  <span className="text-gray-800">{getServiceCenterName(user.assigned)}</span>
-                </p>
-                <p className="text-sm mt-2">
-                  <span className="font-semibold">Status:</span>{" "}
-                  <span
-                    className={`font-semibold ${
-                      user.status === "Active"
-                        ? "text-green-600"
-                        : "text-red-500"
-                    }`}
+      {!selectedServiceCenter ? (
+        /* Service Centers Table */
+        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Service Center Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Number of Users
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {serviceCentersWithCounts.length > 0 ? (
+                serviceCentersWithCounts.map((center) => (
+                  <tr
+                    key={center.id}
+                    onClick={() => handleServiceCenterClick(center)}
+                    className="hover:bg-gray-50 cursor-pointer transition"
                   >
-                    {user.status}
-                  </span>
-                </p>
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-gray-500 col-span-full text-center py-10">
-            No users found
-          </p>
-        )}
-      </div>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold rounded-full w-10 h-10 flex items-center justify-center">
+                          {center.name.charAt(0)}
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{center.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Users size={16} className="text-gray-400" />
+                        <span className="text-sm text-gray-600">{center.userCount} users</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <span className="text-blue-600 hover:text-blue-800">View Users →</span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                    No service centers found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* Users Table for Selected Service Center */
+        <>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 mb-6">
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="border rounded-md px-4 py-2 flex-1 min-w-[200px] focus:ring-2 focus:ring-blue-400 outline-none"
+            />
+            <select
+              value={roleFilter}
+              onChange={(e) => handleRoleChange(e.target.value)}
+              className="border rounded-md px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+            >
+              <option>All</option>
+              <option>Super Admin</option>
+              <option>SC Manager</option>
+              <option>Finance Manager</option>
+              <option>Call Center</option>
+              <option>Technician Engineer</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              className="border rounded-md px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+            >
+              <option>All</option>
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+            <button
+              onClick={resetFilters}
+              className="border rounded-md px-4 py-2 hover:bg-gray-100 transition"
+            >
+              Reset Filters
+            </button>
+          </div>
+
+          {/* Users Table */}
+          <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredUsersForCenter.length > 0 ? (
+                  filteredUsersForCenter.map((user, index) => (
+                    <tr key={index} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-gradient-to-r from-pink-500 to-purple-500 text-white font-semibold rounded-full w-10 h-10 flex items-center justify-center text-sm">
+                            {user.initials}
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">{user.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-600">{user.email}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-md text-xs font-medium">
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`text-sm font-semibold ${
+                            user.status === "Active"
+                              ? "text-green-600"
+                              : "text-red-500"
+                          }`}
+                        >
+                          {user.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditUser(user)}
+                            className="text-blue-600 hover:text-blue-800 p-1.5 hover:bg-blue-50 rounded transition"
+                            title="Edit User"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowUserDetails(true);
+                            }}
+                            className="text-indigo-600 hover:text-indigo-800 p-1.5 hover:bg-indigo-50 rounded transition"
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteClick(user, e)}
+                            className="text-red-600 hover:text-red-800 p-1.5 hover:bg-red-50 rounded transition"
+                            title="Delete User"
+                          >
+                            <Trash size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                      No users found for this service center
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Create New User</h2>
+            <h2 className="text-xl font-semibold mb-4">
+              {editingUser ? "Edit User" : "Create New User"}
+            </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
@@ -465,32 +655,34 @@ export default function UsersAndRolesPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Service Center</label>
-                <select
-                  name="serviceCenter"
-                  value={formData.serviceCenter}
-                  onChange={handleChange}
-                  className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
-                  required={formData.role !== "Call Center"}
-                >
-                  <option value="">
-                    {formData.role === "Call Center" 
-                      ? "Not Required (Can assign to any service center)" 
-                      : "Select Service Center"}
-                  </option>
-                  {centers.map((center) => (
-                    <option key={center.id} value={center.id}>
-                      {center.name}
+              {!selectedServiceCenter && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Service Center</label>
+                  <select
+                    name="serviceCenter"
+                    value={formData.serviceCenter}
+                    onChange={handleChange}
+                    className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
+                    required={formData.role !== "Call Center"}
+                  >
+                    <option value="">
+                      {formData.role === "Call Center" 
+                        ? "Not Required (Can assign to any service center)" 
+                        : "Select Service Center"}
                     </option>
-                  ))}
-                </select>
-                {formData.role === "Call Center" && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Call center staff can assign customers to any service center
-                  </p>
-                )}
-              </div>
+                    {centers.map((center) => (
+                      <option key={center.id} value={center.id}>
+                        {center.name}
+                      </option>
+                    ))}
+                  </select>
+                  {formData.role === "Call Center" && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Call center staff can assign customers to any service center
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium mb-1">Role</label>
@@ -524,7 +716,18 @@ export default function UsersAndRolesPage() {
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingUser(null);
+                    setFormData({
+                      fullName: "",
+                      email: "",
+                      password: "",
+                      role: "Super Admin",
+                      status: "Active",
+                      serviceCenter: "",
+                    });
+                  }}
                   className="bg-gray-300 px-4 py-2 rounded-md hover:bg-gray-400 transition"
                 >
                   Cancel
@@ -533,7 +736,7 @@ export default function UsersAndRolesPage() {
                   type="submit"
                   className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
                 >
-                  Create User
+                  {editingUser ? "Update User" : "Create User"}
                 </button>
               </div>
             </form>
