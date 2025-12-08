@@ -351,6 +351,9 @@ export default function CustomerFind() {
   const [pickupAddressDifferent, setPickupAddressDifferent] = useState<boolean>(false);
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedCity, setSelectedCity] = useState<string>("");
+  // State for vehicle form customer info (separate from create customer form)
+  const [vehicleFormState, setVehicleFormState] = useState<string>("");
+  const [vehicleFormCity, setVehicleFormCity] = useState<string>("");
   
   // Toast notification state
   const [toast, setToast] = useState<{ show: boolean; message: string; type?: "success" | "error" }>({
@@ -515,6 +518,8 @@ export default function CustomerFind() {
 
   const resetVehicleForm = useCallback(() => {
     setNewVehicleForm({ ...initialVehicleForm });
+    setVehicleFormState("");
+    setVehicleFormCity("");
   }, [setNewVehicleForm]);
 
   const resetAppointmentForm = useCallback(() => {
@@ -1018,9 +1023,17 @@ export default function CustomerFind() {
                                   } else {
                                     // No vehicles - allow scheduling for new vehicle
                                     // First add a vehicle, then schedule
+                                    resetVehicleForm();
+                                    // Initialize state and city from customer's cityState
+                                    if (customer.cityState) {
+                                      const parts = customer.cityState.split(",");
+                                      if (parts.length >= 2) {
+                                        setVehicleFormCity(parts[0]?.trim() || "");
+                                        setVehicleFormState(parts[1]?.trim() || "");
+                                      }
+                                    }
                                     setShouldOpenAppointmentAfterVehicleAdd(true);
                                     setShowAddVehiclePopup(true);
-                                    resetVehicleForm();
                                   }
                                 }}
                                 variant="success"
@@ -1369,7 +1382,18 @@ export default function CustomerFind() {
                 <Button onClick={() => setShowComplaints(true)} variant="warning" icon={AlertTriangle}>
                   Complaints
                 </Button>
-                <Button onClick={() => { setShowAddVehiclePopup(true); resetVehicleForm(); }} icon={PlusCircle}>
+                <Button onClick={() => { 
+                  resetVehicleForm();
+                  // Initialize state and city from customer's cityState
+                  if (selectedCustomer.cityState) {
+                    const parts = selectedCustomer.cityState.split(",");
+                    if (parts.length >= 2) {
+                      setVehicleFormCity(parts[0]?.trim() || "");
+                      setVehicleFormState(parts[1]?.trim() || "");
+                    }
+                  }
+                  setShowAddVehiclePopup(true); 
+                }} icon={PlusCircle}>
                   Add Vehicle
                 </Button>
                 </div>
@@ -1377,7 +1401,16 @@ export default function CustomerFind() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <InfoCard icon={Phone} label="Phone" value={selectedCustomer.phone} />
+                {selectedCustomer.whatsappNumber && (
+                  <InfoCard icon={Phone} label="WhatsApp" value={selectedCustomer.whatsappNumber} />
+                )}
+                {selectedCustomer.alternateMobile && (
+                  <InfoCard icon={Phone} label="Alternate Mobile" value={selectedCustomer.alternateMobile} />
+                )}
                 {selectedCustomer.email && <InfoCard icon={Mail} label="Email" value={selectedCustomer.email} />}
+                {selectedCustomer.customerType && (
+                  <InfoCard icon={User} label="Customer Type" value={selectedCustomer.customerType} />
+                )}
                 {(selectedCustomer.address || selectedCustomer.cityState || selectedCustomer.pincode) && (
                   <InfoCard 
                     icon={MapPin} 
@@ -1545,8 +1578,16 @@ export default function CustomerFind() {
                 </p>
                 <button
                   onClick={() => {
-                    setShowAddVehiclePopup(true);
                     resetVehicleForm();
+                    // Initialize state and city from customer's cityState
+                    if (selectedCustomer.cityState) {
+                      const parts = selectedCustomer.cityState.split(",");
+                      if (parts.length >= 2) {
+                        setVehicleFormCity(parts[0]?.trim() || "");
+                        setVehicleFormState(parts[1]?.trim() || "");
+                      }
+                    }
+                    setShowAddVehiclePopup(true);
                   }}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition"
                 >
@@ -1564,7 +1605,128 @@ export default function CustomerFind() {
           <Modal title="Add New Vehicle" onClose={closeVehicleForm}>
             <div className="p-6 space-y-6">
                 {validationError && <ErrorAlert message={validationError} />}
-                <CustomerInfoCard customer={selectedCustomer} />
+                
+                {/* Customer Information Section */}
+                <div className="bg-indigo-50 rounded-lg p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-indigo-900 mb-3">Customer Information</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormInput
+                      label="Customer Type"
+                      value={selectedCustomer.customerType || ""}
+                      onChange={() => {}}
+                      readOnly
+                    />
+                    <FormInput
+                      label="Phone Number"
+                      value={selectedCustomer.phone}
+                      onChange={() => {}}
+                      readOnly
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <FormInput
+                        label="WhatsApp Number"
+                        value={selectedCustomer.whatsappNumber || selectedCustomer.phone || ""}
+                        onChange={() => {}}
+                        readOnly
+                      />
+                      {selectedCustomer.whatsappNumber && selectedCustomer.whatsappNumber !== selectedCustomer.phone && (
+                        <p className="text-xs text-gray-500 mt-1">Different from phone number</p>
+                      )}
+                    </div>
+                    <FormInput
+                      label="Alternate Mobile Number"
+                      value={selectedCustomer.alternateMobile || ""}
+                      onChange={() => {}}
+                      readOnly
+                    />
+                  </div>
+
+                  {selectedCustomer.address && (
+                    <FormInput
+                      label="Full Address"
+                      value={selectedCustomer.address}
+                      onChange={() => {}}
+                      readOnly
+                    />
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        State
+                      </label>
+                      <select
+                        value={vehicleFormState || (() => {
+                          // Parse cityState: format is "City, State"
+                          if (selectedCustomer.cityState) {
+                            const parts = selectedCustomer.cityState.split(",");
+                            return parts.length >= 2 ? parts[1]?.trim() || "" : "";
+                          }
+                          return "";
+                        })()}
+                        onChange={(e) => {
+                          setVehicleFormState(e.target.value);
+                          setVehicleFormCity(""); // Reset city when state changes
+                        }}
+                        className="w-full px-4 py-2.5 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/20 focus:outline-none text-gray-900 transition-all duration-200 border border-gray-200"
+                      >
+                        <option value="">Select State</option>
+                        {INDIAN_STATES.map((state) => (
+                          <option key={state.code} value={state.name}>
+                            {state.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        City
+                      </label>
+                      <select
+                        value={vehicleFormCity || (() => {
+                          // Parse cityState: format is "City, State"
+                          if (selectedCustomer.cityState) {
+                            const parts = selectedCustomer.cityState.split(",");
+                            return parts.length >= 1 ? parts[0]?.trim() || "" : "";
+                          }
+                          return "";
+                        })()}
+                        onChange={(e) => setVehicleFormCity(e.target.value)}
+                        disabled={!vehicleFormState && !selectedCustomer.cityState}
+                        className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 border ${
+                          !vehicleFormState && !selectedCustomer.cityState
+                            ? "bg-gray-100 border-gray-200 cursor-not-allowed text-gray-400"
+                            : "bg-white focus:ring-indigo-500/20 border-gray-200"
+                        }`}
+                      >
+                        <option value="">{(vehicleFormState || selectedCustomer.cityState) ? "Select City" : "Select State First"}</option>
+                        {(vehicleFormState || selectedCustomer.cityState) && 
+                          getCitiesByState(vehicleFormState || (() => {
+                            if (selectedCustomer.cityState) {
+                              const parts = selectedCustomer.cityState.split(",");
+                              return parts.length >= 2 ? parts[1]?.trim() || "" : "";
+                            }
+                            return "";
+                          })()).map((city) => (
+                            <option key={city} value={city}>
+                              {city}
+                            </option>
+                          ))
+                        }
+                      </select>
+                    </div>
+                    <FormInput
+                      label="Pincode"
+                      value={selectedCustomer.pincode || ""}
+                      onChange={() => {}}
+                      readOnly
+                    />
+                  </div>
+                </div>
 
                 {/* Vehicle Form Fields */}
                 <div className="space-y-4">
