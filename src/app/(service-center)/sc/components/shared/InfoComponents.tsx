@@ -50,10 +50,28 @@ export const CustomerInfoCard = ({
         <p className="text-indigo-600 font-medium">Phone</p>
         <p className="text-gray-800 font-semibold">{customer.phone}</p>
       </div>
+      {customer.whatsappNumber && (
+        <div>
+          <p className="text-indigo-600 font-medium">WhatsApp Number</p>
+          <p className="text-gray-800 font-semibold">{customer.whatsappNumber}</p>
+        </div>
+      )}
+      {customer.alternateMobile && (
+        <div>
+          <p className="text-indigo-600 font-medium">Alternate Mobile</p>
+          <p className="text-gray-800 font-semibold">{customer.alternateMobile}</p>
+        </div>
+      )}
       {customer.email && (
         <div>
           <p className="text-indigo-600 font-medium">Email</p>
           <p className="text-gray-800 font-semibold">{customer.email}</p>
+        </div>
+      )}
+      {customer.customerType && (
+        <div>
+          <p className="text-indigo-600 font-medium">Customer Type</p>
+          <p className="text-gray-800 font-semibold">{customer.customerType}</p>
         </div>
       )}
       {customer.address && (
@@ -66,6 +84,12 @@ export const CustomerInfoCard = ({
         <div>
           <p className="text-indigo-600 font-medium">City / State</p>
           <p className="text-gray-800 font-semibold">{customer.cityState}</p>
+        </div>
+      )}
+      {customer.pincode && (
+        <div>
+          <p className="text-indigo-600 font-medium">Pincode</p>
+          <p className="text-gray-800 font-semibold">{customer.pincode}</p>
         </div>
       )}
       {customer.serviceCenterName && (
