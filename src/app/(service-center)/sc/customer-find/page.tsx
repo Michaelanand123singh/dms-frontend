@@ -354,6 +354,7 @@ export default function CustomerFind() {
   // State for vehicle form customer info (separate from create customer form)
   const [vehicleFormState, setVehicleFormState] = useState<string>("");
   const [vehicleFormCity, setVehicleFormCity] = useState<string>("");
+  const [hasInsurance, setHasInsurance] = useState<boolean>(false);
   
   // Toast notification state
   const [toast, setToast] = useState<{ show: boolean; message: string; type?: "success" | "error" }>({
@@ -520,6 +521,7 @@ export default function CustomerFind() {
     setNewVehicleForm({ ...initialVehicleForm });
     setVehicleFormState("");
     setVehicleFormCity("");
+    setHasInsurance(false);
   }, [setNewVehicleForm]);
 
   const resetAppointmentForm = useCallback(() => {
@@ -1798,6 +1800,12 @@ export default function CustomerFind() {
                       value={newVehicleForm.purchaseDate || ""}
                       onChange={(e) => setNewVehicleForm({ ...newVehicleForm, purchaseDate: e.target.value })}
                     />
+                    <FormInput
+                      label="Vehicle Color"
+                      value={newVehicleForm.vehicleColor || ""}
+                      onChange={(e) => setNewVehicleForm({ ...newVehicleForm, vehicleColor: e.target.value })}
+                      placeholder="e.g., Red, Blue, White, Black"
+                    />
                   </div>
 
                   <FormSelect
@@ -1812,30 +1820,60 @@ export default function CustomerFind() {
                     ]}
                   />
 
-                  <div className="pt-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Insurance Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormInput
-                        label="Insurance Start Date"
-                        type="date"
-                        value={newVehicleForm.insuranceStartDate || ""}
-                        onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceStartDate: e.target.value })}
+                  {/* Has Insurance Toggle */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="flex items-center gap-3 mb-4">
+                      <input
+                        type="checkbox"
+                        id="hasInsurance"
+                        checked={hasInsurance}
+                        onChange={(e) => {
+                          setHasInsurance(e.target.checked);
+                          // Clear insurance fields when unchecked
+                          if (!e.target.checked) {
+                            setNewVehicleForm({
+                              ...newVehicleForm,
+                              insuranceStartDate: "",
+                              insuranceEndDate: "",
+                              insuranceCompanyName: "",
+                            });
+                          }
+                        }}
+                        className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
                       />
-                      <FormInput
-                        label="Insurance End Date"
-                        type="date"
-                        value={newVehicleForm.insuranceEndDate || ""}
-                        onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceEndDate: e.target.value })}
-                      />
+                      <label htmlFor="hasInsurance" className="text-sm font-semibold text-gray-800 cursor-pointer">
+                        Has Insurance
+                      </label>
                     </div>
-                    <div className="mt-4">
-                      <FormInput
-                        label="Insurance Company Name"
-                        value={newVehicleForm.insuranceCompanyName || ""}
-                        onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceCompanyName: e.target.value })}
-                        placeholder="Enter insurance company name"
-                      />
-                    </div>
+
+                    {/* Insurance Information - Only show when hasInsurance is true */}
+                    {hasInsurance && (
+                      <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Insurance Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormInput
+                            label="Insurance Start Date"
+                            type="date"
+                            value={newVehicleForm.insuranceStartDate || ""}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceStartDate: e.target.value })}
+                          />
+                          <FormInput
+                            label="Insurance End Date"
+                            type="date"
+                            value={newVehicleForm.insuranceEndDate || ""}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceEndDate: e.target.value })}
+                          />
+                        </div>
+                        <div className="mt-4">
+                          <FormInput
+                            label="Insurance Company Name"
+                            value={newVehicleForm.insuranceCompanyName || ""}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, insuranceCompanyName: e.target.value })}
+                            placeholder="Enter insurance company name"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1867,8 +1905,8 @@ export default function CustomerFind() {
                         return;
                       }
 
-                      // Validate insurance dates if provided
-                      if (newVehicleForm.insuranceStartDate && newVehicleForm.insuranceEndDate) {
+                      // Validate insurance dates if provided and hasInsurance is checked
+                      if (hasInsurance && newVehicleForm.insuranceStartDate && newVehicleForm.insuranceEndDate) {
                         const startDate = new Date(newVehicleForm.insuranceStartDate);
                         const endDate = new Date(newVehicleForm.insuranceEndDate);
                         if (endDate <= startDate) {
@@ -1895,12 +1933,21 @@ export default function CustomerFind() {
                         vehicleYear: newVehicleForm.purchaseDate 
                           ? new Date(newVehicleForm.purchaseDate).getFullYear()
                           : new Date().getFullYear(),
-                        vehicleColor: "", // Not in form, can be added later
+                        vehicleColor: newVehicleForm.vehicleColor || "",
                         lastServiceDate: "",
                         totalServices: 0,
                         totalSpent: "₹0",
                         currentStatus: "Available",
                         activeJobCardId: null,
+                        // Additional vehicle details
+                        variant: newVehicleForm.variant || undefined,
+                        motorNumber: newVehicleForm.motorNumber || undefined,
+                        chargerSerialNumber: newVehicleForm.chargerSerialNumber || undefined,
+                        purchaseDate: newVehicleForm.purchaseDate || undefined,
+                        warrantyStatus: newVehicleForm.warrantyStatus || undefined,
+                        insuranceStartDate: hasInsurance ? (newVehicleForm.insuranceStartDate || undefined) : undefined,
+                        insuranceEndDate: hasInsurance ? (newVehicleForm.insuranceEndDate || undefined) : undefined,
+                        insuranceCompanyName: hasInsurance ? (newVehicleForm.insuranceCompanyName || undefined) : undefined,
                       };
 
                       // Add vehicle to customer's vehicles array
@@ -1977,7 +2024,7 @@ export default function CustomerFind() {
                     </div>
                     <div>
                       <p className="text-indigo-600 font-medium">Color</p>
-                      <p className="text-gray-800 font-semibold">{selectedVehicle.vehicleColor}</p>
+                      <p className="text-gray-800 font-semibold">{selectedVehicle.vehicleColor || "N/A"}</p>
                     </div>
                     <div>
                       <p className="text-indigo-600 font-medium">Make</p>
@@ -1991,6 +2038,46 @@ export default function CustomerFind() {
                       <p className="text-indigo-600 font-medium">Year</p>
                       <p className="text-gray-800 font-semibold">{selectedVehicle.vehicleYear}</p>
                     </div>
+                    {selectedVehicle.variant && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Variant / Battery Capacity</p>
+                        <p className="text-gray-800 font-semibold">{selectedVehicle.variant}</p>
+                      </div>
+                    )}
+                    {selectedVehicle.motorNumber && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Motor Number</p>
+                        <p className="text-gray-800 font-semibold">{selectedVehicle.motorNumber}</p>
+                      </div>
+                    )}
+                    {selectedVehicle.chargerSerialNumber && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Charger Serial Number</p>
+                        <p className="text-gray-800 font-semibold">{selectedVehicle.chargerSerialNumber}</p>
+                      </div>
+                    )}
+                    {selectedVehicle.purchaseDate && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Date of Purchase</p>
+                        <p className="text-gray-800 font-semibold">
+                          {new Date(selectedVehicle.purchaseDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                    {selectedVehicle.warrantyStatus && (
+                      <div>
+                        <p className="text-indigo-600 font-medium">Warranty Status</p>
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                          selectedVehicle.warrantyStatus === "Active"
+                            ? "bg-green-100 text-green-700"
+                            : selectedVehicle.warrantyStatus === "Expired"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}>
+                          {selectedVehicle.warrantyStatus}
+                        </span>
+                      </div>
+                    )}
                     <div>
                       <p className="text-indigo-600 font-medium">Total Services</p>
                       <p className="text-gray-800 font-semibold">{selectedVehicle.totalServices}</p>
@@ -2019,6 +2106,40 @@ export default function CustomerFind() {
                       </div>
                     )}
                   </div>
+
+                  {/* Insurance Information Section */}
+                  {(selectedVehicle.insuranceStartDate || selectedVehicle.insuranceEndDate || selectedVehicle.insuranceCompanyName) && (
+                    <div className="mt-6 pt-6 border-t border-indigo-200">
+                      <h4 className="text-md font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                        <FileText className="text-indigo-600" size={18} />
+                        Insurance Information
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                        {selectedVehicle.insuranceStartDate && (
+                          <div>
+                            <p className="text-indigo-600 font-medium">Insurance Start Date</p>
+                            <p className="text-gray-800 font-semibold">
+                              {new Date(selectedVehicle.insuranceStartDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+                        {selectedVehicle.insuranceEndDate && (
+                          <div>
+                            <p className="text-indigo-600 font-medium">Insurance End Date</p>
+                            <p className="text-gray-800 font-semibold">
+                              {new Date(selectedVehicle.insuranceEndDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+                        {selectedVehicle.insuranceCompanyName && (
+                          <div>
+                            <p className="text-indigo-600 font-medium">Insurance Company</p>
+                            <p className="text-gray-800 font-semibold">{selectedVehicle.insuranceCompanyName}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Service History */}

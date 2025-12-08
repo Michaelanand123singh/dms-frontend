@@ -62,6 +62,15 @@ export interface Vehicle {
   lastServiceCenterId?: number | string; // ID of last service center
   lastServiceCenterName?: string; // Name of last service center where service was done
   externalId?: string;
+  // Additional vehicle details from form
+  variant?: string; // Variant / Battery Capacity
+  motorNumber?: string; // Motor Number
+  chargerSerialNumber?: string; // Charger Serial Number
+  purchaseDate?: string; // Date of Purchase
+  warrantyStatus?: string; // Warranty Status
+  insuranceStartDate?: string; // Insurance start date
+  insuranceEndDate?: string; // Insurance end date
+  insuranceCompanyName?: string; // Insurance company name
 }
 
 export interface ServiceHistoryItem {
