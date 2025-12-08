@@ -9,7 +9,6 @@ import {
   PlusCircle,
   UserPlus,
   AlertTriangle,
-  CheckCircle,
   FileWarning,
   XCircle,
   LucideIcon,
@@ -36,12 +35,6 @@ export default function Dashboard() {
       icon: UserPlus,
       bg: "bg-gradient-to-r from-purple-500 to-indigo-500",
       link: "/user&roles",
-    },
-    {
-      label: "Approve Requests",
-      icon: CheckCircle,
-      bg: "bg-gradient-to-r from-orange-500 to-yellow-500",
-      link: "/approvals",
     },
     {
       label: "Generate Report",

@@ -38,7 +38,6 @@ export const ADMIN_MENU_ITEMS: MenuItem[] = [
   { name: "Users & Roles", icon: Users, href: "/user&roles" },
   { name: "Roles & Permissions", icon: Shield, href: "/roles-permissions" },
   { name: "Inventory", icon: Package, href: "/inventory" },
-  { name: "Approvals", icon: CheckCircle, href: "/approvals" },
   { name: "Finance", icon: DollarSign, href: "/finance" },
   { name: "Reports", icon: FileText, href: "/reports" },
   { name: "Complaints", icon: AlertCircle, href: "/complaints" },

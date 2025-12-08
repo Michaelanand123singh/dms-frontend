@@ -11,7 +11,6 @@ export const ROUTE_CONFIG = {
     SERVICE_CENTERS: "/servicecenters",
     USERS_AND_ROLES: "/user&roles",
     INVENTORY: "/inventory",
-    APPROVALS: "/approvals",
     FINANCE: "/finance",
     REPORTS: "/reports",
     COMPLAINTS: "/complaints",

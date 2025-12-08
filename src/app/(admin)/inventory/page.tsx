@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect, startTransition } from "react";
-import { Plus, Edit, Package, CheckCircle, AlertTriangle, DollarSign, X, Search } from "lucide-react";
+import { Plus, Edit, Package, CheckCircle, AlertTriangle, DollarSign, X, Search, Upload, Download, FileSpreadsheet } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { staticServiceCenters } from "@/__mocks__/data";
 import { 
   defaultInventoryData, 
   type MockInventoryItem as AdminInventoryItem 
 } from "@/__mocks__/data/inventory.mock";
+import * as XLSX from "xlsx";
 
 interface ServiceCenter {
   id: number;
@@ -62,11 +63,18 @@ export default function InventoryPage() {
 
   const [selectedCenter, setSelectedCenter] = useState<string>("all");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingItem, setEditingItem] = useState<AdminInventoryItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<AdminInventoryItem | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{
+    success: number;
+    failed: number;
+    errors: string[];
+  } | null>(null);
   const [form, setForm] = useState<InventoryForm>({
     partName: "",
     sku: "",
@@ -210,6 +218,164 @@ export default function InventoryPage() {
     setItemToDelete(null);
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "text/csv",
+    ];
+    const validExtensions = [".xlsx", ".xls", ".csv"];
+
+    const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    if (!validExtensions.includes(fileExtension) && !validTypes.includes(file.type)) {
+      alert("Please upload a valid Excel file (.xlsx, .xls) or CSV file.");
+      return;
+    }
+
+    setUploadFile(file);
+  };
+
+  const handleExcelUpload = async () => {
+    if (!uploadFile) return;
+
+    try {
+      setUploadProgress({ success: 0, failed: 0, errors: [] });
+      
+      const fileData = await uploadFile.arrayBuffer();
+      const workbook = XLSX.read(fileData, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData: any[] = XLSX.utils.sheet_to_json(firstSheet);
+
+      // Map Excel columns to InventoryForm
+      const inventoryData: InventoryForm[] = jsonData.map((row: any, index: number) => {
+        // Try to match common column names (case-insensitive)
+        const getValue = (keys: string[]) => {
+          for (const key of keys) {
+            const foundKey = Object.keys(row).find(
+              (k) => k.toLowerCase().trim() === key.toLowerCase().trim()
+            );
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== "") {
+              return String(row[foundKey]).trim();
+            }
+          }
+          return "";
+        };
+
+        return {
+          partName: getValue(["part name", "partname", "name", "item name", "product name"]) || "",
+          sku: getValue(["sku", "part number", "partnumber", "part no", "part_no", "code"]) || "",
+          partCode: getValue(["part code", "partcode", "part code", "product code"]) || "",
+          category: getValue(["category", "type", "group", "classification"]) || "",
+          quantity: getValue(["quantity", "qty", "stock", "stock quantity", "inventory"]) || "0",
+          price: getValue(["price", "unit price", "unitprice", "cost", "amount"]) || "0",
+          status: (getValue(["status", "stock status"]) || "In Stock") as "In Stock" | "Low Stock",
+          centerId: getValue(["service center", "servicecenter", "center", "center id", "center_id", "sc"]) || "",
+        };
+      });
+
+      // Validate and add inventory items
+      let success = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      const newItems: AdminInventoryItem[] = [];
+
+      for (let i = 0; i < inventoryData.length; i++) {
+        const data = inventoryData[i];
+        const rowNumber = i + 2; // +2 because row 1 is header, and arrays are 0-indexed
+
+        // Validate required fields
+        if (!data.partName || !data.sku || !data.centerId) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Missing required fields (Part Name, SKU, or Service Center)`);
+          continue;
+        }
+
+        // Check for duplicate SKU
+        const existingSku = inventory.find(item => item.sku.toLowerCase() === data.sku.toLowerCase());
+        if (existingSku) {
+          failed++;
+          errors.push(`Row ${rowNumber}: SKU "${data.sku}" already exists`);
+          continue;
+        }
+
+        // Find service center by ID or name
+        let center: ServiceCenter | undefined;
+        const centerIdNum = parseInt(data.centerId);
+        if (!isNaN(centerIdNum)) {
+          // Try to find by ID
+          center = centers.find(c => c.id === centerIdNum);
+        }
+        // If not found by ID, try to find by name
+        if (!center) {
+          center = centers.find(c => 
+            c.name.toLowerCase().trim() === data.centerId.toLowerCase().trim()
+          );
+        }
+        if (!center) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Service Center "${data.centerId}" not found. Please use Service Center ID or exact name.`);
+          continue;
+        }
+
+        // Create new inventory item
+        const newItem: AdminInventoryItem = {
+          id: inventory.length > 0 ? Math.max(...inventory.map(i => i.id)) + 1 + newItems.length : 1 + newItems.length,
+          partName: data.partName,
+          sku: data.sku,
+          partCode: data.partCode || undefined,
+          category: data.category || "",
+          quantity: data.quantity || "0",
+          price: data.price ? (data.price.includes("₹") ? data.price : `₹${data.price}`) : "₹0",
+          status: data.status || "In Stock",
+          centerName: center.name,
+          centerId: data.centerId,
+        };
+
+        newItems.push(newItem);
+        success++;
+      }
+
+      // Add all new items to inventory
+      if (newItems.length > 0) {
+        const updated = [...inventory, ...newItems];
+        setInventory(updated);
+        if (typeof window !== 'undefined') {
+          safeStorage.setItem('inventoryData', updated);
+        }
+      }
+
+      setUploadProgress({ success, failed, errors });
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Failed to process file. Please check the file format and try again.");
+      setUploadProgress({ success: 0, failed: 0, errors: ["Failed to process file"] });
+    }
+  };
+
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        "Part Name": "Example Part",
+        "SKU": "SKU001",
+        "Part Code": "PC001",
+        "Category": "Electronics",
+        "Quantity": "100",
+        "Price": "450",
+        "Status": "In Stock",
+        "Service Center": "1"
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+    XLSX.writeFile(wb, "inventory_template.xlsx");
+  };
+
   return (
     <div className="min-h-screen bg-white p-4 sm:p-6 md:p-8">
       {/* Header */}
@@ -326,26 +492,39 @@ export default function InventoryPage() {
           </div>
         </div>
         
-        <button
-          onClick={() => {
-            setEditingItem(null);
-            setForm({
-              partName: "",
-              sku: "",
-              category: "",
-              quantity: "",
-              price: "",
-              status: "In Stock",
-              centerId: "",
-              partCode: "",
-            });
-            setShowAddForm(true);
-          }}
-          className="w-full sm:w-auto bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm sm:text-base"
-        >
-          <Plus size={18} />
-          Add Part
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => {
+              setEditingItem(null);
+              setForm({
+                partName: "",
+                sku: "",
+                category: "",
+                quantity: "",
+                price: "",
+                status: "In Stock",
+                centerId: "",
+                partCode: "",
+              });
+              setShowAddForm(true);
+            }}
+            className="w-full sm:w-auto bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 text-sm sm:text-base"
+          >
+            <Plus size={18} />
+            Add Part
+          </button>
+          <button
+            onClick={() => {
+              setShowUploadModal(true);
+              setUploadFile(null);
+              setUploadProgress(null);
+            }}
+            className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm sm:text-base"
+          >
+            <Upload size={18} />
+            Bulk Upload
+          </button>
+        </div>
       </div>
 
       {/* Inventory Table - Hidden on mobile, shown on sm and above */}
@@ -514,7 +693,7 @@ export default function InventoryPage() {
 
       {/* Add/Edit Form Modal */}
       {showAddForm && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-800">
@@ -643,9 +822,131 @@ export default function InventoryPage() {
         </div>
       )}
 
+      {/* Bulk Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">Bulk Upload Inventory</h2>
+              <button
+                className="text-gray-500 hover:text-gray-700"
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setUploadFile(null);
+                  setUploadProgress(null);
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                  <FileSpreadsheet size={20} />
+                  Instructions
+                </h3>
+                <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                  <li>Download the template file to see the required format</li>
+                  <li>Required columns: Part Name, SKU, Service Center</li>
+                  <li>Optional columns: Part Code, Category, Quantity, Price, Status</li>
+                  <li>Service Center should be the Service Center ID (number)</li>
+                  <li>Supported formats: .xlsx, .xls, .csv</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={downloadTemplate}
+                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition flex items-center justify-center gap-2 text-sm"
+                >
+                  <Download size={18} />
+                  Download Template
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Excel File (.xlsx, .xls, .csv)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileUpload}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                  {uploadFile && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <CheckCircle size={18} className="text-green-600" />
+                      {uploadFile.name}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {uploadProgress && (
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold text-gray-900 mb-3">Upload Results</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="text-green-600" size={20} />
+                      <span className="text-sm text-gray-700">
+                        Successfully uploaded: <strong>{uploadProgress.success}</strong> items
+                      </span>
+                    </div>
+                    {uploadProgress.failed > 0 && (
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="text-red-600" size={20} />
+                        <span className="text-sm text-gray-700">
+                          Failed: <strong>{uploadProgress.failed}</strong> items
+                        </span>
+                      </div>
+                    )}
+                    {uploadProgress.errors.length > 0 && (
+                      <div className="mt-3 max-h-40 overflow-y-auto">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Errors:</p>
+                        <ul className="text-xs text-red-600 space-y-1 list-disc list-inside bg-red-50 p-3 rounded">
+                          {uploadProgress.errors.slice(0, 10).map((error, idx) => (
+                            <li key={idx}>{error}</li>
+                          ))}
+                          {uploadProgress.errors.length > 10 && (
+                            <li>... and {uploadProgress.errors.length - 10} more errors</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setUploadFile(null);
+                    setUploadProgress(null);
+                  }}
+                  className="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400 transition text-sm"
+                >
+                  {uploadProgress ? "Close" : "Cancel"}
+                </button>
+                <button
+                  onClick={handleExcelUpload}
+                  disabled={!uploadFile}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                >
+                  <Upload size={18} />
+                  Upload File
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && itemToDelete && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-4 sm:p-6">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">Confirm Delete</h2>
             <p className="text-gray-600 text-sm sm:text-base mb-4 sm:mb-6">
