@@ -147,3 +147,4 @@ items?.map(item => transform(item)) || []
 3. **Week 3:** Fix customer name and vehicle data issues
 4. **Week 4:** Replace `||` with `??` and improve error handling
 
+

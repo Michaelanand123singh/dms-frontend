@@ -1020,6 +1020,7 @@ export default function CustomerFind() {
                                   if (availableVehicles.length > 0) {
                                     setSelectedVehicle(availableVehicles[0]);
                                     initializeAppointmentForm(customer, availableVehicles[0]);
+                                    setShowVehicleDetails(false); // Ensure vehicle details modal is closed
                                     setShowScheduleAppointment(true);
                                   } else {
                                     // No vehicles - allow scheduling for new vehicle
@@ -1547,6 +1548,7 @@ export default function CustomerFind() {
                             <Button
                               onClick={() => {
                                 setSelectedVehicle(vehicle);
+                                setShowVehicleDetails(false); // Ensure vehicle details modal is closed
                                 setShowScheduleAppointment(true);
                                 initializeAppointmentForm(selectedCustomer, vehicle);
                               }}
@@ -1981,6 +1983,7 @@ export default function CustomerFind() {
                       // If we should open appointment after adding vehicle, do it now
                       if (shouldOpenAppointmentAfterVehicleAdd) {
                         initializeAppointmentForm(updatedCustomer, newVehicle);
+                        setShowVehicleDetails(false); // Ensure vehicle details modal is closed
                         setShowScheduleAppointment(true);
                         setShouldOpenAppointmentAfterVehicleAdd(false);
                       }
@@ -2150,6 +2153,7 @@ export default function CustomerFind() {
                     </h3>
                     <Button
                       onClick={() => {
+                        // Close vehicle details modal first, then open appointment modal
                         setShowVehicleDetails(false);
                         setShowScheduleAppointment(true);
                         initializeAppointmentForm(selectedCustomer, selectedVehicle);
@@ -2319,7 +2323,7 @@ export default function CustomerFind() {
         )}
 
         {/* Schedule Appointment Modal */}
-        {showScheduleAppointment && selectedVehicle && selectedCustomer && (
+        {showScheduleAppointment && selectedVehicle && selectedCustomer && !showVehicleDetails && (
           <Modal title="Schedule Appointment" onClose={closeAppointmentForm} maxWidth="max-w-3xl">
             <div className="p-6 space-y-6">
                 {canAccessCustomerType && (
@@ -2469,7 +2473,16 @@ export default function CustomerFind() {
                         required
                         value={appointmentForm.vehicle}
                         onChange={(e) => {
-                          setAppointmentForm({ ...appointmentForm, vehicle: e.target.value });
+                          const selectedVehicleValue = e.target.value;
+                          // Find the vehicle object that matches the selected value
+                          const vehicleObj = selectedCustomer.vehicles?.find((v) => 
+                            `${v.vehicleMake} ${v.vehicleModel} (${v.vehicleYear})` === selectedVehicleValue
+                          );
+                          // Update both appointment form and selected vehicle state
+                          setAppointmentForm({ ...appointmentForm, vehicle: selectedVehicleValue });
+                          if (vehicleObj) {
+                            setSelectedVehicle(vehicleObj);
+                          }
                           if (appointmentFieldErrors.vehicle) {
                             setAppointmentFieldErrors({ ...appointmentFieldErrors, vehicle: "" });
                           }
