@@ -1,10 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { stockUpdateHistoryService } from "@/services/inventory/stockUpdateHistory.service";
+import { stockUpdateHistoryService } from "@/features/inventory/services/stockUpdateHistory.service";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Package, TrendingDown, Clock, User, FileText } from "lucide-react";
-import type { StockUpdateHistory } from "@/services/inventory/stockUpdateHistory.service";
+import type { StockUpdateHistory } from "@/features/inventory/services/stockUpdateHistory.service";
 
 export default function PartsStockUpdatePage() {
   const [updates, setUpdates] = useState<StockUpdateHistory[]>([]);

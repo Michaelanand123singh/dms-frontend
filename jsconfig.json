@@ -1,7 +1,42 @@
 {
   "compilerOptions": {
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@/components/*": [
+        "./src/shared/components/*"
+      ],
+      "@/features/*": [
+        "./src/features/*"
+      ],
+      "@/shared/*": [
+        "./src/shared/*"
+      ],
+      "@/core/*": [
+        "./src/core/*"
+      ],
+      "@/hooks/*": [
+        "./src/shared/hooks/*"
+      ],
+      "@/utils/*": [
+        "./src/shared/utils/*"
+      ],
+      "@/types/*": [
+        "./src/shared/types/*"
+      ],
+      "@/constants/*": [
+        "./src/shared/constants/*"
+      ],
+      "@/lib/*": [
+        "./src/lib/*"
+      ],
+      "@/contexts/*": [
+        "./src/core/contexts/*"
+      ],
+      "@/config/*": [
+        "./src/config/*"
+      ]
     }
   }
 }

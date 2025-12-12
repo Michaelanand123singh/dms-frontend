@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { adminApprovalService } from "@/services/central-inventory/adminApproval.service";
-import { invoiceService } from "@/services/central-inventory/invoice.service";
+import { adminApprovalService } from "@/features/inventory/services/adminApproval.service";
+import { invoiceService } from "@/features/inventory/services/invoice.service";
 import { useToast } from "@/contexts/ToastContext";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

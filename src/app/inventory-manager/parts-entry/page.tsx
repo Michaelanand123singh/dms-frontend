@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { PlusCircle, Trash2, FileText, Calendar, Building2 } from "lucide-react";
-import { partsEntryService, type PartsEntry } from "@/services/inventory/partsEntry.service";
-import { partsMasterService } from "@/services/inventory/partsMaster.service";
+import { partsEntryService, type PartsEntry } from "@/features/inventory/services/partsEntry.service";
+import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import type { Part } from "@/shared/types/inventory.types";
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 

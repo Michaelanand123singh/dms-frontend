@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { partsMasterService } from "@/services/inventory/partsMaster.service";
+import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";

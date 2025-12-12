@@ -34,8 +34,8 @@ import {
   engineers as engineersList,
   type Engineer,
 } from "@/__mocks__/data/job-cards.mock";
-import { jobCardPartsRequestService } from "@/services/inventory/jobCardPartsRequest.service";
-import { partsMasterService } from "@/services/inventory/partsMaster.service";
+import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
+import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import { parseJobCardLinesToPart2, jobCardPart2ToJSON } from "@/shared/utils/jobCardData.util";
 import type { JobCardPart2Item } from "@/shared/types/job-card.types";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";

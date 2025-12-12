@@ -2,12 +2,12 @@
  * Customer Service - Business logic layer for customer operations
  */
 
-import { apiClient, mockApiClient, ApiError } from "@/lib/api";
+import { apiClient, mockApiClient, ApiError } from "@/core/api";
 import { API_ENDPOINTS } from "@/config/api.config";
 import { customerRepository } from "@/__mocks__/repositories/customer.repository";
 import { API_CONFIG } from "@/config/api.config";
 import type { CustomerWithVehicles, NewCustomerForm, CustomerSearchType } from "@/shared/types";
-import type { ApiRequestConfig } from "@/lib/api/types";
+import type { ApiRequestConfig } from "@/core/api";
 
 class CustomerService {
   private useMock: boolean;
@@ -133,12 +133,12 @@ class CustomerService {
       return customer;
     }
     const response = await apiClient.post<CustomerWithVehicles>(API_ENDPOINTS.CUSTOMERS, data);
-    
+
     // Add to recent if using mock
     if (this.useMock && response.data.id) {
       await customerRepository.addToRecent(response.data.id);
     }
-    
+
     return response.data;
   }
 

@@ -2,8 +2,8 @@
  * Utility functions for creating parts requests from job cards
  */
 
-import { jobCardPartsRequestService } from "@/services/inventory/jobCardPartsRequest.service";
-import { partsMasterService } from "@/services/inventory/partsMaster.service";
+import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
+import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import type { JobCard } from "@/shared/types/job-card.types";
 
 /**

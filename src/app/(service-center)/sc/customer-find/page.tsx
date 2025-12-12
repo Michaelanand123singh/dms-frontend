@@ -32,7 +32,7 @@ import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { canCreateCustomer } from "@/shared/constants/roles";
 import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
 import { useCustomerSearch, useCreateCustomer } from "../../../../hooks/api";
-import { customerService } from "@/services/customers";
+import { customerService } from "@/features/customers/services/customer.service";
 import type {
   CustomerSearchType,
   CustomerWithVehicles,

@@ -5,7 +5,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { customerService } from "@/services/customers";
+import { customerService } from "@/features/customers/services/customer.service";
 import type { CustomerWithVehicles, NewCustomerForm, CustomerSearchType } from "@/shared/types";
 import { getErrorMessage } from "@/lib/api";
 

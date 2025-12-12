@@ -2,11 +2,11 @@
  * Job Card Service - Business logic layer for job card operations
  */
 
-import { apiClient, mockApiClient, ApiError } from "@/lib/api";
+import { apiClient, mockApiClient, ApiError } from "@/core/api";
 import { API_ENDPOINTS } from "@/config/api.config";
 import { API_CONFIG } from "@/config/api.config";
 import type { JobCard } from "@/shared/types/job-card.types";
-import type { ApiRequestConfig } from "@/lib/api/types";
+import type { ApiRequestConfig } from "@/core/api";
 
 class JobCardService {
   private useMock: boolean;

@@ -27,13 +27,16 @@
         "./src/*"
       ],
       "@/components/*": [
-        "./src/components/*"
+        "./src/shared/components/*"
       ],
       "@/features/*": [
         "./src/features/*"
       ],
       "@/shared/*": [
         "./src/shared/*"
+      ],
+      "@/core/*": [
+        "./src/core/*"
       ],
       "@/hooks/*": [
         "./src/shared/hooks/*"
@@ -54,7 +57,7 @@
         "./src/shared/lib/*"
       ],
       "@/contexts/*": [
-        "./src/contexts/*"
+        "./src/core/contexts/*"
       ],
       "@/config/*": [
         "./src/config/*"

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { jobCardPartsRequestService } from "@/services/inventory/jobCardPartsRequest.service";
+import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
 import { useRole } from "@/shared/hooks";
 import { useToast } from "@/contexts/ToastContext";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";

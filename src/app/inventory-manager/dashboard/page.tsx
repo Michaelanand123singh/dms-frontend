@@ -20,8 +20,8 @@ import { StatsCard } from "@/components/data-display/StatsCard";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { usePartsApproval } from "@/shared/hooks/usePartsApproval";
-import { partsMasterService } from "@/services/inventory/partsMaster.service";
-import { jobCardPartsRequestService } from "@/services/inventory/jobCardPartsRequest.service";
+import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
+import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import type { InventoryStats, Part } from "@/shared/types/inventory.types";
 import type { JobCardPartsRequest } from "@/shared/types/jobcard-inventory.types";
@@ -66,7 +66,7 @@ export default function InventoryManagerDashboard() {
           .slice(0, 5);
 
         // Count recent entries (last 7 days) - check parts entries
-        const { partsEntryService } = await import("@/services/inventory/partsEntry.service");
+        const { partsEntryService } = await import("@/features/inventory/services/partsEntry.service");
         const recentEntriesData = await partsEntryService.getRecent(10);
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);

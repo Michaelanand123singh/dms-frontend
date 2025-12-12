@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, startTransition } from "react";
-import { partsMasterService } from "@/services/inventory/partsMaster.service";
-import { partsOrderService, type PartsOrder } from "@/services/inventory/partsOrder.service";
+import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
+import { partsOrderService, type PartsOrder } from "@/features/inventory/services/partsOrder.service";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";

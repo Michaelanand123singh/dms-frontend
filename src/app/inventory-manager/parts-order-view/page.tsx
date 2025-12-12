@@ -4,7 +4,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { FileText, CheckCircle, Clock, XCircle, Package, TrendingUp } from "lucide-react";
-import { partsOrderService, type PartsOrder } from "@/services/inventory/partsOrder.service";
+import { partsOrderService, type PartsOrder } from "@/features/inventory/services/partsOrder.service";
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 
 export default function PartsOrderViewPage() {

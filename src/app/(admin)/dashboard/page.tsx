@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type { DashboardCard, Alert, QuickAction } from "@/shared/types";
 import { dashboardData, centres } from "@/__mocks__/data/dashboard.mock";
-import { adminApprovalService } from "@/services/central-inventory/adminApproval.service";
+import { adminApprovalService } from "@/features/inventory/services/adminApproval.service";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { PartsIssue } from "@/shared/types/central-inventory.types";
