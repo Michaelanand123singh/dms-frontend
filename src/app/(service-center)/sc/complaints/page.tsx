@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   AlertCircle,
   Search,
@@ -18,13 +18,37 @@ import {
   Wrench,
   FileText,
   Clock,
+  Building2,
 } from "lucide-react";
 import { defaultComplaints, type Complaint } from "@/__mocks__/data/complaints.mock";
 import { useCustomerSearch } from "../../../../hooks/api";
 import type { CustomerWithVehicles } from "@/shared/types";
 import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
+import { useRole } from "@/shared/hooks";
+import { formatVehicleString } from "../components/shared/vehicle-utils";
+import { findNearestServiceCenter } from "../components/appointment/types";
 
 type FilterType = "all" | "open" | "resolved" | "closed";
+
+interface ComplaintForm {
+  customerName: string;
+  vehicle: string;
+  phone: string;
+  complaint: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  serviceCenterId?: number;
+}
+
+const INITIAL_COMPLAINT_FORM: ComplaintForm = {
+  customerName: "",
+  vehicle: "",
+  phone: "",
+  complaint: "",
+  severity: "Medium",
+  serviceCenterId: undefined,
+};
 
 // Reusable Modal Component
 const Modal = ({
@@ -172,6 +196,9 @@ const Button = ({
 };
 
 export default function Complaints() {
+  const { userRole } = useRole();
+  const isCallCenter = userRole === "call_center";
+
   const [filter, setFilter] = useState<FilterType>("all");
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
@@ -182,10 +209,37 @@ export default function Complaints() {
   const [resolutionNote, setResolutionNote] = useState<string>("");
   const [isResolving, setIsResolving] = useState<boolean>(false);
 
-  // Use mock data from __mocks__ folder
-  const complaints: Complaint[] = defaultComplaints;
+  // Complaint creation form states
+  const [showComplaintModal, setShowComplaintModal] = useState<boolean>(false);
+  const [complaintForm, setComplaintForm] = useState<ComplaintForm>(INITIAL_COMPLAINT_FORM);
+  const [complaintCustomerSearchQuery, setComplaintCustomerSearchQuery] = useState<string>("");
+  const [showComplaintCustomerDropdown, setShowComplaintCustomerDropdown] = useState<boolean>(false);
+  const [selectedComplaintCustomer, setSelectedComplaintCustomer] = useState<CustomerWithVehicles | null>(null);
+  const complaintCustomerDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Customer search hook
+  // Service centers for complaint assignment
+  const [availableServiceCenters] = useState(() => {
+    return defaultServiceCenters.filter((sc) => sc.status === "Active");
+  });
+
+  // Load complaints from storage or use default
+  const [complaints, setComplaints] = useState<Complaint[]>(() => {
+    if (typeof window !== "undefined") {
+      const storedComplaints = safeStorage.getItem<Complaint[]>("complaints", []);
+      return storedComplaints.length > 0 ? storedComplaints : defaultComplaints;
+    }
+    return defaultComplaints;
+  });
+
+  // Customer search hook for complaint form
+  const customerSearch = useCustomerSearch();
+  const customerSearchResults: CustomerWithVehicles[] = customerSearch.results as CustomerWithVehicles[];
+  const typedCustomerSearchResults = customerSearchResults as CustomerWithVehicles[];
+  const customerSearchLoading = customerSearch.loading;
+  const searchCustomer = customerSearch.search;
+  const clearCustomerSearch = customerSearch.clear;
+
+  // Customer search hook for complaint resolution
   const { results: searchResults, loading: searchLoading, search: performSearch, clear: clearSearch } =
     useCustomerSearch();
 
@@ -215,6 +269,145 @@ export default function Complaints() {
       return () => cancelAnimationFrame(rafId);
     }
   }, [searchResults, selectedComplaint, selectedCustomer]);
+
+  // Complaint form handlers
+  const resetComplaintForm = useCallback(() => {
+    setComplaintForm(INITIAL_COMPLAINT_FORM);
+    setComplaintCustomerSearchQuery("");
+    setSelectedComplaintCustomer(null);
+    setShowComplaintCustomerDropdown(false);
+    clearCustomerSearch();
+  }, [clearCustomerSearch]);
+
+  const closeComplaintModal = useCallback(() => {
+    setShowComplaintModal(false);
+    resetComplaintForm();
+  }, [resetComplaintForm]);
+
+  const handleComplaintCustomerSearchChange = useCallback(
+    (value: string) => {
+      setComplaintCustomerSearchQuery(value);
+      setComplaintForm((prev) => ({ ...prev, customerName: value }));
+
+      if (value.trim().length >= 2) {
+        searchCustomer(value, "name");
+        setShowComplaintCustomerDropdown(true);
+      } else {
+        clearCustomerSearch();
+        setShowComplaintCustomerDropdown(false);
+        setSelectedComplaintCustomer(null);
+        setComplaintForm((prev) => ({
+          ...prev,
+          customerName: value,
+          phone: "",
+          vehicle: "",
+        }));
+      }
+    },
+    [searchCustomer, clearCustomerSearch]
+  );
+
+  const handleComplaintCustomerSelect = useCallback(
+    (customer: CustomerWithVehicles) => {
+      setSelectedComplaintCustomer(customer);
+      setComplaintCustomerSearchQuery(customer.name);
+      setShowComplaintCustomerDropdown(false);
+      clearCustomerSearch();
+
+      const firstVehicle =
+        customer.vehicles && customer.vehicles.length > 0 ? formatVehicleString(customer.vehicles[0]) : "";
+
+      // Auto-suggest nearest service center for call center users
+      let suggestedServiceCenterId: number | undefined = undefined;
+      if (isCallCenter && customer.address) {
+        const nearestId = findNearestServiceCenter(customer.address);
+        if (nearestId) {
+          suggestedServiceCenterId = nearestId;
+        }
+      }
+
+      setComplaintForm((prev) => ({
+        ...prev,
+        customerName: customer.name,
+        phone: customer.phone,
+        vehicle: firstVehicle,
+        serviceCenterId: suggestedServiceCenterId,
+      }));
+    },
+    [clearCustomerSearch, isCallCenter]
+  );
+
+  const handleSubmitComplaint = useCallback(() => {
+    if (!complaintForm.customerName || !complaintForm.phone || !complaintForm.vehicle || !complaintForm.complaint) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+
+    if (!/^\d{10}$/.test(complaintForm.phone)) {
+      alert("Please enter a valid 10-digit phone number.");
+      return;
+    }
+
+    if (isCallCenter && !complaintForm.serviceCenterId) {
+      alert("Please select a service center to assign this complaint.");
+      return;
+    }
+
+    // Get service center name if service center is selected
+    const selectedServiceCenter = complaintForm.serviceCenterId
+      ? availableServiceCenters.find((sc) => sc.id === complaintForm.serviceCenterId)
+      : null;
+
+    // Generate complaint ID
+    const maxId = complaints.length > 0 
+      ? Math.max(...complaints.map((c) => {
+          const numId = parseInt(c.id.replace("COMP-", ""), 10);
+          return isNaN(numId) ? 0 : numId;
+        }))
+      : 0;
+    const newId = `COMP-${String(maxId + 1).padStart(3, "0")}`;
+
+    const newComplaint: Complaint = {
+      id: newId,
+      customerName: complaintForm.customerName,
+      vehicle: complaintForm.vehicle,
+      phone: complaintForm.phone,
+      complaint: complaintForm.complaint,
+      severity: complaintForm.severity,
+      status: "Open",
+      date: new Date().toISOString().split("T")[0],
+      serviceCenterId: complaintForm.serviceCenterId?.toString(),
+      serviceCenterName: selectedServiceCenter?.name,
+    };
+
+    const updatedComplaints = [...complaints, newComplaint];
+    setComplaints(updatedComplaints);
+    safeStorage.setItem("complaints", updatedComplaints);
+
+    const successMessage = selectedServiceCenter
+      ? `Complaint created successfully and assigned to ${selectedServiceCenter.name}!`
+      : "Complaint created successfully!";
+    alert(successMessage);
+
+    closeComplaintModal();
+  }, [complaintForm, complaints, isCallCenter, availableServiceCenters, closeComplaintModal]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (complaintCustomerDropdownRef.current && !complaintCustomerDropdownRef.current.contains(event.target as Node)) {
+        setShowComplaintCustomerDropdown(false);
+      }
+    };
+
+    if (showComplaintCustomerDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showComplaintCustomerDropdown]);
 
   // Handle complaint resolution
   const handleResolveComplaint = useCallback(async () => {
@@ -247,8 +440,24 @@ export default function Complaints() {
     <div className="bg-[#f9f9fb] min-h-screen pt-20 px-4 sm:px-6 lg:px-8 pb-10">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-blue-600 mb-2">Complaints</h1>
-          <p className="text-gray-500">Manage and resolve customer complaints</p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-blue-600 mb-2">Complaints</h1>
+              <p className="text-gray-500">Manage and resolve customer complaints</p>
+            </div>
+            {isCallCenter && (
+              <button
+                onClick={() => {
+                  setShowComplaintModal(true);
+                  resetComplaintForm();
+                }}
+                className="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
+              >
+                <AlertTriangle size={20} />
+                Create Complaint
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Filter Tabs */}
@@ -756,6 +965,292 @@ export default function Complaints() {
                 ) : (
                   <p className="text-gray-500 text-center py-8">No service history found</p>
                 )}
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Create Complaint Modal */}
+        {isCallCenter && showComplaintModal && (
+          <Modal
+            title="Create Complaint"
+            onClose={closeComplaintModal}
+            maxWidth="max-w-2xl"
+          >
+            <div className="space-y-4">
+              {/* Customer Information */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="relative" ref={complaintCustomerDropdownRef}>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Customer Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={complaintCustomerSearchQuery}
+                        onChange={(e) => handleComplaintCustomerSearchChange(e.target.value)}
+                        onFocus={() => {
+                          if (complaintCustomerSearchQuery.trim().length >= 2 && customerSearchResults.length > 0) {
+                            setShowComplaintCustomerDropdown(true);
+                          }
+                        }}
+                        placeholder="Start typing customer name..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                        required
+                      />
+                      {showComplaintCustomerDropdown && customerSearchResults.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {typedCustomerSearchResults.map((customer) => (
+                            <div
+                              key={customer.id}
+                              onClick={() => handleComplaintCustomerSelect(customer)}
+                              className="p-3 hover:bg-red-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="p-1.5 rounded-lg bg-red-100">
+                                  <User className="text-red-600" size={16} strokeWidth={2} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-gray-900 truncate">{customer.name}</p>
+                                  <div className="flex items-center gap-3 text-xs text-gray-600 mt-1">
+                                    <span className="flex items-center gap-1">
+                                      <Phone size={12} />
+                                      {customer.phone}
+                                    </span>
+                                    {customer.vehicles && customer.vehicles.length > 0 && (
+                                      <span className="flex items-center gap-1">
+                                        <Car size={12} />
+                                        {customer.vehicles.length} vehicle{customer.vehicles.length > 1 ? "s" : ""}
+                                      </span>
+                                    )}
+                                    {customer.lastServiceCenterName && (
+                                      <span className="flex items-center gap-1">
+                                        <Building2 size={12} />
+                                        {customer.lastServiceCenterName}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {selectedComplaintCustomer?.id === customer.id && (
+                                  <CheckCircle className="text-red-600 shrink-0" size={18} strokeWidth={2} />
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {customerSearchLoading && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={complaintForm.phone}
+                      onChange={(e) =>
+                        setComplaintForm({ ...complaintForm, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })
+                      }
+                      placeholder="9876543210"
+                      maxLength={10}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vehicle <span className="text-red-500">*</span>
+                    </label>
+                    {selectedComplaintCustomer && selectedComplaintCustomer.vehicles && selectedComplaintCustomer.vehicles.length > 0 ? (
+                      <div>
+                        <select
+                          value={complaintForm.vehicle}
+                          onChange={(e) => setComplaintForm({ ...complaintForm, vehicle: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                          required
+                        >
+                          <option value="">Select Vehicle</option>
+                          {selectedComplaintCustomer.vehicles.map((vehicle) => (
+                            <option key={vehicle.id} value={formatVehicleString(vehicle)}>
+                              {formatVehicleString(vehicle)} - {vehicle.registration}
+                            </option>
+                          ))}
+                        </select>
+                        {complaintForm.vehicle && (() => {
+                          const selectedVehicle = selectedComplaintCustomer.vehicles.find((v) =>
+                            formatVehicleString(v) === complaintForm.vehicle
+                          );
+                          return selectedVehicle?.lastServiceCenterName ? (
+                            <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                              <Building2 size={12} />
+                              Last serviced at: {selectedVehicle.lastServiceCenterName}
+                            </p>
+                          ) : null;
+                        })()}
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={complaintForm.vehicle}
+                        onChange={(e) => setComplaintForm({ ...complaintForm, vehicle: e.target.value })}
+                        placeholder={selectedComplaintCustomer ? "No vehicles found" : "Select a customer first"}
+                        disabled={!selectedComplaintCustomer}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                        required
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Selected Customer Info Display */}
+                {selectedComplaintCustomer && (
+                  <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-red-900 mb-3">Selected Customer Information</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-red-600 font-medium">Customer Number</p>
+                        <p className="text-gray-800 font-semibold">{selectedComplaintCustomer.customerNumber}</p>
+                      </div>
+                      {selectedComplaintCustomer.email && (
+                        <div>
+                          <p className="text-red-600 font-medium">Email</p>
+                          <p className="text-gray-800 font-semibold">{selectedComplaintCustomer.email}</p>
+                        </div>
+                      )}
+                      {selectedComplaintCustomer.address && (
+                        <div className="sm:col-span-2">
+                          <p className="text-red-600 font-medium">Address</p>
+                          <p className="text-gray-800 font-semibold">{selectedComplaintCustomer.address}</p>
+                        </div>
+                      )}
+                      {selectedComplaintCustomer.lastServiceCenterName && (
+                        <div className="sm:col-span-2">
+                          <p className="text-red-600 font-medium flex items-center gap-1">
+                            <Building2 size={14} />
+                            Last Service Center
+                          </p>
+                          <p className="text-gray-800 font-semibold">{selectedComplaintCustomer.lastServiceCenterName}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Complaint Details */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Complaint Details</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Complaint Description <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={complaintForm.complaint}
+                      onChange={(e) => setComplaintForm({ ...complaintForm, complaint: e.target.value })}
+                      rows={4}
+                      placeholder="Describe the complaint in detail..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none resize-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Severity <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={complaintForm.severity}
+                      onChange={(e) => setComplaintForm({ ...complaintForm, severity: e.target.value as ComplaintForm["severity"] })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
+                      required
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Service Center Selection (for Call Center) */}
+              {isCallCenter && (
+                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <Building2 className="text-indigo-600" size={20} />
+                    Service Center Assignment
+                  </h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Assign to Service Center <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={complaintForm.serviceCenterId || ""}
+                        onChange={(e) =>
+                          setComplaintForm({
+                            ...complaintForm,
+                            serviceCenterId: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+                        required
+                      >
+                        <option value="">Select Service Center</option>
+                        {availableServiceCenters.map((center) => (
+                          <option key={center.id} value={center.id}>
+                            {center.name} - {center.location}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {selectedComplaintCustomer?.address && complaintForm.serviceCenterId && (
+                      <div className="bg-white border border-indigo-200 rounded-lg p-3 flex items-start gap-3">
+                        <MapPin className="text-indigo-600 shrink-0 mt-0.5" size={18} strokeWidth={2} />
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-indigo-700 mb-1">Nearest Service Center Suggested</p>
+                          <p className="text-sm text-gray-700">
+                            Based on customer address: <span className="font-medium">{selectedComplaintCustomer.address}</span>
+                          </p>
+                          {(() => {
+                            const suggestedId = findNearestServiceCenter(selectedComplaintCustomer.address);
+                            const isSuggested = suggestedId === complaintForm.serviceCenterId;
+                            return isSuggested ? (
+                              <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                                <CheckCircle size={12} />
+                                This is the nearest service center to the customer
+                              </p>
+                            ) : (
+                              <p className="text-xs text-amber-600 mt-1">
+                                Note: A different service center may be closer to the customer
+                              </p>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button onClick={closeComplaintModal} className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitComplaint}
+                  className="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+                >
+                  Create Complaint
+                </button>
               </div>
             </div>
           </Modal>

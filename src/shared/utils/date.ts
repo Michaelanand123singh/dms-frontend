@@ -77,3 +77,47 @@ export function getDaysDifference(date1: Date | string, date2: Date | string): n
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * Get current time in HH:mm format (24-hour)
+ * @returns Current time as string in HH:mm format
+ */
+export function getCurrentTime(): string {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+/**
+ * Get current date in YYYY-MM-DD format
+ * @returns Current date as string in ISO date format
+ */
+export function getCurrentDate(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+/**
+ * Get minimum time for a date picker (current time if today, undefined for future dates)
+ * @param selectedDate - Date string in YYYY-MM-DD format
+ * @returns Minimum time string in HH:mm format or undefined
+ */
+export function getMinTime(selectedDate: string): string | undefined {
+  if (isToday(selectedDate)) {
+    return getCurrentTime();
+  }
+  return undefined; // No restriction for future dates
+}
+
+/**
+ * Format 24-hour time string to 12-hour format with AM/PM
+ * @param time24 - Time string in HH:mm format (24-hour)
+ * @returns Formatted time string in hh:mm AM/PM format
+ */
+export function formatTime24(time24: string): string {
+  const [hours, minutes] = time24.split(":");
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+}
+

@@ -20,34 +20,14 @@ import { findNearestServiceCenter } from "@/app/(service-center)/sc/components/a
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import type { AppointmentForm as AppointmentFormType } from "@/app/(service-center)/sc/components/appointment/types";
 import { INITIAL_APPOINTMENT_FORM } from "@/app/(service-center)/sc/components/appointment/types";
-
-// Helper functions
-const getCurrentTime = (): string => {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
-};
-
-const getCurrentDate = (): string => {
-  return new Date().toISOString().split("T")[0];
-};
-
-const isToday = (dateString: string): boolean => {
-  return dateString === getCurrentDate();
-};
-
-const getMinTime = (selectedDate: string): string | undefined => {
-  if (isToday(selectedDate)) {
-    return getCurrentTime();
-  }
-  return undefined;
-};
-
-const validatePhone = (phone: string): boolean => {
-  const cleaned = phone.replace(/[\s-+]/g, "").replace(/^91/, "");
-  return cleaned.length === 10 && /^\d{10}$/.test(cleaned);
-};
+import {
+  getCurrentTime,
+  getCurrentDate,
+  isToday,
+  getMinTime,
+} from "@/shared/utils/date";
+import { validatePhone } from "@/shared/utils/validation";
+import { getInitialAppointmentForm } from "@/shared/utils/form.utils";
 
 export interface AppointmentFormProps {
   initialData?: Partial<AppointmentFormType>;
@@ -108,12 +88,9 @@ export const AppointmentForm = ({
   const canViewCostEstimation = canAccessEstimatedCost || isInventoryManager;
 
   // Form state
-  const [formData, setFormData] = useState<AppointmentFormType>(() => ({
-    ...INITIAL_APPOINTMENT_FORM,
-    date: getCurrentDate(),
-    time: getCurrentTime(),
-    ...initialData,
-  }));
+  const [formData, setFormData] = useState<AppointmentFormType>(() =>
+    getInitialAppointmentForm(initialData)
+  );
 
   // Local state for UI
   const [pickupAddressDifferent, setPickupAddressDifferent] = useState(false);
