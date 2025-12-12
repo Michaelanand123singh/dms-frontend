@@ -18,7 +18,7 @@
 
 ### ✅ Phase 2: Refactor AppointmentForm.tsx (100% Complete)
 **Files Modified**:
-- `src/components/shared/appointment-form/AppointmentForm.tsx` - Refactored to use shared utilities
+- `src/app/(service-center)/sc/components/appointment/AppointmentForm.tsx` - Refactored to use shared utilities
 
 **Lines Removed**: ~50 lines of duplicate code
 **Status**: ✅ Complete and tested
@@ -66,7 +66,7 @@
 - `src/app/(service-center)/sc/customer-find/components/modals/CustomerDetailsModal.tsx` - Created (~200 lines)
 - `src/app/(service-center)/sc/customer-find/components/modals/AddVehicleFormModal.tsx` - Created (~250 lines)
 - `src/app/(service-center)/sc/customer-find/components/modals/VehicleDetailsModal.tsx` - Created (~200 lines)
-- `src/app/(service-center)/sc/customer-find/components/modals/AppointmentFormModal.tsx` - Created (~80 lines)
+- `src/app/(service-center)/sc/components/appointment/AppointmentFormModal.tsx` - Created (~80 lines)
 - `src/app/(service-center)/sc/customer-find/components/modals/ComplaintsModal.tsx` - Created (~70 lines)
 
 **Total Lines**: ~1070 lines extracted

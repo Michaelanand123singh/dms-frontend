@@ -17,7 +17,7 @@
 ---
 
 ### Phase 2: Refactor AppointmentForm.tsx (COMPLETE)
-**Location**: `src/components/shared/appointment-form/AppointmentForm.tsx`
+**Location**: `src/app/(service-center)/sc/components/appointment/AppointmentForm.tsx`
 
 - ✅ Removed duplicate helper functions (`getCurrentTime`, `getCurrentDate`, `isToday`, `getMinTime`, `validatePhone`)
 - ✅ Updated to use shared utilities from `@/shared/utils`

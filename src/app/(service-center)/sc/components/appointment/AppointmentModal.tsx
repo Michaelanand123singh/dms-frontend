@@ -1,16 +1,10 @@
 "use client";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useCustomerSearch } from "../../../../../hooks/api";
-import { Modal } from "../shared/FormElements";
-import { CustomerInfoCard } from "../shared/InfoComponents";
-import { formatVehicleString } from "../shared/vehicle-utils";
-import {
-  Appointment,
-  AppointmentForm,
-  INITIAL_APPOINTMENT_FORM,
-} from "../appointment/types";
+import { useCustomerSearch } from "@/app/(service-center)/sc/components/customers";
+import { Modal, CustomerInfoCard, formatVehicleString } from "../shared";
+import { Appointment, AppointmentForm, INITIAL_APPOINTMENT_FORM } from "./types";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
-import { AppointmentForm as SharedAppointmentForm } from "@/components/shared/appointment-form";
+import { AppointmentForm as SharedAppointmentForm } from "./AppointmentForm";
 
 interface AppointmentModalProps {
   open: boolean;

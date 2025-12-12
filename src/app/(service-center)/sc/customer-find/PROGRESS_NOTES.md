@@ -163,7 +163,7 @@
 - `src/shared/utils/date.ts` - Extended
 - `src/shared/utils/validation.ts` - Extended
 - `src/shared/utils/index.ts` - Updated exports
-- `src/components/shared/appointment-form/AppointmentForm.tsx` - Refactored
+- `src/app/(service-center)/sc/components/appointment/AppointmentForm.tsx` - Refactored
 - `src/app/(service-center)/sc/customer-find/page.tsx` - Needs refactoring (Phase 8)
 
 ---

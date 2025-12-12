@@ -22,8 +22,8 @@ import {
 } from "lucide-react";
 import { useRole } from "@/shared/hooks";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
-import { useCustomerSearch } from "../../../../hooks/api";
+import { getServiceCenterContext, staticServiceCenters } from "@/app/(service-center)/sc/components/service-center";
+import { useCustomerSearch } from "@/app/(service-center)/sc/components/customers";
 import { canCreateCustomer } from "@/shared/constants/roles";
 import type {
   CustomerSearchType,
@@ -37,13 +37,11 @@ import type {
 import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
 import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
 import { mockCustomers } from "@/__mocks__/data/customers.mock";
-import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import { validatePhone, validateEmail, validateVIN, cleanPhone } from "@/shared/utils/validation";
-import { formatVehicleString } from "../components/shared/vehicle-utils";
-import type { Appointment } from "../components/appointment/types";
-import type { AppointmentForm as AppointmentFormType } from "../components/appointment/types";
-import { getInitialAppointmentForm } from "@/shared/utils/form.utils";
-import { formatTime24 as formatTime } from "@/shared/utils/date";
+import { formatVehicleString } from "../components/shared";
+import type { Appointment } from "@/app/(service-center)/sc/components/appointment/types";
+import type { AppointmentForm as AppointmentFormType } from "@/app/(service-center)/sc/components/appointment/types";
+import { getInitialAppointmentForm, formatTime } from "@/app/(service-center)/sc/components/appointment/utils";
 import { detectSearchType, getSearchTypeLabel } from "./utils/search.utils";
 // Extracted Hooks
 import {
@@ -71,7 +69,7 @@ import {
 } from "./components";
 
 // Extracted Shared Components
-import { Button } from "../components/shared/Button";
+import { Button } from "../components/shared";
 
 
 
@@ -220,7 +218,7 @@ export default function CustomerFind() {
   const filteredSearchResults = useMemo(() => {
     if (!shouldFilterByServiceCenter || searchResults.length === 0) return searchResults;
     return searchResults.filter(
-      (customer) => Number(customer.serviceCenterId) === Number(serviceCenterFilterId)
+      (customer: CustomerWithVehicles) => Number(customer.serviceCenterId) === Number(serviceCenterFilterId)
     );
   }, [searchResults, shouldFilterByServiceCenter, serviceCenterFilterId]);
   

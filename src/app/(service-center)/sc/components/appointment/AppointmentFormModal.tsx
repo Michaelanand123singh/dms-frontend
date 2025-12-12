@@ -3,13 +3,12 @@
  * Wrapper around shared AppointmentForm component
  */
 
-import { Modal } from "../../../components/shared/FormElements";
-import { AppointmentForm } from "@/components/shared/appointment-form/AppointmentForm";
-import { CustomerInfoCard } from "../../../components/shared/InfoComponents";
-import { FormInput } from "../../../components/shared/FormElements";
+import { Modal, FormInput } from "../shared";
+import { AppointmentForm } from "./AppointmentForm";
+import { CustomerInfoCard } from "../shared";
 import { Car } from "lucide-react";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
-import type { AppointmentForm as AppointmentFormType } from "../../../components/appointment/types";
+import type { AppointmentForm as AppointmentFormType } from "./types";
 
 export interface AppointmentFormModalProps {
   isOpen: boolean;

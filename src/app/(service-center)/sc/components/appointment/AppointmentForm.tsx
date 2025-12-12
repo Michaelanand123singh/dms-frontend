@@ -11,15 +11,14 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useRole } from "@/shared/hooks";
-import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
+import { defaultServiceCenters } from "../service-center";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 import { INDIAN_STATES, getCitiesByState } from "@/shared/constants/indian-states-cities";
-import { FormInput, FormSelect } from "@/app/(service-center)/sc/components/shared/FormElements";
-import { formatVehicleString } from "@/app/(service-center)/sc/components/shared/vehicle-utils";
-import { findNearestServiceCenter } from "@/app/(service-center)/sc/components/appointment/types";
+import { FormInput, FormSelect, formatVehicleString } from "../shared";
+import { findNearestServiceCenter } from "./types";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
-import type { AppointmentForm as AppointmentFormType } from "@/app/(service-center)/sc/components/appointment/types";
-import { INITIAL_APPOINTMENT_FORM } from "@/app/(service-center)/sc/components/appointment/types";
+import type { AppointmentForm as AppointmentFormType } from "./types";
+import { INITIAL_APPOINTMENT_FORM } from "./types";
 import {
   getCurrentTime,
   getCurrentDate,
@@ -27,7 +26,7 @@ import {
   getMinTime,
 } from "@/shared/utils/date";
 import { validatePhone } from "@/shared/utils/validation";
-import { getInitialAppointmentForm } from "@/shared/utils/form.utils";
+import { getInitialAppointmentForm } from "./utils";
 
 export interface AppointmentFormProps {
   initialData?: Partial<AppointmentFormType>;

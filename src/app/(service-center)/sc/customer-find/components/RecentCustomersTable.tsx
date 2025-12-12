@@ -5,7 +5,7 @@
 import { Clock, Phone, Mail, Car, Calendar } from "lucide-react";
 import { Button } from "../../components/shared/Button";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
-import type { AppointmentForm as AppointmentFormType } from "../../components/appointment/types";
+import type { AppointmentForm as AppointmentFormType } from "@/app/(service-center)/sc/components/appointment/types";
 
 export interface RecentCustomersTableProps {
   recentCustomers: CustomerWithVehicles[];

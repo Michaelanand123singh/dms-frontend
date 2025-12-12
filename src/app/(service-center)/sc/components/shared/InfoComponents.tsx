@@ -27,7 +27,7 @@ export const InfoCard = ({
     </div>
     <div>
       <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className="text-sm font-semibold text-gray-900 mt-0.5">{value}</p>
+      <div className="text-sm font-semibold text-gray-900 mt-0.5">{value}</div>
     </div>
   </div>
 );

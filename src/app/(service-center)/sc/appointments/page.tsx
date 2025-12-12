@@ -4,8 +4,8 @@ import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "rea
 import Image from "next/image";
 import { Calendar, Clock, User, Car, X, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2, UserCheck, Camera, Mail } from "lucide-react";
 import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
-import CameraModal from "../components/shared/CameraModal";
-import { useCustomerSearch } from "../../../../hooks/api";
+import { CameraModal } from "../components/shared";
+import { useCustomerSearch } from "@/app/(service-center)/sc/components/customers";
 import { useRole } from "@/shared/hooks";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -21,18 +21,17 @@ import {
   filterByServiceCenter,
   getServiceCenterContext,
   shouldFilterByServiceCenter,
-} from "@/shared/lib/serviceCenter";
+  staticServiceCenters,
+} from "@/app/(service-center)/sc/components/service-center";
 import { defaultJobCards } from "@/__mocks__/data/job-cards.mock";
-import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
 import { populateJobCardPart1, createEmptyJobCardPart1, generateSrNoForPart2Items, createEmptyJobCardPart2A } from "@/shared/utils/jobCardData.util";
 import { customerService } from "@/features/customers/services/customer.service";
 import type { JobCardPart2Item } from "@/shared/types/job-card.types";
-import { AppointmentFormModal } from "../customer-find/components/modals/AppointmentFormModal";
+import { AppointmentFormModal } from "../components/appointment/AppointmentFormModal";
 import type { AppointmentForm as AppointmentFormType } from "../components/appointment/types";
-import { getInitialAppointmentForm } from "@/shared/utils/form.utils";
-import { formatTime24 as formatTime } from "@/shared/utils/date";
+import { getInitialAppointmentForm, formatTime } from "../components/appointment/utils";
 import { canCreateAppointment } from "@/shared/constants/roles";
 
 // ==================== Types ====================
