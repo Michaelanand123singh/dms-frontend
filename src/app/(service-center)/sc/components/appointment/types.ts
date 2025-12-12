@@ -33,7 +33,13 @@ export interface Appointment {
   assignedTechnician?: string;
   pickupDropRequired?: boolean;
   pickupAddress?: string;
+  pickupState?: string;
+  pickupCity?: string;
+  pickupPincode?: string;
   dropAddress?: string;
+  dropState?: string;
+  dropCity?: string;
+  dropPincode?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
   paymentMethod?: "Cash" | "Card" | "UPI" | "Online" | "Cheque";
   gstRequirement?: boolean;
@@ -74,7 +80,13 @@ export interface AppointmentForm {
   assignedTechnician?: string;
   pickupDropRequired?: boolean;
   pickupAddress?: string;
+  pickupState?: string;
+  pickupCity?: string;
+  pickupPincode?: string;
   dropAddress?: string;
+  dropState?: string;
+  dropCity?: string;
+  dropPincode?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
   paymentMethod?: "Cash" | "Card" | "UPI" | "Online" | "Cheque";
   gstRequirement?: boolean;
@@ -82,6 +94,7 @@ export interface AppointmentForm {
   feedbackRating?: number;
   nextServiceDueDate?: string;
   amcSubscriptionStatus?: string;
+  serviceStatus?: string; // Post-Service Feedback: Service Status (Pending, In Service, Ready for Delivery, Delivered, Cancelled)
 }
 
 export const INITIAL_DOCUMENTATION_FILES: DocumentationFiles = {
@@ -115,7 +128,13 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   assignedTechnician: undefined,
   pickupDropRequired: undefined,
   pickupAddress: undefined,
+  pickupState: undefined,
+  pickupCity: undefined,
+  pickupPincode: undefined,
   dropAddress: undefined,
+  dropState: undefined,
+  dropCity: undefined,
+  dropPincode: undefined,
   preferredCommunicationMode: undefined,
   paymentMethod: undefined,
   gstRequirement: undefined,
@@ -123,6 +142,7 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   feedbackRating: undefined,
   nextServiceDueDate: undefined,
   amcSubscriptionStatus: undefined,
+  serviceStatus: undefined,
 };
 
 export const DEFAULT_MAX_APPOINTMENTS_PER_DAY = 20;

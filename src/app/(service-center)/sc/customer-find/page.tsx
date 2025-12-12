@@ -23,6 +23,8 @@ import {
   Upload,
   Trash2,
   Image as ImageIcon,
+  Edit2,
+  X as XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useRole } from "@/shared/hooks";
@@ -53,7 +55,9 @@ import { FormInput, FormSelect, Modal } from "../components/shared/FormElements"
 import { CustomerInfoCard, InfoCard, ErrorAlert } from "../components/shared/InfoComponents";
 import { formatVehicleString } from "../components/shared/vehicle-utils";
 import { AppointmentModal } from "../components/appointment/AppointmentModal";
-import type { Appointment, AppointmentForm } from "../components/appointment/types";
+import type { Appointment, AppointmentForm as AppointmentFormType } from "../components/appointment/types";
+import { INITIAL_APPOINTMENT_FORM } from "../components/appointment/types";
+import { AppointmentForm } from "@/components/shared/appointment-form";
 
 // Initial form states (constants for reuse)
 const initialCustomerForm: NewCustomerForm = {
@@ -121,54 +125,13 @@ const getMinTime = (selectedDate: string): string | undefined => {
   return undefined; // No restriction for future dates
 };
 
-const initialAppointmentForm = {
-  customerName: "",
-  phone: "",
-  vehicle: "",
-  serviceType: "",
+// Use canonical INITIAL_APPOINTMENT_FORM from types file
+// Local state will extend it with date/time defaults
+const getInitialAppointmentForm = () => ({
+  ...INITIAL_APPOINTMENT_FORM,
   date: new Date().toISOString().split("T")[0],
   time: getCurrentTime(),
-  duration: "2",
-  // Customer Information
-  customerType: undefined as "B2C" | "B2B" | undefined,
-  alternateMobile: undefined as string | undefined,
-  // Service Details
-  customerComplaintIssue: undefined as string | undefined,
-  previousServiceHistory: undefined as string | undefined,
-  estimatedServiceTime: undefined as string | undefined,
-  estimatedCost: undefined as string | undefined,
-  estimationCost: undefined as string | undefined,
-  odometerReading: undefined as string | undefined,
-  // Documentation
-  customerIdProof: undefined as DocumentationFiles | undefined,
-  vehicleRCCopy: undefined as DocumentationFiles | undefined,
-  warrantyCardServiceBook: undefined as DocumentationFiles | undefined,
-  photosVideos: undefined as DocumentationFiles | undefined,
-  // Operational Details
-  estimatedDeliveryDate: undefined as string | undefined,
-  assignedServiceAdvisor: undefined as string | undefined,
-  assignedTechnician: undefined as string | undefined,
-  pickupDropRequired: undefined as boolean | undefined,
-  pickupAddress: undefined as string | undefined,
-  pickupState: undefined as string | undefined,
-  pickupCity: undefined as string | undefined,
-  pickupPincode: undefined as string | undefined,
-  dropAddress: undefined as string | undefined,
-  dropState: undefined as string | undefined,
-  dropCity: undefined as string | undefined,
-  dropPincode: undefined as string | undefined,
-  preferredCommunicationMode: undefined as "Phone" | "Email" | "SMS" | "WhatsApp" | undefined,
-  assignedServiceCenter: undefined as string | undefined,
-  // Billing & Payment
-  paymentMethod: undefined as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | undefined,
-  gstRequirement: undefined as boolean | undefined,
-  businessNameForInvoice: undefined as string | undefined,
-  // Post-Service Survey
-  serviceStatus: undefined as string | undefined,
-  feedbackRating: undefined as number | undefined,
-  nextServiceDueDate: undefined as string | undefined,
-  amcSubscriptionStatus: undefined as string | undefined,
-};
+});
 
 const formatTime = (time24: string): string => {
   const [hours, minutes] = time24.split(":");
@@ -304,6 +267,7 @@ export default function CustomerFind() {
   const [showComplaints, setShowComplaints] = useState<boolean>(false);
   const [shouldOpenAppointmentAfterVehicleAdd, setShouldOpenAppointmentAfterVehicleAdd] = useState<boolean>(false);
   const [serviceHistory, setServiceHistory] = useState<ServiceHistoryItem[]>([]);
+  const [editingFeedbackRating, setEditingFeedbackRating] = useState<number | string | null>(null);
   const [validationError, setValidationError] = useState<string>("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [appointmentFieldErrors, setAppointmentFieldErrors] = useState<Record<string, string>>({});
@@ -451,10 +415,9 @@ export default function CustomerFind() {
   const [newVehicleForm, setNewVehicleForm] = useState<Partial<NewVehicleForm>>(initialVehicleForm);
 
   // Form state for scheduling appointment
-  const [appointmentForm, setAppointmentForm] = useState(() => ({
-    ...initialAppointmentForm,
-    date: new Date().toISOString().split("T")[0],
-  }));
+  const [appointmentForm, setAppointmentForm] = useState<Partial<AppointmentFormType>>(() => 
+    getInitialAppointmentForm()
+  );
 
   const handleAssignNearestCenter = useCallback(() => {
     const nearest = getNearestServiceCenter();
@@ -576,7 +539,7 @@ export default function CustomerFind() {
   }, [setNewVehicleForm]);
 
   const resetAppointmentForm = useCallback(() => {
-    setAppointmentForm({ ...initialAppointmentForm, date: new Date().toISOString().split("T")[0], time: getCurrentTime() });
+    setAppointmentForm(getInitialAppointmentForm());
     setPickupState("");
     setPickupCity("");
     setDropState("");
@@ -585,18 +548,30 @@ export default function CustomerFind() {
     setDropSameAsPickup(false);
   }, [setAppointmentForm]);
 
-  // Helper to initialize appointment form with customer and vehicle data
-  const initializeAppointmentForm = useCallback((customer: CustomerWithVehicles, vehicle: Vehicle) => {
+  // Helper to initialize appointment form with customer and optional vehicle data
+  const initializeAppointmentForm = useCallback((customer: CustomerWithVehicles, vehicle?: Vehicle | null) => {
+    const vehicleString = vehicle 
+      ? `${vehicle.vehicleMake} ${vehicle.vehicleModel} (${vehicle.vehicleYear})`
+      : (customer.vehicles && customer.vehicles.length > 0
+          ? formatVehicleString(customer.vehicles[0])
+          : "");
+    
     setAppointmentForm({
-      ...initialAppointmentForm,
+      ...getInitialAppointmentForm(),
       customerName: customer.name,
       phone: customer.phone,
-      vehicle: `${vehicle.vehicleMake} ${vehicle.vehicleModel} (${vehicle.vehicleYear})`,
+      vehicle: vehicleString,
       serviceType: "",
-      date: new Date().toISOString().split("T")[0],
-      time: getCurrentTime(),
-      duration: "2",
     });
+    
+    // Set selected vehicle if provided, otherwise set first vehicle if available
+    if (vehicle) {
+      setSelectedVehicle(vehicle);
+    } else if (customer.vehicles && customer.vehicles.length > 0) {
+      setSelectedVehicle(customer.vehicles[0]);
+    } else {
+      setSelectedVehicle(null);
+    }
   }, [setAppointmentForm]);
 
   // Modal close handlers
@@ -614,6 +589,105 @@ export default function CustomerFind() {
     setShouldOpenAppointmentAfterVehicleAdd(false);
   }, [resetVehicleForm]);
 
+  // Function to enrich service history with feedback ratings from appointments
+  const enrichServiceHistoryWithFeedbackRatings = useCallback((
+    serviceHistory: ServiceHistoryItem[],
+    vehicle: Vehicle,
+    customer: CustomerWithVehicles | null
+  ): ServiceHistoryItem[] => {
+    if (!customer || typeof window === "undefined") return serviceHistory;
+
+    try {
+      const appointments = safeStorage.getItem<Appointment[]>("appointments", []);
+      const vehicleString = formatVehicleString(vehicle);
+
+      // Match appointments to service history items by date and vehicle
+      return serviceHistory.map((service) => {
+        // Find matching appointment by date and vehicle
+        const matchingAppointment = appointments.find((apt) => {
+          const appointmentDate = apt.date?.split("T")[0] || apt.date;
+          const serviceDate = service.date;
+          const vehicleMatches = apt.vehicle === vehicleString || 
+                                 apt.vehicle?.includes(vehicle.vehicleMake) ||
+                                 apt.vehicle?.includes(vehicle.vehicleModel);
+          
+          return appointmentDate === serviceDate && vehicleMatches && 
+                 apt.customerName === customer.name &&
+                 apt.feedbackRating !== undefined && apt.feedbackRating !== null;
+        });
+
+        if (matchingAppointment?.feedbackRating) {
+          return {
+            ...service,
+            feedbackRating: matchingAppointment.feedbackRating,
+          };
+        }
+
+        return service;
+      });
+    } catch (error) {
+      console.error("Error enriching service history with feedback ratings:", error);
+      return serviceHistory;
+    }
+  }, []);
+
+  // Function to update feedback rating for a service
+  const handleUpdateFeedbackRating = useCallback((
+    service: ServiceHistoryItem,
+    newRating: number
+  ) => {
+    if (!selectedCustomer || !selectedVehicle || typeof window === "undefined") return;
+
+    try {
+      const appointments = safeStorage.getItem<Appointment[]>("appointments", []);
+      const vehicleString = formatVehicleString(selectedVehicle);
+
+      // Find matching appointment by date and vehicle
+      const matchingAppointmentIndex = appointments.findIndex((apt) => {
+        const appointmentDate = apt.date?.split("T")[0] || apt.date;
+        const serviceDate = service.date;
+        const vehicleMatches = apt.vehicle === vehicleString || 
+                               apt.vehicle?.includes(selectedVehicle.vehicleMake) ||
+                               apt.vehicle?.includes(selectedVehicle.vehicleModel);
+        
+        return appointmentDate === serviceDate && vehicleMatches && 
+               apt.customerName === selectedCustomer.name;
+      });
+
+      if (matchingAppointmentIndex !== -1) {
+        // Update the appointment's feedback rating
+        const updatedAppointments = [...appointments];
+        updatedAppointments[matchingAppointmentIndex] = {
+          ...updatedAppointments[matchingAppointmentIndex],
+          feedbackRating: newRating,
+        };
+        safeStorage.setItem("appointments", updatedAppointments);
+
+        // Update the service history display
+        setServiceHistory((prev) =>
+          prev.map((s) =>
+            s.id === service.id ? { ...s, feedbackRating: newRating } : s
+          )
+        );
+
+        showToast(`Feedback rating updated to ${newRating} stars`, "success");
+      } else {
+        // If no matching appointment found, still update the display
+        setServiceHistory((prev) =>
+          prev.map((s) =>
+            s.id === service.id ? { ...s, feedbackRating: newRating } : s
+          )
+        );
+        showToast(`Feedback rating updated to ${newRating} stars`, "success");
+      }
+
+      setEditingFeedbackRating(null);
+    } catch (error) {
+      console.error("Error updating feedback rating:", error);
+      showToast("Failed to update feedback rating", "error");
+    }
+  }, [selectedCustomer, selectedVehicle, showToast]);
+
   const closeAppointmentForm = useCallback(() => {
     // Clean up file URLs before closing
     setAppointmentForm((prev) => {
@@ -629,7 +703,7 @@ export default function CustomerFind() {
       if (prev.photosVideos?.urls) {
         prev.photosVideos.urls.forEach((url) => URL.revokeObjectURL(url));
       }
-      return { ...initialAppointmentForm, date: new Date().toISOString().split("T")[0] };
+      return getInitialAppointmentForm();
     });
     setShowScheduleAppointment(false);
     setValidationError("");
@@ -1080,13 +1154,12 @@ export default function CustomerFind() {
                                   e.stopPropagation();
                                   setSelectedCustomer(customer);
                                   
-                                  // If customer has available vehicles, use the first one
-                                  if (availableVehicles.length > 0) {
-                                    setSelectedVehicle(availableVehicles[0]);
-                                    initializeAppointmentForm(customer, availableVehicles[0]);
+                                  // Initialize appointment form (will use first vehicle if available, or show dropdown for multiple)
+                                  initializeAppointmentForm(customer);
                                     setShowVehicleDetails(false); // Ensure vehicle details modal is closed
                                     setShowScheduleAppointment(true);
-                                  } else {
+                                  
+                                  if (availableVehicles.length === 0) {
                                     // No vehicles - allow scheduling for new vehicle
                                     // First add a vehicle, then schedule
                                     resetVehicleForm();
@@ -1595,7 +1668,14 @@ export default function CustomerFind() {
                               // Only show service history if vehicle has services (totalServices > 0)
                               // Newly added vehicles should have empty service history
                               if (vehicle.totalServices > 0 && vehicle.lastServiceDate) {
-                                setServiceHistory(getMockServiceHistory(vehicle.id));
+                                const baseHistory = getMockServiceHistory(vehicle.id);
+                                // Enrich service history with feedback ratings from appointments
+                                const enrichedHistory = enrichServiceHistoryWithFeedbackRatings(
+                                  baseHistory,
+                                  vehicle,
+                                  selectedCustomer
+                                );
+                                setServiceHistory(enrichedHistory);
                               } else {
                                 setServiceHistory([]);
                               }
@@ -2260,6 +2340,73 @@ export default function CustomerFind() {
                                   Service Center: <span className="font-medium">{service.serviceCenterName}</span>
                                 </p>
                               )}
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-sm text-gray-600 font-medium">Feedback Rating:</span>
+                                {editingFeedbackRating === service.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
+                                      {[1, 2, 3, 4, 5].map((star) => {
+                                        const currentRating = service.feedbackRating || 0;
+                                        return (
+                                          <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => handleUpdateFeedbackRating(service, star)}
+                                            className={`text-xl transition-all hover:scale-110 ${
+                                              star <= currentRating
+                                                ? "text-yellow-400"
+                                                : "text-gray-300"
+                                            }`}
+                                            title={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                                          >
+                                            ★
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    <span className="text-sm text-gray-600">
+                                      ({service.feedbackRating || 0}/5)
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingFeedbackRating(null)}
+                                      className="text-gray-400 hover:text-gray-600 transition"
+                                      title="Cancel editing"
+                                    >
+                                      <XIcon size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <span
+                                          key={star}
+                                          className={`text-lg ${
+                                            star <= (service.feedbackRating || 0)
+                                              ? "text-yellow-400"
+                                              : "text-gray-300"
+                                          }`}
+                                        >
+                                          ★
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <span className="text-sm text-gray-600">
+                                      ({service.feedbackRating || 0}/5)
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingFeedbackRating(service.id)}
+                                      className="ml-2 text-indigo-600 hover:text-indigo-700 transition flex items-center gap-1 text-xs"
+                                      title="Edit feedback rating"
+                                    >
+                                      <Edit2 size={14} />
+                                      <span>Edit</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                               <div className="flex flex-wrap gap-2">
                                 {service.parts.map((part, idx) => (
                                   <span
@@ -2297,97 +2444,14 @@ export default function CustomerFind() {
                   ) : (
                     <p className="text-gray-500 text-center py-8">No service history found</p>
                   )}
-                  {canAccessPostServiceSurvey && serviceHistory.length > 0 && (
-                    <div className="bg-teal-50 p-4 rounded-lg border border-teal-200 mt-6">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <CheckCircle className="text-teal-600" size={20} />
-                        Post-Service Feedback
-                      </h3>
-                      <div className="space-y-4">
-                        {canAccessServiceStatus && (
-                          <FormSelect
-                            label="Service Status"
-                            value={appointmentForm.serviceStatus || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, serviceStatus: e.target.value })}
-                            placeholder="Select service status"
-                            options={[
-                              { value: "Pending", label: "Pending" },
-                              { value: "In Service", label: "In Service" },
-                              { value: "Ready for Delivery", label: "Ready for Delivery" },
-                              { value: "Delivered", label: "Delivered" },
-                              { value: "Cancelled", label: "Cancelled" },
-                            ]}
-                          />
-                        )}
-
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Feedback Rating
-                          </label>
-                          <div className="flex items-center gap-2">
-                            {[1, 2, 3, 4, 5].map((rating) => (
-                              <button
-                                key={rating}
-                                type="button"
-                                onClick={() => setAppointmentForm({ ...appointmentForm, feedbackRating: rating })}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-                                  appointmentForm.feedbackRating === rating
-                                    ? "bg-teal-600 text-white scale-110"
-                                    : "bg-gray-200 text-gray-600 hover:bg-teal-100 hover:text-teal-700"
-                                }`}
-                              >
-                                {rating}
-                              </button>
-                            ))}
-                            {appointmentForm.feedbackRating && (
-                              <span className="text-sm text-gray-600 ml-2">
-                                {appointmentForm.feedbackRating === 5
-                                  ? "Excellent"
-                                  : appointmentForm.feedbackRating === 4
-                                  ? "Very Good"
-                                  : appointmentForm.feedbackRating === 3
-                                  ? "Good"
-                                  : appointmentForm.feedbackRating === 2
-                                  ? "Fair"
-                                  : "Poor"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {canAccessServiceStatus && (
-                          <FormInput
-                            label="Next Service Due Date"
-                            type="date"
-                            value={appointmentForm.nextServiceDueDate || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, nextServiceDueDate: e.target.value })}
-                          />
-                        )}
-
-                        {canAccessAMCStatus && (
-                          <FormSelect
-                            label="AMC / Subscription Status"
-                            value={appointmentForm.amcSubscriptionStatus || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, amcSubscriptionStatus: e.target.value })}
-                            placeholder="Select AMC/Subscription status"
-                            options={[
-                              { value: "Active", label: "Active" },
-                              { value: "Expired", label: "Expired" },
-                              { value: "Not Applicable", label: "Not Applicable" },
-                              { value: "Pending Renewal", label: "Pending Renewal" },
-                            ]}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  {/* Post-Service Survey fields are now handled by SharedAppointmentForm component */}
                 </div>
             </div>
           </Modal>
         )}
 
         {/* Schedule Appointment Modal */}
-        {showScheduleAppointment && selectedVehicle && selectedCustomer && !showVehicleDetails && (
+        {showScheduleAppointment && selectedCustomer && !showVehicleDetails && (
           <Modal title="Schedule Appointment" onClose={closeAppointmentForm} maxWidth="max-w-3xl">
             <div className="p-6 space-y-6">
                 {canAccessCustomerType && (
@@ -2528,848 +2592,64 @@ export default function CustomerFind() {
                   </div>
                 )}
 
-                {/* Appointment Form */}
-                <div className="space-y-4">
-                  <div>
-                    {selectedCustomer && selectedCustomer.vehicles && selectedCustomer.vehicles.length > 1 ? (
-                      <FormSelect
-                        label="Vehicle"
-                        required
-                        value={appointmentForm.vehicle}
-                        onChange={(e) => {
-                          const selectedVehicleValue = e.target.value;
-                          // Find the vehicle object that matches the selected value
-                          const vehicleObj = selectedCustomer.vehicles?.find((v) => 
-                            `${v.vehicleMake} ${v.vehicleModel} (${v.vehicleYear})` === selectedVehicleValue
-                          );
-                          // Update both appointment form and selected vehicle state
-                          setAppointmentForm({ ...appointmentForm, vehicle: selectedVehicleValue });
-                          if (vehicleObj) {
-                            setSelectedVehicle(vehicleObj);
-                          }
-                          if (appointmentFieldErrors.vehicle) {
-                            setAppointmentFieldErrors({ ...appointmentFieldErrors, vehicle: "" });
-                          }
-                        }}
-                        placeholder="Select vehicle"
-                        options={selectedCustomer.vehicles.map((v) => ({
-                          value: `${v.vehicleMake} ${v.vehicleModel} (${v.vehicleYear})`,
-                          label: `${v.vehicleMake} ${v.vehicleModel} (${v.vehicleYear})${v.registration ? ` - ${v.registration}` : ""}`,
-                        }))}
-                        error={appointmentFieldErrors.vehicle}
-                      />
-                    ) : (
-                      <FormInput
-                        label="Vehicle"
-                        required
-                        value={appointmentForm.vehicle}
-                        onChange={() => {}}
-                        readOnly
-                        error={appointmentFieldErrors.vehicle}
-                      />
-                    )}
-                    {selectedCustomer && appointmentForm.vehicle && (() => {
-                      const selectedVehicle = selectedCustomer.vehicles?.find((v) => 
-                        `${v.vehicleMake} ${v.vehicleModel} (${v.vehicleYear})` === appointmentForm.vehicle
-                      );
-                      return selectedVehicle?.lastServiceCenterName ? (
-                        <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
-                          <Building2 size={12} />
-                          Last serviced at: {selectedVehicle.lastServiceCenterName}
-                        </p>
-                      ) : null;
-                    })()}
-                  </div>
-
-                  <FormSelect
-                    label="Service Type"
-                    required
-                    value={appointmentForm.serviceType}
-                    onChange={(e) => {
-                      setAppointmentForm({ ...appointmentForm, serviceType: e.target.value });
-                      if (appointmentFieldErrors.serviceType) {
-                        setAppointmentFieldErrors({ ...appointmentFieldErrors, serviceType: "" });
-                      }
-                    }}
-                    placeholder="Select service type"
-                    options={SERVICE_TYPE_OPTIONS.map((type) => ({ value: type, label: type }))}
-                    error={appointmentFieldErrors.serviceType}
-                  />
-
-                  {canAssignServiceCenter && (
-                    <div className="space-y-2">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <div className="flex-1">
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Service Center</label>
-                          <button
-                            type="button"
-                            onClick={() => setShowServiceCenterSelector(true)}
-                            className="w-full text-left px-4 py-3 rounded-lg border border-gray-300 bg-white hover:border-indigo-500 transition"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-800">
-                                {appointmentForm.assignedServiceCenter
-                                  ? `${appointmentForm.assignedServiceCenter}`
-                                  : "Select a service center"}
-                              </span>
-                              <Search size={16} className="text-gray-400" />
-                            </div>
-                          </button>
-                        </div>
-                        <Button onClick={handleAssignNearestCenter} variant="secondary" size="sm" className="whitespace-nowrap">
-                          Assign Nearest
-                        </Button>
-                      </div>
-                      {appointmentForm.assignedServiceCenter && (
-                        <p className="text-xs text-gray-500">
-                          Selected center: {appointmentForm.assignedServiceCenter}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-
-
-                  {/* Service Details Section */}
-                  {canAccessServiceDetails && (
-                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <FileText className="text-purple-600" size={20} />
-                        Service Details
-                      </h3>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Customer Complaint / Issue Description {isCallCenter && <span className="text-red-500">*</span>}
-                          </label>
-                          <textarea
-                            value={appointmentForm.customerComplaintIssue || ""}
-                            onChange={(e) => {
-                              setAppointmentForm({ ...appointmentForm, customerComplaintIssue: e.target.value });
-                              if (appointmentFieldErrors.customerComplaintIssue) {
-                                setAppointmentFieldErrors({ ...appointmentFieldErrors, customerComplaintIssue: "" });
-                              }
-                            }}
-                            rows={3}
-                            placeholder="Describe the customer complaint or issue..."
-                            className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 resize-none ${
-                              appointmentFieldErrors.customerComplaintIssue 
-                                ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500" 
-                                : "border border-gray-200 focus:ring-purple-500/20 focus:border-purple-500 bg-gray-50/50 focus:bg-white"
-                            }`}
-                            required={isCallCenter}
-                          />
-                          {appointmentFieldErrors.customerComplaintIssue && (
-                            <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
-                              <span className="text-red-500">•</span>
-                              {appointmentFieldErrors.customerComplaintIssue}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Previous Service History
-                          </label>
-                          <textarea
-                            value={appointmentForm.previousServiceHistory || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, previousServiceHistory: e.target.value })}
-                            rows={3}
-                            placeholder="Enter previous service history..."
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white resize-none"
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormInput
-                            label="Estimated Service Time"
-                            value={appointmentForm.estimatedServiceTime || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedServiceTime: e.target.value })}
-                            placeholder="e.g., 2 hours"
-                          />
-                          {canAccessEstimatedCost && (
-                            <FormInput
-                              label="Estimated Cost"
-                              type="number"
-                              value={appointmentForm.estimatedCost || ""}
-                              onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedCost: e.target.value })}
-                              placeholder="Enter estimated cost"
-                            />
-                          )}
-                        </div>
-                        <FormInput
-                          label="Estimation Cost"
-                          value={appointmentForm.estimationCost || ""}
-                          onChange={(e) => setAppointmentForm({ ...appointmentForm, estimationCost: e.target.value })}
-                          placeholder="Enter estimation cost"
-                        />
-                        {canAccessOdometer && (
-                          <FormInput
-                            label="Odometer Reading"
-                            type="number"
-                            value={appointmentForm.odometerReading || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, odometerReading: e.target.value })}
-                            placeholder="Enter odometer reading"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Documentation Section */}
-                  {(hasDocUploadAccess || hasDropoffMediaAccess) && (
-                    <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <Upload className="text-amber-600" size={20} />
-                        Documentation
-                      </h3>
-                      <div className="space-y-4">
-                        {hasDocUploadAccess && (
-                          <>
-                            {/* Customer ID Proof */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Customer ID Proof <span className="text-xs font-normal text-gray-500">(Optional)</span>
-                              </label>
-                              <input
-                                type="file"
-                                multiple
-                                accept="image/*,.pdf"
-                                onChange={(e) => {
-                                  const files = Array.from(e.target.files || []);
-                                  const urls = files.map((file) => URL.createObjectURL(file));
-                                  setAppointmentForm({
-                                    ...appointmentForm,
-                                    customerIdProof: {
-                                      files,
-                                      urls,
-                                    },
-                                  });
-                                }}
-                                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
-                              />
-                              {appointmentForm.customerIdProof?.files && appointmentForm.customerIdProof.files.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {appointmentForm.customerIdProof.files.map((file, index) => (
-                                    <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                      {file.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Vehicle RC Copy */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Vehicle RC Copy <span className="text-xs font-normal text-gray-500">(Optional)</span>
-                              </label>
-                              <input
-                                type="file"
-                                multiple
-                                accept="image/*,.pdf"
-                                onChange={(e) => {
-                                  const files = Array.from(e.target.files || []);
-                                  const urls = files.map((file) => URL.createObjectURL(file));
-                                  setAppointmentForm({
-                                    ...appointmentForm,
-                                    vehicleRCCopy: {
-                                      files,
-                                      urls,
-                                    },
-                                  });
-                                }}
-                                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
-                              />
-                              {appointmentForm.vehicleRCCopy?.files && appointmentForm.vehicleRCCopy.files.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {appointmentForm.vehicleRCCopy.files.map((file, index) => (
-                                    <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                      {file.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Warranty Card / Service Book */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Warranty Card / Service Book
-                              </label>
-                              <input
-                                type="file"
-                                multiple
-                                accept="image/*,.pdf"
-                                onChange={(e) => {
-                                  const files = Array.from(e.target.files || []);
-                                  const urls = files.map((file) => URL.createObjectURL(file));
-                                  setAppointmentForm({
-                                    ...appointmentForm,
-                                    warrantyCardServiceBook: {
-                                      files,
-                                      urls,
-                                    },
-                                  });
-                                }}
-                                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
-                              />
-                              {appointmentForm.warrantyCardServiceBook?.files && appointmentForm.warrantyCardServiceBook.files.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {appointmentForm.warrantyCardServiceBook.files.map((file, index) => (
-                                    <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                      {file.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </>
-                        )}
-                        {hasDropoffMediaAccess && (
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              Photos/Videos of Vehicle at Drop-off
-                            </label>
-                            <input
-                              type="file"
-                              multiple
-                              accept="image/*,video/*"
-                              onChange={(e) => {
-                                const files = Array.from(e.target.files || []);
-                                const urls = files.map((file) => URL.createObjectURL(file));
-                                setAppointmentForm({
-                                  ...appointmentForm,
-                                  photosVideos: {
-                                    files,
-                                    urls,
-                                  },
-                                });
-                              }}
-                              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none text-gray-900 transition-all duration-200 bg-gray-50/50 focus:bg-white"
-                            />
-                            {appointmentForm.photosVideos?.files && appointmentForm.photosVideos.files.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {appointmentForm.photosVideos.files.map((file, index) => (
-                                  <span key={index} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
-                                    {file.name}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <FormInput
-                        label="Date"
-                        required
-                        type="date"
-                        value={appointmentForm.date}
-                        onChange={(e) => {
-                          const newDate = e.target.value;
-                          // If changing to today and current time is in the past, update time to current time
-                          let updatedTime = appointmentForm.time;
-                          if (isToday(newDate) && appointmentForm.time) {
-                            const currentTime = getCurrentTime();
-                            if (appointmentForm.time < currentTime) {
-                              updatedTime = currentTime;
-                            }
-                          }
-                          setAppointmentForm({ ...appointmentForm, date: newDate, time: updatedTime });
-                          if (appointmentFieldErrors.date) {
-                            setAppointmentFieldErrors({ ...appointmentFieldErrors, date: "" });
-                          }
-                        }}
-                        min={new Date().toISOString().split("T")[0]}
-                        error={appointmentFieldErrors.date}
-                      />
-                    </div>
-                    <FormInput
-                      label="Time"
-                      required
-                      type="time"
-                      value={appointmentForm.time}
-                      onChange={(e) => {
-                        const selectedTime = e.target.value;
-                        // Validate time if date is today
-                        if (appointmentForm.date && isToday(appointmentForm.date)) {
-                          const currentTime = getCurrentTime();
-                          if (selectedTime < currentTime) {
-                            // Don't allow past times for today
-                            return;
-                          }
-                        }
-                        setAppointmentForm({ ...appointmentForm, time: selectedTime });
-                        if (appointmentFieldErrors.time) {
-                          setAppointmentFieldErrors({ ...appointmentFieldErrors, time: "" });
-                        }
-                      }}
-                      min={appointmentForm.date ? getMinTime(appointmentForm.date) : undefined}
-                      error={appointmentFieldErrors.time}
-                    />
-                  </div>
-
-                  {/* Operational Details Section */}
-                  {canAccessOperationalDetails && (
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <Clock className="text-blue-600" size={20} />
-                        Operational Details
-                      </h3>
-                      <div className="space-y-4">
-
-                        {(isServiceAdvisor || isServiceManager) && (
-                          <FormInput
-                            label="Estimated Delivery Date"
-                            type="date"
-                            value={appointmentForm.estimatedDeliveryDate || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, estimatedDeliveryDate: e.target.value })}
-                          />
-                        )}
-
-                        {(isServiceAdvisor || isServiceManager) && (
-                          <FormInput
-                            label="Assigned Service Advisor"
-                            value={appointmentForm.assignedServiceAdvisor || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, assignedServiceAdvisor: e.target.value })}
-                            placeholder="Enter service advisor name"
-                          />
-                        )}
-
-                        {canAssignTechnician && (
-                          <FormInput
-                            label="Assigned Technician"
-                            value={appointmentForm.assignedTechnician || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, assignedTechnician: e.target.value })}
-                            placeholder="Enter technician name"
-                          />
-                        )}
-
-                        {/* Pickup / Drop Required */}
-                        <div className="space-y-3">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={appointmentForm.pickupDropRequired || false}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                setAppointmentForm({
-                                  ...appointmentForm,
-                                  pickupDropRequired: checked,
-                                  ...(checked
-                                    ? {}
-                                    : {
-                                        pickupAddress: undefined,
-                                        pickupState: undefined,
-                                        pickupCity: undefined,
-                                        pickupPincode: undefined,
-                                        dropAddress: undefined,
-                                        dropState: undefined,
-                                        dropCity: undefined,
-                                        dropPincode: undefined,
-                                      }),
-                                });
-                                if (!checked) {
-                                  setPickupAddressDifferent(false);
-                                  setPickupState("");
-                                  setPickupCity("");
-                                  setDropState("");
-                                  setDropCity("");
-                                }
-                              }}
-                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <span className="text-sm font-medium text-gray-700">Pickup / Drop Required</span>
-                          </label>
-
-                          {/* If pickup/drop is required, ask only when address is different */}
-                          {appointmentForm.pickupDropRequired && (
-                            <div className="space-y-3">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={pickupAddressDifferent}
-                                  onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    setPickupAddressDifferent(checked);
-                                    if (!checked) {
-                                      setAppointmentForm({
-                                        ...appointmentForm,
-                                        pickupAddress: undefined,
-                                        pickupState: undefined,
-                                        pickupCity: undefined,
-                                        pickupPincode: undefined,
-                                        dropAddress: undefined,
-                                        dropState: undefined,
-                                        dropCity: undefined,
-                                        dropPincode: undefined,
-                                      });
-                                      setPickupState("");
-                                      setPickupCity("");
-                                      setDropState("");
-                                      setDropCity("");
-                                    }
-                                  }}
-                                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-gray-700">
-                                  Pickup / Drop address is different from customer address
-                                </span>
-                              </label>
-
-                              {pickupAddressDifferent && canAccessPickupAddress && (
-                                <>
-                                  {/* Pickup Address Section */}
-                                  <div className="space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <h4 className="text-md font-semibold text-gray-800 mb-3">Pickup Address</h4>
-                                    <FormInput
-                                      label="Address"
-                                      value={appointmentForm.pickupAddress || ""}
-                                      onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setAppointmentForm({ 
-                                          ...appointmentForm, 
-                                          pickupAddress: newValue,
-                                          ...(dropSameAsPickup ? { dropAddress: newValue } : {})
-                                        });
-                                      }}
-                                      placeholder="Enter full address"
-                                    />
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <FormSelect
-                                        label="State"
-                                        value={pickupState}
-                                        onChange={(e) => {
-                                          const newState = e.target.value;
-                                          setPickupState(newState);
-                                          setPickupCity(""); // Reset city when state changes
-                                          setAppointmentForm({ 
-                                            ...appointmentForm, 
-                                            pickupState: newState, 
-                                            pickupCity: undefined,
-                                            ...(dropSameAsPickup ? { 
-                                              dropState: newState, 
-                                              dropCity: undefined 
-                                            } : {})
-                                          });
-                                          if (dropSameAsPickup) {
-                                            setDropState(newState);
-                                            setDropCity("");
-                                          }
-                                        }}
-                                        placeholder="Select State"
-                                        options={INDIAN_STATES.map((state) => ({ value: state.name, label: state.name }))}
-                                      />
-                                      <FormSelect
-                                        label="City"
-                                        value={pickupCity}
-                                        onChange={(e) => {
-                                          const newCity = e.target.value;
-                                          setPickupCity(newCity);
-                                          setAppointmentForm({ 
-                                            ...appointmentForm, 
-                                            pickupCity: newCity,
-                                            ...(dropSameAsPickup ? { dropCity: newCity } : {})
-                                          });
-                                          if (dropSameAsPickup) {
-                                            setDropCity(newCity);
-                                          }
-                                        }}
-                                        placeholder={pickupState ? "Select City" : "Select State First"}
-                                        options={pickupState ? getCitiesByState(pickupState).map((city) => ({ value: city, label: city })) : []}
-                                        disabled={!pickupState}
-                                      />
-                                    </div>
-                                    <FormInput
-                                      label="Pincode"
-                                      value={appointmentForm.pickupPincode || ""}
-                                      onChange={(e) => {
-                                        const newPincode = e.target.value.replace(/\D/g, "").slice(0, 6);
-                                        setAppointmentForm({ 
-                                          ...appointmentForm, 
-                                          pickupPincode: newPincode,
-                                          ...(dropSameAsPickup ? { dropPincode: newPincode } : {})
-                                        });
-                                      }}
-                                      placeholder="6-digit pincode"
-                                      maxLength={6}
-                                    />
-                                  </div>
-
-                                  {/* Drop Address Section */}
-                                  <div className="space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <div className="flex items-center justify-between mb-3">
-                                      <h4 className="text-md font-semibold text-gray-800">Drop Address</h4>
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={dropSameAsPickup}
-                                          onChange={(e) => {
-                                            const checked = e.target.checked;
-                                            setDropSameAsPickup(checked);
-                                            if (checked) {
-                                              // Copy pickup address to drop address
-                                              setDropState(pickupState);
-                                              setDropCity(pickupCity);
-                                              setAppointmentForm({
-                                                ...appointmentForm,
-                                                dropAddress: appointmentForm.pickupAddress,
-                                                dropState: appointmentForm.pickupState,
-                                                dropCity: appointmentForm.pickupCity,
-                                                dropPincode: appointmentForm.pickupPincode,
-                                              });
-                                            } else {
-                                              // Clear drop address when unchecked
-                                              setDropState("");
-                                              setDropCity("");
-                                              setAppointmentForm({
-                                                ...appointmentForm,
-                                                dropAddress: undefined,
-                                                dropState: undefined,
-                                                dropCity: undefined,
-                                                dropPincode: undefined,
-                                              });
-                                            }
-                                          }}
-                                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                                        />
-                                        <span className="text-sm text-gray-700">Same as pickup address</span>
-                                      </label>
-                                    </div>
-                                    <FormInput
-                                      label="Address"
-                                      value={appointmentForm.dropAddress || ""}
-                                      onChange={(e) =>
-                                        setAppointmentForm({ ...appointmentForm, dropAddress: e.target.value })
-                                      }
-                                      placeholder="Enter full address"
-                                      readOnly={dropSameAsPickup}
-                                    />
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <FormSelect
-                                        label="State"
-                                        value={dropState}
-                                        onChange={(e) => {
-                                          setDropState(e.target.value);
-                                          setDropCity(""); // Reset city when state changes
-                                          setAppointmentForm({ ...appointmentForm, dropState: e.target.value, dropCity: undefined });
-                                        }}
-                                        placeholder="Select State"
-                                        options={INDIAN_STATES.map((state) => ({ value: state.name, label: state.name }))}
-                                        disabled={dropSameAsPickup}
-                                      />
-                                      <FormSelect
-                                        label="City"
-                                        value={dropCity}
-                                        onChange={(e) => {
-                                          setDropCity(e.target.value);
-                                          setAppointmentForm({ ...appointmentForm, dropCity: e.target.value });
-                                        }}
-                                        placeholder={dropState ? "Select City" : "Select State First"}
-                                        options={dropState ? getCitiesByState(dropState).map((city) => ({ value: city, label: city })) : []}
-                                        disabled={!dropState || dropSameAsPickup}
-                                      />
-                                    </div>
-                                    <FormInput
-                                      label="Pincode"
-                                      value={appointmentForm.dropPincode || ""}
-                                      onChange={(e) =>
-                                        setAppointmentForm({ ...appointmentForm, dropPincode: e.target.value.replace(/\D/g, "").slice(0, 6) })
-                                      }
-                                      placeholder="6-digit pincode"
-                                      maxLength={6}
-                                      readOnly={dropSameAsPickup}
-                                    />
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Preferred Communication Mode */}
-                        {canAccessPreferredCommunication && (
-                          <FormSelect
-                            label="Preferred Communication Mode"
-                            value={appointmentForm.preferredCommunicationMode || ""}
-                            onChange={(e) => setAppointmentForm({ ...appointmentForm, preferredCommunicationMode: e.target.value as "Phone" | "Email" | "SMS" | "WhatsApp" | undefined })}
-                            placeholder="Select communication mode"
-                            options={[
-                              { value: "Phone", label: "Phone" },
-                              { value: "Email", label: "Email" },
-                              { value: "SMS", label: "SMS" },
-                              { value: "WhatsApp", label: "WhatsApp" },
-                            ]}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Cost Estimation (Billing & Payment fields removed - only available during invoice creation) */}
-                  {canViewCostEstimation && appointmentForm.estimatedCost && (
-                    <div className="bg-white p-4 rounded-lg border border-gray-200">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <FileText className="text-indigo-600" size={20} />
-                        Cost Estimation
-                      </h3>
-                      <div className="space-y-4">
-                        <FormInput
-                          label="Estimated Cost"
-                          value={appointmentForm.estimatedCost ? `₹${appointmentForm.estimatedCost}` : ""}
-                          onChange={() => {}}
-                          readOnly
-                          placeholder="Cost will be determined during service"
-                        />
-                        <p className="text-xs text-gray-500">
-                          Note: Payment method and billing details will be collected when creating the invoice during vehicle delivery.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
-                {/* Validation Errors at Bottom */}
-                {Object.keys(appointmentFieldErrors).length > 0 && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-sm font-semibold text-red-800 mb-2">Please fill the following mandatory fields:</p>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
-                      {Object.entries(appointmentFieldErrors).map(([field, error]) => (
-                        <li key={field}>{error}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={closeAppointmentForm}
-                    className="flex-1 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Validate form with field-level errors
-                      const errors: Record<string, string> = {};
-                      const missingFields: string[] = [];
-
-                      if (!appointmentForm.customerName?.trim()) {
-                        errors.customerName = "Customer Name is required";
-                        missingFields.push("Customer Name");
-                      }
-
-                      if (!appointmentForm.phone?.trim()) {
-                        errors.phone = "Phone Number is required";
-                        missingFields.push("Phone Number");
-                      } else if (!validatePhone(appointmentForm.phone)) {
-                        errors.phone = "Please enter a valid 10-digit phone number";
-                        missingFields.push("Phone Number (invalid format)");
-                      }
-
-                      if (!appointmentForm.vehicle?.trim()) {
-                        errors.vehicle = "Vehicle is required";
-                        missingFields.push("Vehicle");
-                      }
-
-                      if (!appointmentForm.serviceType?.trim()) {
-                        errors.serviceType = "Service Type is required";
-                        missingFields.push("Service Type");
-                      }
-
-                      if (!appointmentForm.date?.trim()) {
-                        errors.date = "Date is required";
-                        missingFields.push("Date");
-                      }
-
-                      if (!appointmentForm.time?.trim()) {
-                        errors.time = "Time is required";
-                        missingFields.push("Time");
-                      } else if (appointmentForm.date && isToday(appointmentForm.date)) {
-                        // Validate that time is not in the past for today's date
-                        const currentTime = getCurrentTime();
-                        if (appointmentForm.time < currentTime) {
-                          errors.time = "Cannot schedule appointment for a past time on today's date";
-                          missingFields.push("Time");
-                        }
-                      }
-
-                      if (isCallCenter && !appointmentForm.customerComplaintIssue?.trim()) {
-                        errors.customerComplaintIssue = "Customer Complaint / Issue Description is required";
-                        missingFields.push("Customer Complaint / Issue Description");
-                      }
-
-                      setAppointmentFieldErrors(errors);
-
-                      if (Object.keys(errors).length > 0) {
-                        const errorMessage = `Please fill the following mandatory fields: ${missingFields.join(", ")}`;
-                        setValidationError(errorMessage);
-                        return;
-                      }
-
-                      setValidationError("");
-                      setAppointmentFieldErrors({});
-
+                {/* Appointment Form - Using Shared Component */}
+                <AppointmentForm
+                  initialData={appointmentForm}
+                  onSubmit={(form) => {
                       // Map service center name to ID for proper filtering
-                      const selectedServiceCenter = appointmentForm.assignedServiceCenter
-                        ? staticServiceCenters.find((center) => center.name === appointmentForm.assignedServiceCenter)
+                    const selectedServiceCenter = form.serviceCenterName
+                      ? staticServiceCenters.find((center) => center.name === form.serviceCenterName)
                         : null;
                       const serviceCenterId = (selectedServiceCenter as any)?.serviceCenterId || selectedServiceCenter?.id?.toString() || null;
-                      const serviceCenterName = appointmentForm.assignedServiceCenter || null;
+                    const serviceCenterName = form.serviceCenterName || null;
+                    const assignedServiceCenter = form.serviceCenterName || null;
 
                       // Clean up file URLs before saving
                       const appointmentData: any = {
-                        customerName: appointmentForm.customerName,
-                        vehicle: appointmentForm.vehicle,
-                        phone: appointmentForm.phone,
-                        serviceType: appointmentForm.serviceType,
-                        date: appointmentForm.date,
-                        time: formatTime(appointmentForm.time),
-                        duration: `${appointmentForm.duration} hours`,
+                      customerName: form.customerName,
+                      vehicle: form.vehicle,
+                      phone: form.phone,
+                      serviceType: form.serviceType,
+                      date: form.date,
+                      time: formatTime(form.time),
+                      duration: `${form.duration} hours`,
                         status: "Confirmed",
                         customerType: selectedCustomer.customerType,
-                      alternateMobile: appointmentForm.alternateMobile,
-                        customerComplaintIssue: appointmentForm.customerComplaintIssue,
-                        previousServiceHistory: appointmentForm.previousServiceHistory,
-                        estimatedServiceTime: appointmentForm.estimatedServiceTime,
-                        estimatedCost: appointmentForm.estimatedCost,
-                        estimationCost: appointmentForm.estimationCost,
-                        odometerReading: appointmentForm.odometerReading,
-                        estimatedDeliveryDate: appointmentForm.estimatedDeliveryDate,
-                        assignedServiceAdvisor: appointmentForm.assignedServiceAdvisor,
-                        assignedTechnician: appointmentForm.assignedTechnician,
-                        assignedServiceCenter: appointmentForm.assignedServiceCenter,
-                        // Add serviceCenterId and serviceCenterName for proper filtering
+                      alternateMobile: (form as any).alternateMobile,
+                      customerComplaintIssue: form.customerComplaintIssue,
+                      previousServiceHistory: form.previousServiceHistory,
+                      estimatedServiceTime: form.estimatedServiceTime,
+                      estimatedCost: form.estimatedCost,
+                      estimationCost: (form as any).estimationCost,
+                      odometerReading: form.odometerReading,
+                      estimatedDeliveryDate: form.estimatedDeliveryDate,
+                      assignedServiceAdvisor: form.assignedServiceAdvisor,
+                      assignedTechnician: form.assignedTechnician,
+                      assignedServiceCenter: assignedServiceCenter,
                         serviceCenterId: serviceCenterId,
                         serviceCenterName: serviceCenterName,
-                        pickupDropRequired: appointmentForm.pickupDropRequired,
-                        pickupAddress: appointmentForm.pickupAddress,
-                        pickupState: appointmentForm.pickupState,
-                        pickupCity: appointmentForm.pickupCity,
-                        pickupPincode: appointmentForm.pickupPincode,
-                        dropAddress: appointmentForm.dropAddress,
-                        dropState: appointmentForm.dropState,
-                        dropCity: appointmentForm.dropCity,
-                        dropPincode: appointmentForm.dropPincode,
-                        preferredCommunicationMode: appointmentForm.preferredCommunicationMode,
-                        paymentMethod: appointmentForm.paymentMethod,
-                        gstRequirement: appointmentForm.gstRequirement,
-                        businessNameForInvoice: appointmentForm.businessNameForInvoice,
-                      serviceStatus: appointmentForm.serviceStatus,
-                        feedbackRating: appointmentForm.feedbackRating,
-                        nextServiceDueDate: appointmentForm.nextServiceDueDate,
-                        amcSubscriptionStatus: appointmentForm.amcSubscriptionStatus,
-                        // Store file counts and names (in real app, these would be uploaded)
+                      pickupDropRequired: form.pickupDropRequired,
+                      pickupAddress: form.pickupAddress,
+                      pickupState: (form as any).pickupState,
+                      pickupCity: (form as any).pickupCity,
+                      pickupPincode: (form as any).pickupPincode,
+                      dropAddress: form.dropAddress,
+                      dropState: (form as any).dropState,
+                      dropCity: (form as any).dropCity,
+                      dropPincode: (form as any).dropPincode,
+                      preferredCommunicationMode: form.preferredCommunicationMode,
+                      paymentMethod: form.paymentMethod,
+                      gstRequirement: form.gstRequirement,
+                      businessNameForInvoice: form.businessNameForInvoice,
+                      serviceStatus: form.serviceStatus,
+                      feedbackRating: form.feedbackRating,
+                      nextServiceDueDate: form.nextServiceDueDate,
+                      amcSubscriptionStatus: form.amcSubscriptionStatus,
                         documentationFiles: {
-                          customerIdProof: appointmentForm.customerIdProof?.files.length || 0,
-                          vehicleRCCopy: appointmentForm.vehicleRCCopy?.files.length || 0,
-                          warrantyCardServiceBook: appointmentForm.warrantyCardServiceBook?.files.length || 0,
-                          photosVideos: appointmentForm.photosVideos?.files.length || 0,
+                        customerIdProof: form.customerIdProof?.files.length || 0,
+                        vehicleRCCopy: form.vehicleRCCopy?.files.length || 0,
+                        warrantyCardServiceBook: form.warrantyCardServiceBook?.files.length || 0,
+                        photosVideos: form.photosVideos?.files.length || 0,
                         },
                       };
 
@@ -3389,29 +2669,32 @@ export default function CustomerFind() {
                       safeStorage.setItem("appointments", updatedAppointments);
 
                       // Clean up file URLs
-                      if (appointmentForm.customerIdProof?.urls) {
-                        appointmentForm.customerIdProof.urls.forEach((url) => URL.revokeObjectURL(url));
+                    if (form.customerIdProof?.urls) {
+                      form.customerIdProof.urls.forEach((url) => URL.revokeObjectURL(url));
                       }
-                      if (appointmentForm.vehicleRCCopy?.urls) {
-                        appointmentForm.vehicleRCCopy.urls.forEach((url) => URL.revokeObjectURL(url));
+                    if (form.vehicleRCCopy?.urls) {
+                      form.vehicleRCCopy.urls.forEach((url) => URL.revokeObjectURL(url));
                       }
-                      if (appointmentForm.warrantyCardServiceBook?.urls) {
-                        appointmentForm.warrantyCardServiceBook.urls.forEach((url) => URL.revokeObjectURL(url));
+                    if (form.warrantyCardServiceBook?.urls) {
+                      form.warrantyCardServiceBook.urls.forEach((url) => URL.revokeObjectURL(url));
                       }
-                      if (appointmentForm.photosVideos?.urls) {
-                        appointmentForm.photosVideos.urls.forEach((url) => URL.revokeObjectURL(url));
+                    if (form.photosVideos?.urls) {
+                      form.photosVideos.urls.forEach((url) => URL.revokeObjectURL(url));
                       }
 
-                      showToast(`Appointment scheduled successfully! Customer: ${appointmentForm.customerName} | Vehicle: ${appointmentForm.vehicle} | Service: ${appointmentForm.serviceType} | Date: ${appointmentForm.date} | Time: ${formatTime(appointmentForm.time)}`, "success");
+                    showToast(`Appointment scheduled successfully! Customer: ${form.customerName} | Vehicle: ${form.vehicle} | Service: ${form.serviceType} | Date: ${form.date} | Time: ${formatTime(form.time)}`, "success");
 
                       // Close modal and reset form
                       closeAppointmentForm();
                     }}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2.5 rounded-lg font-medium hover:opacity-90 transition text-sm"
-                  >
-                    Schedule Appointment
-                  </button>
-                </div>
+                  onCancel={closeAppointmentForm}
+                  mode="create"
+                  customerInfo={selectedCustomer}
+                  vehicleInfo={selectedVehicle || undefined}
+                  onVehicleChange={(vehicle) => {
+                    setSelectedVehicle(vehicle);
+                  }}
+                />
             </div>
           </Modal>
         )}

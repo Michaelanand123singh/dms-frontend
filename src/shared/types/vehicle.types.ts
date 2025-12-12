@@ -90,6 +90,7 @@ export interface ServiceHistoryItem {
   serviceCenterName?: string; // Service center name
   customerId?: string;
   vehicleId?: string;
+  feedbackRating?: number; // Customer feedback rating (1-5 stars)
 }
 
 export interface NewVehicleForm {

@@ -33,6 +33,7 @@ export const getMockServiceHistory = (vehicleId?: number | string): ExtendedServ
       serviceCenterName: "Delhi Central Hub",
       customerId: "cust-001",
       vehicleId: "veh-001",
+      feedbackRating: 5, // Example feedback rating
     },
     {
       id: 2,
@@ -50,6 +51,7 @@ export const getMockServiceHistory = (vehicleId?: number | string): ExtendedServ
       serviceCenterName: "Mumbai Metroplex",
       customerId: "cust-002",
       vehicleId: "veh-003",
+      feedbackRating: 4, // Example feedback rating
     },
     {
       id: 3,
@@ -67,6 +69,7 @@ export const getMockServiceHistory = (vehicleId?: number | string): ExtendedServ
       serviceCenterName: "Bangalore Innovation Center",
       customerId: "cust-003",
       vehicleId: "veh-004",
+      feedbackRating: 3, // Example feedback rating
     },
   ];
 };

@@ -30,6 +30,13 @@ import type { JobCard } from "@/shared/types/job-card.types";
 import { populateJobCardPart1, createEmptyJobCardPart1, generateSrNoForPart2Items, createEmptyJobCardPart2A } from "@/shared/utils/jobCardData.util";
 import { customerService } from "@/services/customers/customer.service";
 import type { JobCardPart2Item } from "@/shared/types/job-card.types";
+import { AppointmentForm as SharedAppointmentForm } from "@/components/shared/appointment-form";
+import type { AppointmentForm } from "../components/appointment/types";
+import { 
+  INITIAL_APPOINTMENT_FORM,
+  validateAppointmentForm,
+  getMaxAppointmentsPerDay,
+} from "../components/appointment/types";
 
 // ==================== Types ====================
 interface AppointmentRecord {
@@ -75,47 +82,7 @@ interface AppointmentRecord {
   createdByRole?: "call_center" | "service_advisor" | "service_manager"; // Track who created the appointment
 }
 
-interface AppointmentForm {
-  customerName: string;
-  vehicle: string;
-  phone: string;
-  serviceType: string;
-  date: string;
-  time: string;
-  duration: string;
-  serviceCenterId?: number | string;
-  serviceCenterName?: string;
-  // Customer Information
-  customerType?: "B2C" | "B2B";
-  // Service Details
-  customerComplaintIssue?: string;
-  previousServiceHistory?: string;
-  estimatedServiceTime?: string;
-  estimatedCost?: string;
-  odometerReading?: string;
-  // Documentation
-  customerIdProof?: DocumentationFiles;
-  vehicleRCCopy?: DocumentationFiles;
-  warrantyCardServiceBook?: DocumentationFiles;
-  photosVideos?: DocumentationFiles;
-  arrivalMode?: "vehicle_present" | "vehicle_absent";
-  // Operational Details
-  estimatedDeliveryDate?: string;
-  assignedServiceAdvisor?: string;
-  assignedTechnician?: string;
-  pickupDropRequired?: boolean;
-  pickupAddress?: string;
-  dropAddress?: string;
-  preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
-  // Billing & Payment
-  paymentMethod?: "Cash" | "Card" | "UPI" | "Online" | "Cheque";
-  gstRequirement?: boolean;
-  businessNameForInvoice?: string;
-  // Post-Service Survey
-  feedbackRating?: number;
-  nextServiceDueDate?: string;
-  amcSubscriptionStatus?: string;
-}
+// Import AppointmentForm from canonical types - no duplicate interface needed
 
 interface Complaint {
   id: number;
@@ -270,45 +237,7 @@ type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
 type CustomerArrivalStatus = "arrived" | "not_arrived" | null;
 
 // ==================== Constants ====================
-const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
-    customerName: "",
-    vehicle: "",
-    phone: "",
-    serviceType: "",
-    date: new Date().toISOString().split("T")[0],
-    time: "",
-    duration: "2",
-  serviceCenterId: undefined,
-  serviceCenterName: undefined,
-  customerType: undefined,
-  // Service Details
-  customerComplaintIssue: undefined,
-  previousServiceHistory: undefined,
-  estimatedServiceTime: undefined,
-  estimatedCost: undefined,
-  odometerReading: undefined,
-  // Documentation
-  customerIdProof: undefined,
-  vehicleRCCopy: undefined,
-  warrantyCardServiceBook: undefined,
-  photosVideos: undefined,
-  // Operational Details
-  estimatedDeliveryDate: undefined,
-  assignedServiceAdvisor: undefined,
-  assignedTechnician: undefined,
-  pickupDropRequired: undefined,
-  pickupAddress: undefined,
-  dropAddress: undefined,
-  preferredCommunicationMode: undefined,
-  // Billing & Payment
-  paymentMethod: undefined,
-  gstRequirement: undefined,
-  businessNameForInvoice: undefined,
-  // Post-Service Survey
-  feedbackRating: undefined,
-  nextServiceDueDate: undefined,
-  amcSubscriptionStatus: undefined,
-};
+// INITIAL_APPOINTMENT_FORM is now imported from canonical types file
 
 const INITIAL_COMPLAINT_FORM: ComplaintForm = {
   customerName: "",
@@ -415,56 +344,16 @@ const getStatusBadgeClass = (status: string): string => {
   return `px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`;
 };
 
-const validateAppointmentForm = (form: AppointmentForm, isCallCenter: boolean = false): string | null => {
-  if (!form.customerName || !form.phone || !form.vehicle || !form.serviceType || !form.date || !form.time) {
-    return "Please fill in all required fields.";
-  }
-  if (!/^\d{10}$/.test(form.phone)) {
-    return "Please enter a valid 10-digit phone number.";
-  }
-  if (isCallCenter && !form.serviceCenterId) {
-    return "Please select a service center to assign this appointment.";
-  }
-  // If major issue is checked, customer complaint is required
-  return null;
-};
+// validateAppointmentForm is now imported from canonical types file
 
 const getNextAppointmentId = (appointments: AppointmentRecord[]): number => {
   return appointments.length > 0 ? Math.max(...appointments.map((a) => a.id)) + 1 : 1;
 };
 
-/**
- * Get maximum appointments per day for a service center
- * Checks service center settings in localStorage
- */
-const getMaxAppointmentsPerDay = (serviceCenterName: string | null | undefined): number => {
-  if (!serviceCenterName || typeof window === "undefined") {
-    return DEFAULT_MAX_APPOINTMENTS_PER_DAY;
-  }
-
-  try {
-    const storedCenters = safeStorage.getItem<Record<string, any>>("serviceCenters", {});
-    
-    // Find service center by name
-    const center = Object.values(storedCenters).find(
-      (c: any) => c.name === serviceCenterName
-    );
-
-    // Check if maxAppointmentsPerDay is configured
-    if (center && typeof center.maxAppointmentsPerDay === "number" && center.maxAppointmentsPerDay > 0) {
-      return center.maxAppointmentsPerDay;
-    }
-  } catch (error) {
-    console.error("Error reading service center settings:", error);
-  }
-
-  return DEFAULT_MAX_APPOINTMENTS_PER_DAY;
-};
-
-/**
- * Count appointments for a specific date
- */
-const countAppointmentsForDate = (appointments: AppointmentRecord[], date: string): number => {
+// getMaxAppointmentsPerDay and countAppointmentsForDate are now imported from canonical types file
+// Note: countAppointmentsForDate from types uses Appointment[], but we need AppointmentRecord[]
+// So we'll keep a local wrapper for AppointmentRecord[]
+const countAppointmentsForDateLocal = (appointments: AppointmentRecord[], date: string): number => {
   return appointments.filter((apt) => apt.date === date).length;
 };
 
@@ -854,7 +743,7 @@ function AppointmentsContent() {
   const [detailCustomer, setDetailCustomer] = useState<CustomerWithVehicles | null>(null);
   const [currentJobCardId, setCurrentJobCardId] = useState<string | null>(null);
   const [currentJobCard, setCurrentJobCard] = useState<JobCard | null>(null);
-  const [arrivalMode, setArrivalMode] = useState<AppointmentForm["arrivalMode"] | null>(null);
+  const [arrivalMode, setArrivalMode] = useState<ServiceIntakeForm["arrivalMode"] | null>(null);
   const [checkInSlipData, setCheckInSlipData] = useState<any>(null);
   const [showCheckInSlipModal, setShowCheckInSlipModal] = useState<boolean>(false);
   
@@ -1479,7 +1368,7 @@ function AppointmentsContent() {
     };
   }, [selectedAppointment, currentJobCard, serviceIntakeForm, detailCustomer, selectedCustomer, serviceCenterContext]);
 
-  const handleArrivalModeSelect = useCallback((mode: AppointmentForm["arrivalMode"] | null) => {
+  const handleArrivalModeSelect = useCallback((mode: ServiceIntakeForm["arrivalMode"] | null) => {
     if (!selectedAppointment) return;
 
     setArrivalMode(mode);
@@ -1553,7 +1442,7 @@ function AppointmentsContent() {
     // Check maximum appointments per day limit (only for new appointments)
     if (!isEditing) {
       const maxAppointments = getMaxAppointmentsPerDay(serviceCenterName);
-      const appointmentsForDate = countAppointmentsForDate(visibleAppointments, appointmentForm.date);
+      const appointmentsForDate = countAppointmentsForDateLocal(visibleAppointments, appointmentForm.date);
       
       if (appointmentsForDate >= maxAppointments) {
         showToast(
@@ -1568,7 +1457,7 @@ function AppointmentsContent() {
       // Check limit when editing if date is changed
       if (selectedAppointment.date !== appointmentForm.date) {
         const maxAppointments = getMaxAppointmentsPerDay(serviceCenterName);
-        const appointmentsForDate = countAppointmentsForDate(
+        const appointmentsForDate = countAppointmentsForDateLocal(
           visibleAppointments.filter((apt) => apt.id !== selectedAppointment.id),
           appointmentForm.date
         );
@@ -2741,7 +2630,7 @@ function AppointmentsContent() {
                   <div className="mt-2 text-xs">
                     {(() => {
                       const maxAppointments = getMaxAppointmentsPerDay(serviceCenterName);
-                      const currentCount = countAppointmentsForDate(
+                      const currentCount = countAppointmentsForDateLocal(
                         isEditing && selectedAppointment
                       ? visibleAppointments.filter((apt) => apt.id !== selectedAppointment.id)
                       : visibleAppointments,
