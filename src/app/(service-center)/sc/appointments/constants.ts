@@ -13,6 +13,9 @@ export const STATUS_CONFIG: Record<string, { bg: string; text: string }> = {
   Confirmed: { bg: "bg-green-100", text: "text-green-800" },
   Pending: { bg: "bg-yellow-100", text: "text-yellow-800" },
   Cancelled: { bg: "bg-red-100", text: "text-red-800" },
+  "In Progress": { bg: "bg-blue-100", text: "text-blue-800" },
+  "Sent to Manager": { bg: "bg-purple-100", text: "text-purple-800" },
+  "Quotation Created": { bg: "bg-indigo-100", text: "text-indigo-800" },
 };
 
 export const TOAST_DURATION = 3000;

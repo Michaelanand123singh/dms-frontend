@@ -121,3 +121,36 @@ export function formatTime24(time24: string): string {
   return `${hour12}:${minutes} ${ampm}`;
 }
 
+/**
+ * Convert 12-hour time string with AM/PM to 24-hour format (HH:mm)
+ * @param time12 - Time string in hh:mm AM/PM format (12-hour)
+ * @returns Time string in HH:mm format (24-hour)
+ */
+export function parseTime12To24(time12: string): string {
+  if (!time12) return "";
+  
+  // If already in 24-hour format (HH:mm), return as is
+  if (/^\d{2}:\d{2}$/.test(time12.trim())) {
+    return time12.trim();
+  }
+  
+  // Parse 12-hour format (hh:mm AM/PM)
+  const match = time12.trim().match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) {
+    // If format doesn't match, try to return as is or return empty
+    return "";
+  }
+  
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const ampm = match[3].toUpperCase();
+  
+  if (ampm === "PM" && hours !== 12) {
+    hours += 12;
+  } else if (ampm === "AM" && hours === 12) {
+    hours = 0;
+  }
+  
+  return `${String(hours).padStart(2, "0")}:${minutes}`;
+}
+

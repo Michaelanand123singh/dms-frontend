@@ -49,6 +49,7 @@ export interface AppointmentFormProps {
   onCustomerArrived?: (form: AppointmentFormType) => void;
   appointmentStatus?: string;
   customerArrived?: boolean;
+  onCreateQuotation?: (form: AppointmentFormType) => void;
 }
 
 export const AppointmentForm = ({
@@ -67,6 +68,7 @@ export const AppointmentForm = ({
   onCustomerArrived,
   appointmentStatus,
   customerArrived,
+  onCreateQuotation,
 }: AppointmentFormProps) => {
   const { userRole, userInfo } = useRole();
   const isCallCenter = userRole === "call_center";
@@ -161,6 +163,32 @@ export const AppointmentForm = ({
         ...prev,
         ...initialData,
       }));
+      
+      // Initialize pickup/drop state and city from initialData
+      if (initialData.pickupState) {
+        setPickupState(initialData.pickupState);
+      }
+      if (initialData.pickupCity) {
+        setPickupCity(initialData.pickupCity);
+      }
+      if (initialData.dropState) {
+        setDropState(initialData.dropState);
+      }
+      if (initialData.dropCity) {
+        setDropCity(initialData.dropCity);
+      }
+      // Initialize pickupAddressDifferent if pickup address exists
+      if (initialData.pickupAddress) {
+        setPickupAddressDifferent(true);
+      }
+      // Initialize dropSameAsPickup if drop address matches pickup
+      if (initialData.dropAddress && 
+          initialData.dropAddress === initialData.pickupAddress &&
+          initialData.dropState === initialData.pickupState &&
+          initialData.dropCity === initialData.pickupCity &&
+          initialData.dropPincode === initialData.pickupPincode) {
+        setDropSameAsPickup(true);
+      }
     }
   }, [initialData]);
 
@@ -257,49 +285,59 @@ export const AppointmentForm = ({
   }, [selectedCustomer, availableServiceCenters]);
 
   const handleSubmit = useCallback(() => {
+    // Ensure all state values are synced to formData before submission
+    const finalFormData: AppointmentFormType = {
+      ...formData,
+      // Sync pickup/drop state and city from separate state variables
+      pickupState: pickupState || formData.pickupState,
+      pickupCity: pickupCity || formData.pickupCity,
+      dropState: dropState || formData.dropState,
+      dropCity: dropCity || formData.dropCity,
+    };
+    
     const errors: Record<string, string> = {};
     const missingFields: string[] = [];
 
-    if (!formData.customerName?.trim()) {
+    if (!finalFormData.customerName?.trim()) {
       errors.customerName = "Customer Name is required";
       missingFields.push("Customer Name");
     }
 
-    if (!formData.phone?.trim()) {
+    if (!finalFormData.phone?.trim()) {
       errors.phone = "Phone Number is required";
       missingFields.push("Phone Number");
-    } else if (!validatePhone(formData.phone)) {
+    } else if (!validatePhone(finalFormData.phone)) {
       errors.phone = "Please enter a valid 10-digit phone number";
       missingFields.push("Phone Number (invalid format)");
     }
 
-    if (!formData.vehicle?.trim()) {
+    if (!finalFormData.vehicle?.trim()) {
       errors.vehicle = "Vehicle is required";
       missingFields.push("Vehicle");
     }
 
-    if (!formData.serviceType?.trim()) {
+    if (!finalFormData.serviceType?.trim()) {
       errors.serviceType = "Service Type is required";
       missingFields.push("Service Type");
     }
 
-    if (!formData.date?.trim()) {
+    if (!finalFormData.date?.trim()) {
       errors.date = "Date is required";
       missingFields.push("Date");
     }
 
-    if (!formData.time?.trim()) {
+    if (!finalFormData.time?.trim()) {
       errors.time = "Time is required";
       missingFields.push("Time");
-    } else if (formData.date && isToday(formData.date)) {
+    } else if (finalFormData.date && isToday(finalFormData.date)) {
       const currentTime = getCurrentTime();
-      if (formData.time < currentTime) {
+      if (finalFormData.time < currentTime) {
         errors.time = "Cannot schedule appointment for a past time on today's date";
         missingFields.push("Time");
       }
     }
 
-    if (isCallCenter && !formData.customerComplaintIssue?.trim()) {
+    if (isCallCenter && !finalFormData.customerComplaintIssue?.trim()) {
       errors.customerComplaintIssue = "Customer Complaint / Issue Description is required";
       missingFields.push("Customer Complaint / Issue Description");
     }
@@ -314,8 +352,8 @@ export const AppointmentForm = ({
 
     setValidationError("");
     setFieldErrors({});
-    onSubmit(formData);
-  }, [formData, isCallCenter, onSubmit]);
+    onSubmit(finalFormData);
+  }, [formData, pickupState, pickupCity, dropState, dropCity, isCallCenter, onSubmit]);
 
   const updateFormData = useCallback((updates: Partial<AppointmentFormType>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -1360,7 +1398,15 @@ export const AppointmentForm = ({
               type="button"
               onClick={() => {
                 if (onCustomerArrived) {
-                  onCustomerArrived({ ...formData });
+                  // Ensure all state values are synced to formData
+                  const finalFormData: AppointmentFormType = {
+                    ...formData,
+                    pickupState: pickupState || formData.pickupState,
+                    pickupCity: pickupCity || formData.pickupCity,
+                    dropState: dropState || formData.dropState,
+                    dropCity: dropCity || formData.dropCity,
+                  };
+                  onCustomerArrived(finalFormData);
                 }
               }}
               className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-2"
@@ -1387,12 +1433,34 @@ export const AppointmentForm = ({
         >
           Cancel
         </button>
-        <button
-          onClick={handleSubmit}
-          className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
-        >
-          {mode === "edit" ? "Update Appointment" : "Schedule Appointment"}
-        </button>
+        {customerArrived && onCreateQuotation ? (
+          <button
+            onClick={() => {
+              if (onCreateQuotation) {
+                // Ensure all state values are synced to formData
+                const finalFormData: AppointmentFormType = {
+                  ...formData,
+                  pickupState: pickupState || formData.pickupState,
+                  pickupCity: pickupCity || formData.pickupCity,
+                  dropState: dropState || formData.dropState,
+                  dropCity: dropCity || formData.dropCity,
+                };
+                onCreateQuotation(finalFormData);
+              }
+            }}
+            className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
+          >
+            <FileText size={18} />
+            Create Quotation
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+          >
+            {mode === "edit" ? "Update Appointment" : "Schedule Appointment"}
+          </button>
+        )}
       </div>
 
       {/* Service Center Selector Modal */}

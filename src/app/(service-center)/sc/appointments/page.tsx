@@ -3,7 +3,6 @@ import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Calendar, Clock, X, Phone, CheckCircle, AlertCircle, Mail, User, Car } from "lucide-react";
 import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
-import { CameraModal } from "../components/shared";
 import { AppointmentGrid, Toast, AppointmentDetailModal, CustomerSearchModal } from "../components/appointments";
 import { useCustomerSearch } from "@/app/(service-center)/sc/components/customers";
 import { useRole } from "@/shared/hooks";
@@ -32,9 +31,9 @@ import { customerService } from "@/features/customers/services/customer.service"
 import { AppointmentFormModal } from "../components/appointment/AppointmentFormModal";
 import type { AppointmentForm as AppointmentFormType } from "../components/appointment/types";
 import { getInitialAppointmentForm, formatTime } from "../components/appointment/utils";
-import type { AppointmentRecord, ServiceIntakeForm, ToastType, CustomerArrivalStatus } from "./types";
+import type { AppointmentRecord, ToastType, CustomerArrivalStatus } from "./types";
 import { convertAppointmentToFormData, formatVehicleString } from "./utils";
-import { SERVICE_CENTER_CODE_MAP, TOAST_DURATION, JOB_CARD_STORAGE_KEY, INITIAL_SERVICE_INTAKE_FORM } from "./constants";
+import { SERVICE_CENTER_CODE_MAP, TOAST_DURATION, JOB_CARD_STORAGE_KEY } from "./constants";
 
 // ==================== Utility Functions ====================
 const loadJobCards = (): JobCard[] => {
@@ -215,7 +214,6 @@ function AppointmentsContent() {
   const [detailCustomer, setDetailCustomer] = useState<CustomerWithVehicles | null>(null);
   const [currentJobCardId, setCurrentJobCardId] = useState<string | null>(null);
   const [currentJobCard, setCurrentJobCard] = useState<JobCard | null>(null);
-  const [arrivalMode, setArrivalMode] = useState<ServiceIntakeForm["arrivalMode"] | null>(null);
   const [checkInSlipData, setCheckInSlipData] = useState<any>(null);
   const [showCheckInSlipModal, setShowCheckInSlipModal] = useState<boolean>(false);
 
@@ -228,13 +226,8 @@ function AppointmentsContent() {
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
   const [showVehicleDetails, setShowVehicleDetails] = useState<boolean>(false);
 
-  // Service Intake States (for service advisor)
+  // Customer Arrival State (for service advisor)
   const [customerArrivalStatus, setCustomerArrivalStatus] = useState<CustomerArrivalStatus>(null);
-  const [serviceIntakeForm, setServiceIntakeForm] = useState<ServiceIntakeForm>(INITIAL_SERVICE_INTAKE_FORM);
-
-  // Camera Modal States
-  const [cameraModalOpen, setCameraModalOpen] = useState<boolean>(false);
-  const [cameraDocumentType, setCameraDocumentType] = useState<keyof Pick<ServiceIntakeForm, "customerIdProof" | "vehicleRCCopy" | "warrantyCardServiceBook" | "photosVideos"> | null>(null);
   const visibleAppointments = useMemo(() => {
     if (shouldFilterAppointments) {
       return filterByServiceCenter(appointments, serviceCenterContext);
@@ -313,15 +306,6 @@ function AppointmentsContent() {
     setShowDetailModal(false);
     setSelectedAppointment(null);
     setDetailCustomer(null);
-    // Clean up object URLs before resetting form
-    setServiceIntakeForm((prev) => {
-      // Revoke all object URLs to prevent memory leaks
-      prev.customerIdProof.urls.forEach((url) => URL.revokeObjectURL(url));
-      prev.vehicleRCCopy.urls.forEach((url) => URL.revokeObjectURL(url));
-      prev.warrantyCardServiceBook.urls.forEach((url) => URL.revokeObjectURL(url));
-      prev.photosVideos.urls.forEach((url) => URL.revokeObjectURL(url));
-      return INITIAL_SERVICE_INTAKE_FORM;
-    });
     setCustomerArrivalStatus(null);
     clearCustomerSearch();
     setCurrentJobCardId(null);
@@ -489,7 +473,7 @@ function AppointmentsContent() {
       customerArrivalTimestamp: new Date().toISOString(),
       // Structured PART 1 data
       part1,
-      // PART 2 will be populated from service intake form
+      // PART 2 will be populated when parts are added
       part2: [],
       // PART 2A and PART 3 will be populated later if needed
     };
@@ -512,99 +496,6 @@ function AppointmentsContent() {
     []
   );
 
-  const handleSaveDraft = useCallback(async () => {
-    if (!currentJobCardId) {
-      showToast("Please arrive a customer before saving a draft.", "error");
-      return;
-    }
-
-    // Try to fetch customer data for PART 1
-    let customerData: CustomerWithVehicles | null = null;
-    let vehicleData: Vehicle | null = null;
-
-    if (detailCustomer) {
-      customerData = detailCustomer;
-      vehicleData = detailCustomer.vehicles?.find((v) =>
-        formatVehicleString(v) === selectedAppointment?.vehicle
-      ) || detailCustomer.vehicles?.[0] || null;
-    }
-
-    const intakeSnapshot = {
-      ...serviceIntakeForm,
-      customerIdProof: {
-        files: [],
-        urls: serviceIntakeForm.customerIdProof.urls,
-      },
-      vehicleRCCopy: {
-        files: [],
-        urls: serviceIntakeForm.vehicleRCCopy.urls,
-      },
-      warrantyCardServiceBook: {
-        files: [],
-        urls: serviceIntakeForm.warrantyCardServiceBook.urls,
-      },
-      photosVideos: {
-        files: [],
-        urls: serviceIntakeForm.photosVideos.urls,
-      },
-    };
-
-    // Get current job card to preserve jobCardNumber
-    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-    const currentJobCard = storedJobCards.find((card) => card.id === currentJobCardId);
-    const jobCardNumber = currentJobCard?.jobCardNumber || "";
-
-    // Populate PART 1 from service intake form
-    const part1 = customerData && vehicleData
-      ? populateJobCardPart1(
-        customerData,
-        vehicleData,
-        jobCardNumber,
-        {
-          customerFeedback: serviceIntakeForm.customerComplaintIssue || "",
-          technicianObservation: serviceIntakeForm.checkInNotes || "",
-          insuranceStartDate: serviceIntakeForm.insuranceStartDate || "",
-          insuranceEndDate: serviceIntakeForm.insuranceEndDate || "",
-          insuranceCompanyName: serviceIntakeForm.insuranceCompanyName || "",
-          variantBatteryCapacity: serviceIntakeForm.variantBatteryCapacity || "",
-          warrantyStatus: serviceIntakeForm.warrantyStatus || "",
-          estimatedDeliveryDate: serviceIntakeForm.estimatedDeliveryDate || "",
-          batterySerialNumber: "", // Will be filled if applicable
-          mcuSerialNumber: "", // Will be filled if applicable
-          vcuSerialNumber: "", // Will be filled if applicable
-          otherPartSerialNumber: "", // Will be filled if applicable
-        }
-      )
-      : createEmptyJobCardPart1(jobCardNumber);
-
-    // Override with service intake form data
-    if (serviceIntakeForm.vehicleBrand) part1.vehicleBrand = serviceIntakeForm.vehicleBrand;
-    if (serviceIntakeForm.vehicleModel) part1.vehicleModel = serviceIntakeForm.vehicleModel;
-    if (serviceIntakeForm.registrationNumber) part1.registrationNumber = serviceIntakeForm.registrationNumber;
-    if (serviceIntakeForm.vinChassisNumber) part1.vinChassisNumber = serviceIntakeForm.vinChassisNumber;
-    if (serviceIntakeForm.variantBatteryCapacity) part1.variantBatteryCapacity = serviceIntakeForm.variantBatteryCapacity;
-    if (serviceIntakeForm.warrantyStatus) part1.warrantyStatus = serviceIntakeForm.warrantyStatus;
-    if (serviceIntakeForm.estimatedDeliveryDate) part1.estimatedDeliveryDate = serviceIntakeForm.estimatedDeliveryDate;
-    if (serviceIntakeForm.customerComplaintIssue) part1.customerFeedback = serviceIntakeForm.customerComplaintIssue;
-    if (serviceIntakeForm.checkInNotes) part1.technicianObservation = serviceIntakeForm.checkInNotes;
-    if (serviceIntakeForm.insuranceStartDate) part1.insuranceStartDate = serviceIntakeForm.insuranceStartDate;
-    if (serviceIntakeForm.insuranceEndDate) part1.insuranceEndDate = serviceIntakeForm.insuranceEndDate;
-    if (serviceIntakeForm.insuranceCompanyName) part1.insuranceCompanyName = serviceIntakeForm.insuranceCompanyName;
-
-    const updated = updateStoredJobCard(currentJobCardId, (card) => ({
-      ...card,
-      status: "Created",
-      draftIntake: intakeSnapshot,
-      // Update PART 1 with service intake form data
-      part1,
-      // PART 2 will be populated when parts are added
-      part2: card.part2 || [],
-    }));
-    if (updated) {
-      setCurrentJobCardId(updated.id);
-    }
-    showToast("Job card saved as draft.", "success");
-  }, [currentJobCardId, showToast, updateStoredJobCard, serviceIntakeForm, detailCustomer, selectedAppointment]);
 
   const handleViewVehicleDetails = useCallback(() => {
     if (!selectedAppointment) return;
@@ -622,9 +513,9 @@ function AppointmentsContent() {
     setCurrentJobCard(jobCard);
   }, [currentJobCardId]);
 
-  // Generate check-in slip data
+  // Generate check-in slip data from appointment
   const generateCheckInSlipData = useCallback((): CheckInSlipData | null => {
-    if (!selectedAppointment || !currentJobCard) return null;
+    if (!selectedAppointment) return null;
 
     const serviceCenterId = selectedAppointment.serviceCenterId?.toString() || serviceCenterContext.serviceCenterId?.toString() || "sc-001";
     const serviceCenterCode = SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
@@ -633,21 +524,21 @@ function AppointmentsContent() {
     );
 
     const now = new Date();
-    const checkInDate = serviceIntakeForm.checkInDate || now.toISOString().split("T")[0];
-    const checkInTime = serviceIntakeForm.checkInTime || now.toTimeString().slice(0, 5);
-    const slipNumber = serviceIntakeForm.checkInSlipNumber || generateCheckInSlipNumber(serviceCenterCode);
+    const checkInDate = now.toISOString().split("T")[0];
+    const checkInTime = now.toTimeString().slice(0, 5);
+    const slipNumber = generateCheckInSlipNumber(serviceCenterCode);
 
     // Extract vehicle details
     const vehicleParts = selectedAppointment.vehicle.match(/^(.+?)\s+(.+?)\s+\((\d+)\)$/);
     const vehicleMake = vehicleParts ? vehicleParts[1] : selectedAppointment.vehicle.split(" ")[0] || "";
     const vehicleModel = vehicleParts ? vehicleParts[2] : selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "";
 
-    // Get registration from service intake form or job card
-    const registrationNumber = serviceIntakeForm.registrationNumber || currentJobCard.registration || "";
-    const vin = serviceIntakeForm.vinChassisNumber || currentJobCard.vehicleId || "";
+    // Get registration from appointment or job card
+    const registrationNumber = (selectedAppointment as any).registrationNumber || currentJobCard?.registration || "";
+    const vin = (selectedAppointment as any).vinChassisNumber || currentJobCard?.vehicleId || "";
 
     // Get customer email if available
-    const customerEmail = detailCustomer?.email || undefined;
+    const customerEmail = detailCustomer?.email || (selectedAppointment as any).email || undefined;
 
     // Parse service center location for address components
     const locationParts = serviceCenter?.location?.split(",") || [];
@@ -673,58 +564,31 @@ function AppointmentsContent() {
       serviceCenterState,
       serviceCenterPincode,
       serviceCenterPhone: undefined, // Can be added to service center data
-      expectedServiceDate: serviceIntakeForm.estimatedDeliveryDate || selectedAppointment.estimatedDeliveryDate || undefined,
-      serviceType: serviceIntakeForm.serviceType || selectedAppointment.serviceType || undefined,
-      notes: serviceIntakeForm.checkInNotes || undefined,
+      expectedServiceDate: selectedAppointment.estimatedDeliveryDate || undefined,
+      serviceType: selectedAppointment.serviceType || undefined,
+      notes: (selectedAppointment as any).technicianObservation || selectedAppointment.customerComplaintIssue || undefined,
     };
-  }, [selectedAppointment, currentJobCard, serviceIntakeForm, detailCustomer, serviceCenterContext]);
+  }, [selectedAppointment, currentJobCard, detailCustomer, serviceCenterContext]);
 
-  const handleArrivalModeSelect = useCallback((mode: ServiceIntakeForm["arrivalMode"] | null) => {
-    if (!selectedAppointment) return;
+  // Generate check-in slip handler
+  const handleGenerateCheckInSlip = useCallback(() => {
+    if (!selectedAppointment) {
+      showToast("Please select an appointment first.", "error");
+      return;
+    }
 
-    setArrivalMode(mode);
-    setServiceIntakeForm((prev) => ({ ...prev, arrivalMode: mode || "" }));
+    // Ensure job card exists
+    if (!currentJobCardId) {
+      showToast("Please wait for job card to be created first.", "error");
+      return;
+    }
 
-    // If vehicle is present, generate check-in slip immediately
-    if (mode === "vehicle_present") {
-      // Ensure job card exists
-      if (!currentJobCardId) {
-        showToast("Please wait for job card to be created first.", "error");
-        setArrivalMode(null);
-        setServiceIntakeForm((prev) => ({ ...prev, arrivalMode: "" }));
-        return;
-      }
-
-      // Generate check-in slip data
-      const slipData = generateCheckInSlipData();
-      if (slipData) {
-        setCheckInSlipData(slipData);
-        setServiceIntakeForm((prev) => ({
-          ...prev,
-          checkInSlipNumber: slipData.slipNumber,
-          checkInDate: slipData.checkInDate,
-          checkInTime: slipData.checkInTime,
-        }));
-
-        // Show check-in slip modal
-        setShowCheckInSlipModal(true);
-        showToast("Check-in slip generated. Vehicle is confirmed at service center.", "success");
-      }
-    } else if (mode === "vehicle_absent") {
-      // Check if pickup/drop address is provided
-      const hasPickupAddress = selectedAppointment.pickupDropRequired &&
-        (selectedAppointment.pickupAddress || selectedAppointment.dropAddress);
-
-      if (!hasPickupAddress) {
-        showToast("Vehicle Absent mode requires pickup/drop address. Please update appointment with pickup/drop address first.", "error");
-        setArrivalMode(null);
-        setServiceIntakeForm((prev) => ({ ...prev, arrivalMode: "" }));
-        return;
-      }
-
-      // For vehicle absent with pickup address, check-in slip will be generated when vehicle is picked up
-      setCheckInSlipData(null);
-      showToast("Vehicle will be picked up from provided address. Check-in slip will be generated when vehicle arrives.", "success");
+    // Generate check-in slip data
+    const slipData = generateCheckInSlipData();
+    if (slipData) {
+      setCheckInSlipData(slipData);
+      setShowCheckInSlipModal(true);
+      showToast("Check-in slip generated successfully.", "success");
     }
   }, [selectedAppointment, currentJobCardId, generateCheckInSlipData, showToast]);
 
@@ -825,13 +689,13 @@ function AppointmentsContent() {
       serviceCenterName: serviceCenterName,
       pickupDropRequired: form.pickupDropRequired,
       pickupAddress: form.pickupAddress,
-      pickupState: (form as any).pickupState,
-      pickupCity: (form as any).pickupCity,
-      pickupPincode: (form as any).pickupPincode,
+      pickupState: form.pickupState,
+      pickupCity: form.pickupCity,
+      pickupPincode: form.pickupPincode,
       dropAddress: form.dropAddress,
-      dropState: (form as any).dropState,
-      dropCity: (form as any).dropCity,
-      dropPincode: (form as any).dropPincode,
+      dropState: form.dropState,
+      dropCity: form.dropCity,
+      dropPincode: form.dropPincode,
       preferredCommunicationMode: form.preferredCommunicationMode,
       documentationFiles: {
         customerIdProof: form.customerIdProof?.files.length || 0,
@@ -960,100 +824,120 @@ function AppointmentsContent() {
     showToast("Customer arrival recorded. Appointment status updated to 'In Progress'.", "success");
   }, [selectedAppointment, showToast]);
 
-  // File Upload Handlers
-  const handleDocumentUpload = useCallback(
-    (documentType: keyof Pick<ServiceIntakeForm, "customerIdProof" | "vehicleRCCopy" | "warrantyCardServiceBook" | "photosVideos">, files: FileList | null) => {
-      if (!files || files.length === 0) return;
-
-      const fileArray = Array.from(files);
-      const newUrls = fileArray.map((file) => URL.createObjectURL(file));
-
-      setServiceIntakeForm((prev) => ({
-        ...prev,
-        [documentType]: {
-          files: [...prev[documentType].files, ...fileArray],
-          urls: [...prev[documentType].urls, ...newUrls],
-        },
-      }));
-    },
-    []
-  );
-
-  const handleRemoveDocument = useCallback(
-    (documentType: keyof Pick<ServiceIntakeForm, "customerIdProof" | "vehicleRCCopy" | "warrantyCardServiceBook" | "photosVideos">, index: number) => {
-      setServiceIntakeForm((prev) => {
-        const updated = { ...prev };
-        const doc = updated[documentType];
-
-        // Revoke object URL to free memory
-        if (doc.urls[index]) {
-          URL.revokeObjectURL(doc.urls[index]);
-        }
-
-        updated[documentType] = {
-          files: doc.files.filter((_, i) => i !== index),
-          urls: doc.urls.filter((_, i) => i !== index),
-        };
-        return updated;
-      });
-    },
-    []
-  );
-
-  // Camera Handlers
-  const handleOpenCamera = useCallback(
-    (documentType: keyof Pick<ServiceIntakeForm, "customerIdProof" | "vehicleRCCopy" | "warrantyCardServiceBook" | "photosVideos">) => {
-      setCameraDocumentType(documentType);
-      setCameraModalOpen(true);
-    },
-    []
-  );
-
-  const handleCameraCapture = useCallback(
-    (file: File) => {
-      if (!cameraDocumentType) return;
-
-      const newUrl = URL.createObjectURL(file);
-      setServiceIntakeForm((prev) => ({
-        ...prev,
-        [cameraDocumentType]: {
-          files: [...prev[cameraDocumentType].files, file],
-          urls: [...prev[cameraDocumentType].urls, newUrl],
-        },
-      }));
-      setCameraModalOpen(false);
-      setCameraDocumentType(null);
-
-      // Show success message
-      const documentTypeNames: Record<typeof cameraDocumentType, string> = {
-        customerIdProof: "Customer ID Proof",
-        vehicleRCCopy: "Vehicle RC Copy",
-        warrantyCardServiceBook: "Warranty Card / Service Book",
-        photosVideos: "Vehicle Photo",
-      };
-      showToast(`Photo captured and added to ${documentTypeNames[cameraDocumentType]}`, "success");
-    },
-    [cameraDocumentType, showToast]
-  );
 
   // Router for navigation
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Handle Create Quotation from Form (when customer has arrived)
+  const handleCreateQuotationFromForm = useCallback(async (form: AppointmentFormType) => {
+    if (!selectedAppointment) return;
 
-  // Service Intake Handlers - Convert to Estimation/Quotation
+    // First, save/update the appointment with form data
+    const selectedServiceCenter = form.serviceCenterName
+      ? staticServiceCenters.find((center) => center.name === form.serviceCenterName)
+      : null;
+    const serviceCenterId = (selectedServiceCenter as any)?.serviceCenterId || selectedServiceCenter?.id?.toString() || null;
+    const serviceCenterName = form.serviceCenterName || null;
+
+    const appointmentData: any = {
+      ...form,
+      status: "In Progress", // Ensure status is In Progress
+      serviceCenterId: serviceCenterId,
+      serviceCenterName: serviceCenterName,
+      time: formatTime(form.time),
+      duration: `${form.duration} hours`,
+      createdByRole: selectedAppointment.createdByRole,
+    };
+
+    // Update appointment in storage
+    const existingAppointments = safeStorage.getItem<Array<any>>("appointments", []);
+    const updatedAppointments = existingAppointments.map((apt: any) =>
+      apt.id === selectedAppointment.id
+        ? { ...apt, ...appointmentData }
+        : apt
+    );
+    safeStorage.setItem("appointments", updatedAppointments);
+    setAppointments(updatedAppointments);
+
+    // Update selectedAppointment state
+    const updatedAppointment = { ...selectedAppointment, ...appointmentData };
+    setSelectedAppointment(updatedAppointment);
+
+    // Ensure job card exists
+    if (!currentJobCardId) {
+      const jobCard = await convertAppointmentToJobCard(updatedAppointment);
+      setCurrentJobCardId(jobCard.id);
+    }
+
+    // Prepare quotation data from appointment form
+    const customerIdForQuotation =
+      selectedAppointmentCustomer?.id?.toString() ||
+      updatedAppointment.customerExternalId ||
+      undefined;
+    const serviceCenterIdForQuotation =
+      serviceCenterId ||
+      serviceCenterContext.serviceCenterId ||
+      undefined;
+    const serviceCenterNameForQuotation =
+      serviceCenterName ||
+      serviceCenterContext.serviceCenterName ||
+      undefined;
+
+    const quotationData = {
+      appointmentId: updatedAppointment.id,
+      customerName: updatedAppointment.customerName,
+      phone: updatedAppointment.phone,
+      vehicle: updatedAppointment.vehicle,
+      customerId: customerIdForQuotation,
+      serviceCenterId: serviceCenterIdForQuotation,
+      serviceCenterName: serviceCenterNameForQuotation,
+      jobCardId: currentJobCardId || undefined,
+      appointmentData: updatedAppointment, // Store full appointment data
+    };
+
+    // Store appointment data for quotation page
+    safeStorage.setItem("pendingQuotationFromAppointment", quotationData);
+
+    // Clean up file URLs
+    if (form.customerIdProof?.urls) {
+      form.customerIdProof.urls.forEach((url: string) => URL.revokeObjectURL(url));
+    }
+    if (form.vehicleRCCopy?.urls) {
+      form.vehicleRCCopy.urls.forEach((url: string) => URL.revokeObjectURL(url));
+    }
+    if (form.warrantyCardServiceBook?.urls) {
+      form.warrantyCardServiceBook.urls.forEach((url: string) => URL.revokeObjectURL(url));
+    }
+    if (form.photosVideos?.urls) {
+      form.photosVideos.urls.forEach((url: string) => URL.revokeObjectURL(url));
+    }
+
+    // Close modal
+    handleCloseAppointmentForm();
+
+    // Navigate to quotations page
+    router.push("/sc/quotations?fromAppointment=true");
+
+    showToast("Appointment saved. Redirecting to create quotation...", "success");
+  }, [selectedAppointment, selectedAppointmentCustomer, serviceCenterContext, currentJobCardId, convertAppointmentToJobCard, router, handleCloseAppointmentForm, showToast]);
+
+
+  // Convert Appointment to Quotation
   const handleConvertToQuotation = useCallback(async () => {
     if (!selectedAppointment) return;
 
-    // Basic validation
-    if (!serviceIntakeForm.vehicleBrand || !serviceIntakeForm.registrationNumber || !serviceIntakeForm.serviceType || !serviceIntakeForm.customerComplaintIssue) {
-      showToast("Please fill in all required fields.", "error");
+    // Basic validation - use appointment data
+    const appointment = selectedAppointment as any;
+    if (!appointment.vehicleBrand && !appointment.vehicle) {
+      showToast("Please ensure vehicle information is available in the appointment.", "error");
       return;
     }
 
     if (!currentJobCardId) {
-      showToast("Select an arrival mode to generate the job card before creating a quotation.", "error");
-      return;
+      // Create job card if it doesn't exist
+      const jobCard = await convertAppointmentToJobCard(selectedAppointment);
+      setCurrentJobCardId(jobCard.id);
     }
 
     // Try to fetch customer data for PART 1
@@ -1072,51 +956,52 @@ function AppointmentsContent() {
     const currentJobCard = storedJobCards.find((card) => card.id === currentJobCardId);
     const jobCardNumber = currentJobCard?.jobCardNumber || "";
 
-    // Populate PART 1 from service intake form
+    // Populate PART 1 from appointment data
     const part1 = customerData && vehicleData
       ? populateJobCardPart1(
         customerData,
         vehicleData,
         jobCardNumber,
         {
-          customerFeedback: serviceIntakeForm.customerComplaintIssue || "",
-          technicianObservation: serviceIntakeForm.checkInNotes || "",
-          insuranceStartDate: serviceIntakeForm.insuranceStartDate || "",
-          insuranceEndDate: serviceIntakeForm.insuranceEndDate || "",
-          insuranceCompanyName: serviceIntakeForm.insuranceCompanyName || "",
-          variantBatteryCapacity: serviceIntakeForm.variantBatteryCapacity || "",
-          warrantyStatus: serviceIntakeForm.warrantyStatus || "",
-          estimatedDeliveryDate: serviceIntakeForm.estimatedDeliveryDate || "",
+          customerFeedback: appointment.customerComplaintIssue || "",
+          technicianObservation: appointment.technicianObservation || "",
+          insuranceStartDate: appointment.insuranceStartDate || "",
+          insuranceEndDate: appointment.insuranceEndDate || "",
+          insuranceCompanyName: appointment.insuranceCompanyName || "",
+          variantBatteryCapacity: appointment.variantBatteryCapacity || "",
+          warrantyStatus: appointment.warrantyStatus || "",
+          estimatedDeliveryDate: appointment.estimatedDeliveryDate || "",
         }
       )
       : createEmptyJobCardPart1(jobCardNumber);
 
-    // Override with service intake form data
-    if (serviceIntakeForm.vehicleBrand) part1.vehicleBrand = serviceIntakeForm.vehicleBrand;
-    if (serviceIntakeForm.vehicleModel) part1.vehicleModel = serviceIntakeForm.vehicleModel;
-    if (serviceIntakeForm.registrationNumber) part1.registrationNumber = serviceIntakeForm.registrationNumber;
-    if (serviceIntakeForm.vinChassisNumber) part1.vinChassisNumber = serviceIntakeForm.vinChassisNumber;
-    if (serviceIntakeForm.variantBatteryCapacity) part1.variantBatteryCapacity = serviceIntakeForm.variantBatteryCapacity;
-    if (serviceIntakeForm.warrantyStatus) part1.warrantyStatus = serviceIntakeForm.warrantyStatus;
-    if (serviceIntakeForm.estimatedDeliveryDate) part1.estimatedDeliveryDate = serviceIntakeForm.estimatedDeliveryDate;
-    if (serviceIntakeForm.customerComplaintIssue) part1.customerFeedback = serviceIntakeForm.customerComplaintIssue;
-    if (serviceIntakeForm.checkInNotes) part1.technicianObservation = serviceIntakeForm.checkInNotes;
-    if (serviceIntakeForm.insuranceStartDate) part1.insuranceStartDate = serviceIntakeForm.insuranceStartDate;
-    if (serviceIntakeForm.insuranceEndDate) part1.insuranceEndDate = serviceIntakeForm.insuranceEndDate;
-    if (serviceIntakeForm.insuranceCompanyName) part1.insuranceCompanyName = serviceIntakeForm.insuranceCompanyName;
+    // Override with appointment data
+    if (appointment.vehicleBrand) part1.vehicleBrand = appointment.vehicleBrand;
+    if (appointment.vehicleModel) part1.vehicleModel = appointment.vehicleModel;
+    if (appointment.registrationNumber) part1.registrationNumber = appointment.registrationNumber;
+    if (appointment.vinChassisNumber) part1.vinChassisNumber = appointment.vinChassisNumber;
+    if (appointment.variantBatteryCapacity) part1.variantBatteryCapacity = appointment.variantBatteryCapacity;
+    if (appointment.warrantyStatus) part1.warrantyStatus = appointment.warrantyStatus;
+    if (appointment.estimatedDeliveryDate) part1.estimatedDeliveryDate = appointment.estimatedDeliveryDate;
+    if (appointment.customerComplaintIssue) part1.customerFeedback = appointment.customerComplaintIssue;
+    if (appointment.technicianObservation) part1.technicianObservation = appointment.technicianObservation;
+    if (appointment.insuranceStartDate) part1.insuranceStartDate = appointment.insuranceStartDate;
+    if (appointment.insuranceEndDate) part1.insuranceEndDate = appointment.insuranceEndDate;
+    if (appointment.insuranceCompanyName) part1.insuranceCompanyName = appointment.insuranceCompanyName;
 
-    // Populate PART 2A if warranty/insurance evidence exists
-    const part2A = (serviceIntakeForm.photosVideos.urls.length > 0 ||
-      serviceIntakeForm.warrantyCardServiceBook.urls.length > 0)
+    // Populate PART 2A if documentation files exist
+    const hasPhotos = appointment.photosVideos?.urls?.length > 0 || appointment.documentationFiles?.photosVideos > 0;
+    const hasWarranty = appointment.warrantyCardServiceBook?.urls?.length > 0 || appointment.documentationFiles?.warrantyCardServiceBook > 0;
+    const part2A = (hasPhotos || hasWarranty)
       ? {
-        videoEvidence: serviceIntakeForm.photosVideos.urls.some(url => url.includes('video') || url.includes('mp4')) ? "Yes" : "No" as "Yes" | "No" | "",
-        vinImage: serviceIntakeForm.photosVideos.urls.some(url => url.includes('vin')) ? "Yes" : "No" as "Yes" | "No" | "",
-        odoImage: serviceIntakeForm.photosVideos.urls.some(url => url.includes('odo')) ? "Yes" : "No" as "Yes" | "No" | "",
-        damageImages: serviceIntakeForm.photosVideos.urls.length > 0 ? "Yes" : "No" as "Yes" | "No" | "",
-        issueDescription: serviceIntakeForm.customerComplaintIssue || "",
-        numberOfObservations: String(serviceIntakeForm.photosVideos.urls.length),
-        symptom: serviceIntakeForm.previousServiceHistory || "",
-        defectPart: serviceIntakeForm.customerComplaintIssue || "",
+        videoEvidence: hasPhotos ? "Yes" : "No" as "Yes" | "No" | "",
+        vinImage: hasPhotos ? "Yes" : "No" as "Yes" | "No" | "",
+        odoImage: hasPhotos ? "Yes" : "No" as "Yes" | "No" | "",
+        damageImages: hasPhotos ? "Yes" : "No" as "Yes" | "No" | "",
+        issueDescription: appointment.customerComplaintIssue || "",
+        numberOfObservations: String(appointment.documentationFiles?.photosVideos || 0),
+        symptom: appointment.previousServiceHistory || "",
+        defectPart: appointment.customerComplaintIssue || "",
       }
       : undefined;
 
@@ -1125,21 +1010,21 @@ function AppointmentsContent() {
       updateStoredJobCard(currentJobCardId, (card) => ({
         ...card,
         status: "In Progress",
-        // Update PART 1 with service intake form data
+        // Update PART 1 with appointment data
         part1,
         // PART 2 will be populated when parts are added in quotation
         part2: card.part2 || [],
-        // PART 2A if warranty/insurance evidence exists
+        // PART 2A if documentation exists
         part2A,
         // Update legacy fields for backward compatibility
-        vehicleMake: serviceIntakeForm.vehicleBrand,
-        vehicleModel: serviceIntakeForm.vehicleModel,
-        registration: serviceIntakeForm.registrationNumber,
-        description: serviceIntakeForm.customerComplaintIssue || card.description,
+        vehicleMake: appointment.vehicleBrand || card.vehicleMake,
+        vehicleModel: appointment.vehicleModel || card.vehicleModel,
+        registration: appointment.registrationNumber || card.registration,
+        description: appointment.customerComplaintIssue || card.description,
       }));
     }
 
-    // Save service intake data to localStorage for quotation page to use
+    // Save appointment data to localStorage for quotation page to use
     const customerIdForQuotation =
       detailCustomer?.id?.toString() ||
       selectedAppointment.customerExternalId ||
@@ -1153,7 +1038,7 @@ function AppointmentsContent() {
       serviceCenterContext.serviceCenterName ||
       undefined;
 
-    const serviceIntakeData = {
+    const quotationData = {
       appointmentId: selectedAppointment.id,
       customerName: selectedAppointment.customerName,
       phone: selectedAppointment.phone,
@@ -1162,30 +1047,11 @@ function AppointmentsContent() {
       serviceCenterId: serviceCenterIdForQuotation,
       serviceCenterName: serviceCenterNameForQuotation,
       jobCardId: currentJobCardId,
-      serviceIntakeForm: {
-        ...serviceIntakeForm,
-        // Convert File objects to URLs for storage (in real app, these would be uploaded first)
-        customerIdProof: {
-          files: [],
-          urls: serviceIntakeForm.customerIdProof.urls,
-        },
-        vehicleRCCopy: {
-          files: [],
-          urls: serviceIntakeForm.vehicleRCCopy.urls,
-        },
-        warrantyCardServiceBook: {
-          files: [],
-          urls: serviceIntakeForm.warrantyCardServiceBook.urls,
-        },
-        photosVideos: {
-          files: [],
-          urls: serviceIntakeForm.photosVideos.urls,
-        },
-      },
+      appointmentData: appointment, // Store full appointment data
     };
 
-    // Store service intake data for quotation page
-    safeStorage.setItem("pendingQuotationFromAppointment", serviceIntakeData);
+    // Store appointment data for quotation page
+    safeStorage.setItem("pendingQuotationFromAppointment", quotationData);
 
     // Update appointment status to indicate customer has arrived and intake is done
     const updatedAppointments = appointments.map((apt) =>
@@ -1201,7 +1067,7 @@ function AppointmentsContent() {
 
     // Close the appointment detail modal
     closeDetailModal();
-  }, [selectedAppointment, serviceIntakeForm, appointments, router, closeDetailModal, showToast, currentJobCardId, updateStoredJobCard, detailCustomer, serviceCenterContext]);
+  }, [selectedAppointment, appointments, router, closeDetailModal, showToast, currentJobCardId, updateStoredJobCard, detailCustomer, serviceCenterContext, convertAppointmentToJobCard]);
 
   const updateLeadForAppointment = useCallback(
     (appointment: AppointmentRecord) => {
@@ -1241,7 +1107,7 @@ function AppointmentsContent() {
         setCustomerArrivalStatus("arrived");
       }
 
-      // Try to find associated job card
+      // Try to find associated job card, or create one if it doesn't exist
       if (!currentJobCardId) {
         const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
         const associatedJobCard = storedJobCards.find(
@@ -1249,6 +1115,13 @@ function AppointmentsContent() {
         );
         if (associatedJobCard) {
           setCurrentJobCardId(associatedJobCard.id);
+        } else {
+          // Auto-create job card when customer arrives
+          convertAppointmentToJobCard(selectedAppointment).then((jobCard) => {
+            setCurrentJobCardId(jobCard.id);
+          }).catch((error) => {
+            console.error("Error creating job card:", error);
+          });
         }
       }
     } else if (selectedAppointment.status === "Confirmed" || selectedAppointment.status === "Pending") {
@@ -1257,7 +1130,7 @@ function AppointmentsContent() {
         setCustomerArrivalStatus(null);
       }
     }
-  }, [selectedAppointment, customerArrivalStatus, currentJobCardId]);
+  }, [selectedAppointment, customerArrivalStatus, currentJobCardId, convertAppointmentToJobCard]);
 
   // Watch for customer search results to populate vehicle details
   useEffect(() => {
@@ -1302,10 +1175,7 @@ function AppointmentsContent() {
 
     // Batch state updates to avoid cascading renders
     setSelectedAppointment(appointment);
-    setServiceIntakeForm((prev) => ({
-      ...prev,
-      ...jobCard.draftIntake,
-    }));
+    // Job card data is already loaded in currentJobCard
     setCustomerArrivalStatus("arrived");
     setCurrentJobCardId(jobCard.id);
     setShowDetailModal(true);
@@ -1326,25 +1196,6 @@ function AppointmentsContent() {
     <div className="bg-[#f9f9fb] min-h-screen">
       <Toast show={toast.show} message={toast.message} type={toast.type} />
 
-      <CameraModal
-        isOpen={cameraModalOpen}
-        onClose={() => {
-          setCameraModalOpen(false);
-          setCameraDocumentType(null);
-        }}
-        onCapture={handleCameraCapture}
-        title={
-          cameraDocumentType === "customerIdProof"
-            ? "Capture Customer ID Proof"
-            : cameraDocumentType === "vehicleRCCopy"
-              ? "Capture Vehicle RC Copy"
-              : cameraDocumentType === "warrantyCardServiceBook"
-                ? "Capture Warranty Card / Service Book"
-                : cameraDocumentType === "photosVideos"
-                  ? "Capture Vehicle Photo"
-                  : "Capture Photo"
-        }
-      />
 
       <div className="pt-6 pb-10">
         {/* Header */}
@@ -1388,8 +1239,6 @@ function AppointmentsContent() {
         availableServiceCenters={availableServiceCenters}
         onCustomerArrived={() => setCustomerArrivalStatus("arrived")}
         onCustomerNotArrived={() => setCustomerArrivalStatus("not_arrived")}
-        setServiceIntakeForm={setServiceIntakeForm}
-        setArrivalMode={setArrivalMode}
         setCurrentJobCard={setCurrentJobCard}
         setCheckInSlipData={setCheckInSlipData}
         setShowCheckInSlipModal={setShowCheckInSlipModal}
@@ -1397,6 +1246,9 @@ function AppointmentsContent() {
         setSelectedAppointment={setSelectedAppointment}
         showToast={showToast}
         appointments={appointments}
+        onConvertToQuotation={isServiceAdvisor && (selectedAppointment?.status === "In Progress" || selectedAppointment?.status === "Sent to Manager" || selectedAppointment?.status === "Quotation Created") ? handleConvertToQuotation : undefined}
+        onGenerateCheckInSlip={handleGenerateCheckInSlip}
+        currentJobCardId={currentJobCardId}
       />
 
       {showCheckInSlipModal && checkInSlipData && (
@@ -1418,6 +1270,7 @@ function AppointmentsContent() {
           onCustomerArrived={isServiceAdvisor ? handleCustomerArrivedFromForm : undefined}
           appointmentStatus={selectedAppointment?.status}
           customerArrived={selectedAppointment?.status === "In Progress" || selectedAppointment?.status === "Sent to Manager"}
+          onCreateQuotation={isServiceAdvisor && (selectedAppointment?.status === "In Progress" || selectedAppointment?.status === "Sent to Manager" || selectedAppointment?.status === "Quotation Created") ? handleCreateQuotationFromForm : undefined}
         />
       )}
 

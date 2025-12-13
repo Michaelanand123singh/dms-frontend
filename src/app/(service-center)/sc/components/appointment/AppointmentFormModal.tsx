@@ -22,6 +22,7 @@ export interface AppointmentFormModalProps {
   onCustomerArrived?: (form: AppointmentFormType) => void;
   appointmentStatus?: string;
   customerArrived?: boolean;
+  onCreateQuotation?: (form: AppointmentFormType) => void;
 }
 
 export function AppointmentFormModal({
@@ -37,6 +38,7 @@ export function AppointmentFormModal({
   onCustomerArrived,
   appointmentStatus,
   customerArrived,
+  onCreateQuotation,
 }: AppointmentFormModalProps) {
   // Allow modal to open even without customer for edit mode
   if (!isOpen) return null;
@@ -65,6 +67,7 @@ export function AppointmentFormModal({
           onCustomerArrived={onCustomerArrived}
           appointmentStatus={appointmentStatus}
           customerArrived={customerArrived}
+          onCreateQuotation={onCreateQuotation}
         />
       </div>
     </Modal>

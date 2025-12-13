@@ -22,8 +22,6 @@ interface AppointmentDetailModalProps {
   availableServiceCenters: typeof defaultServiceCenters;
   onCustomerArrived: () => void;
   onCustomerNotArrived: () => void;
-  setServiceIntakeForm: (form: ServiceIntakeForm) => void;
-  setArrivalMode: (mode: ServiceIntakeForm["arrivalMode"] | null) => void;
   setCurrentJobCard: (card: JobCard | null) => void;
   setCheckInSlipData: (data: any) => void;
   setShowCheckInSlipModal: (show: boolean) => void;
@@ -31,6 +29,9 @@ interface AppointmentDetailModalProps {
   setSelectedAppointment: (appointment: AppointmentRecord | null) => void;
   showToast: (message: string, type: "success" | "error") => void;
   appointments: AppointmentRecord[];
+  onConvertToQuotation?: () => void;
+  onGenerateCheckInSlip?: () => void;
+  currentJobCardId?: string | null;
 }
 
 export function AppointmentDetailModal({
@@ -45,8 +46,6 @@ export function AppointmentDetailModal({
   availableServiceCenters,
   onCustomerArrived,
   onCustomerNotArrived,
-  setServiceIntakeForm,
-  setArrivalMode,
   setCurrentJobCard,
   setCheckInSlipData,
   setShowCheckInSlipModal,
@@ -54,6 +53,9 @@ export function AppointmentDetailModal({
   setSelectedAppointment,
   showToast,
   appointments,
+  onConvertToQuotation,
+  onGenerateCheckInSlip,
+  currentJobCardId,
 }: AppointmentDetailModalProps) {
   if (!appointment) return null;
 
@@ -101,18 +103,10 @@ export function AppointmentDetailModal({
       // Update selectedAppointment state
       setSelectedAppointment({ ...appointment, status: "In Progress" });
 
-      // Pre-fill form with appointment data (no job card yet)
-      setServiceIntakeForm({
-        ...INITIAL_SERVICE_INTAKE_FORM,
-        serviceType: appointment.serviceType || "",
-        vehicleBrand: appointment.vehicle.split(" ")[0] || "",
-        vehicleModel: appointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
-        estimatedDeliveryDate: appointment.estimatedDeliveryDate || "",
-        customerComplaintIssue: appointment.customerComplaintIssue || "",
-      });
-
+      // Create job card automatically when customer arrives
+      // The job card will be created in the parent component via convertAppointmentToJobCard
       onCustomerArrived();
-      showToast("Customer arrival recorded. Please select an action: Create Quotation, Pass to Manager, or Generate Check-in Slip.", "success");
+      showToast("Customer arrival recorded. Job card will be created automatically. You can now create a quotation or generate a check-in slip.", "success");
     } catch (error) {
       console.error("Error recording customer arrival:", error);
       showToast("Failed to record customer arrival. Please try again.", "error");
@@ -120,8 +114,6 @@ export function AppointmentDetailModal({
   };
 
   const handleCustomerNotArrived = () => {
-    setServiceIntakeForm(INITIAL_SERVICE_INTAKE_FORM);
-    setArrivalMode(null);
     setCurrentJobCard(null);
     setCheckInSlipData(null);
     setShowCheckInSlipModal(false);
@@ -438,20 +430,60 @@ export function AppointmentDetailModal({
           appointment &&
           (customerArrivalStatus === "arrived" ||
             appointment.status === "In Progress" ||
-            appointment.status === "Sent to Manager") && (
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="text-green-600" size={24} />
-                <div>
-                  <h3 className="text-lg font-semibold text-green-800">Customer Arrived</h3>
-                  <p className="text-sm text-green-700">
-                    Appointment status: <span className="font-medium">{appointment.status}</span>
-                    {currentJobCard && (
-                      <span className="ml-2">• Job Card: <span className="font-medium">{currentJobCard.jobCardNumber}</span></span>
-                    )}
-                  </p>
+            appointment.status === "Sent to Manager" ||
+            appointment.status === "Quotation Created") && (
+            <div className="space-y-4">
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="text-green-600" size={24} />
+                  <div>
+                    <h3 className="text-lg font-semibold text-green-800">Customer Arrived</h3>
+                    <p className="text-sm text-green-700">
+                      Appointment status: <span className="font-medium">{appointment.status}</span>
+                      {currentJobCard && (
+                        <span className="ml-2">• Job Card: <span className="font-medium">{currentJobCard.jobCardNumber}</span></span>
+                      )}
+                    </p>
+                  </div>
                 </div>
               </div>
+
+              {/* Action Buttons */}
+              {(onConvertToQuotation || onGenerateCheckInSlip) && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Actions</h3>
+                  {(() => {
+                    // Check if quotation already exists for this appointment
+                    const existingQuotations = safeStorage.getItem<any[]>("quotations", []);
+                    const hasExistingQuotation = existingQuotations.some(
+                      (q) => q.appointmentId === appointment.id
+                    );
+                    
+                    return (
+                      <div className="flex gap-3">
+                        {onConvertToQuotation && (
+                          <button
+                            onClick={onConvertToQuotation}
+                            className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-indigo-600 text-white hover:bg-indigo-700 flex items-center justify-center gap-2"
+                          >
+                            <FileText size={18} />
+                            {hasExistingQuotation ? "Create New Quotation" : "Create Quotation"}
+                          </button>
+                        )}
+                    {onGenerateCheckInSlip && currentJobCardId && (
+                      <button
+                        onClick={onGenerateCheckInSlip}
+                        className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-2"
+                      >
+                        <FileText size={18} />
+                        Generate Check-in Slip
+                      </button>
+                    )}
+                  </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
       </div>

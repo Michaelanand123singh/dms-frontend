@@ -1,17 +1,21 @@
 import type { AppointmentRecord } from "./types";
 import type { AppointmentForm as AppointmentFormType } from "../components/appointment/types";
 import { formatTime } from "../components/appointment/utils";
+import { parseTime12To24 } from "@/shared/utils/date";
 import type { Vehicle } from "@/shared/types";
 import { STATUS_CONFIG } from "./constants";
 
 export const convertAppointmentToFormData = (appointment: AppointmentRecord): Partial<AppointmentFormType> => {
+  // Convert time from 12-hour format (hh:mm AM/PM) to 24-hour format (HH:mm) for HTML time input
+  const timeIn24Hour = parseTime12To24(appointment.time);
+  
   return {
     customerName: appointment.customerName,
     vehicle: appointment.vehicle,
     phone: appointment.phone,
     serviceType: appointment.serviceType,
     date: appointment.date,
-    time: appointment.time,
+    time: timeIn24Hour || appointment.time, // Fallback to original if conversion fails
     duration: appointment.duration.replace(" hours", "").replace(" hour", ""),
     serviceCenterId: appointment.serviceCenterId ? Number(appointment.serviceCenterId) : undefined,
     serviceCenterName: appointment.serviceCenterName || undefined,

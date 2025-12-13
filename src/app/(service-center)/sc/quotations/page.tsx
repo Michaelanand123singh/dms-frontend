@@ -170,26 +170,27 @@ function QuotationsContent() {
     }
   }, [customerSearchQuery, performCustomerSearch, clearCustomerSearch]);
 
-  // Handle pre-filling form from appointment service intake
+  // Handle pre-filling form from appointment data
   useEffect(() => {
     if (fromAppointment && typeof window !== "undefined") {
-      const serviceIntakeData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
+      const quotationData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
       
-      if (serviceIntakeData) {
+      if (quotationData && quotationData.appointmentData) {
+        const appointmentData = quotationData.appointmentData;
         const normalizedCenterId = normalizeServiceCenterId(
-          serviceIntakeData.serviceCenterId ?? serviceCenterContext.serviceCenterId
+          quotationData.serviceCenterId ?? serviceCenterContext.serviceCenterId
         );
         setActiveServiceCenterId(normalizedCenterId);
 
         // Find customer by phone or name
         const findCustomer = async () => {
           try {
-            await performCustomerSearch(serviceIntakeData.customerName || serviceIntakeData.phone, "auto");
+            await performCustomerSearch(quotationData.customerName || quotationData.phone, "auto");
             // Wait a bit for search results
             setTimeout(() => {
               const customers = customerSearchResults;
               const customer = customers.find(
-                (c) => c.phone === serviceIntakeData.phone || c.name === serviceIntakeData.customerName
+                (c) => c.phone === quotationData.phone || c.name === quotationData.customerName
               );
               
               if (customer) {
@@ -199,15 +200,15 @@ function QuotationsContent() {
                   ...prev,
                   customerId: String(customer.id),
                   documentType: "Quotation",
-                  notes: serviceIntakeData.serviceIntakeForm.customerComplaintIssue || "",
-                  customNotes: serviceIntakeData.serviceIntakeForm.previousServiceHistory || "",
-                  batterySerialNumber: serviceIntakeData.serviceIntakeForm.chargerSerialNumber || "",
+                  notes: appointmentData.customerComplaintIssue || "",
+                  customNotes: appointmentData.previousServiceHistory || "",
+                  batterySerialNumber: appointmentData.batterySerialNumber || appointmentData.chargerSerialNumber || "",
                 }));
                 
                 // Find matching vehicle
                 if (customer.vehicles && customer.vehicles.length > 0) {
                   const vehicle = customer.vehicles.find(
-                    (v) => v.registration === serviceIntakeData.serviceIntakeForm.registrationNumber
+                    (v) => v.registration === appointmentData.registrationNumber
                   ) || customer.vehicles[0];
                   
                   if (vehicle) {
@@ -224,8 +225,8 @@ function QuotationsContent() {
                 // Clear the stored data
                 safeStorage.removeItem("pendingQuotationFromAppointment");
               }
-              else if (serviceIntakeData.customerId) {
-                const decodedCustomerId = String(serviceIntakeData.customerId);
+              else if (quotationData.customerId) {
+                const decodedCustomerId = String(quotationData.customerId);
                 setForm((prev) => ({ ...prev, customerId: decodedCustomerId }));
                 setActiveCustomerId(decodedCustomerId);
                 setShowCreateModal(true);
@@ -328,6 +329,10 @@ const buildQuotationFromForm = (): Quotation => {
     (center) => normalizeServiceCenterId(center.id) === resolvedServiceCenterId
   );
 
+  // Get appointmentId from pendingQuotationFromAppointment if available
+  const pendingQuotationData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
+  const appointmentId = pendingQuotationData?.appointmentId || undefined;
+
   return {
     id: `qt-${Date.now()}`,
     quotationNumber,
@@ -335,6 +340,7 @@ const buildQuotationFromForm = (): Quotation => {
     customerId: resolvedCustomerId,
     vehicleId: form.vehicleId,
     serviceAdvisorId: userInfo?.id || "user-001",
+    appointmentId: appointmentId,
     documentType: form.documentType,
     quotationDate: form.quotationDate,
     validUntil: validUntil.toISOString().split("T")[0],
@@ -405,6 +411,31 @@ const persistQuotation = (quotation: Quotation) => {
   const updatedQuotations = [quotation, ...quotations];
   setQuotations(updatedQuotations);
   safeStorage.setItem("quotations", updatedQuotations);
+  
+  // Update appointment status if quotation is linked to an appointment
+  if (quotation.appointmentId) {
+    const appointments = safeStorage.getItem<any[]>("appointments", []);
+    const appointmentIndex = appointments.findIndex((apt) => apt.id === quotation.appointmentId);
+    
+    if (appointmentIndex !== -1) {
+      const appointment = appointments[appointmentIndex];
+      // Check if this is the first quotation for this appointment
+      const existingQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
+      const quotationsForAppointment = existingQuotations.filter(
+        (q) => q.appointmentId === quotation.appointmentId && q.id !== quotation.id
+      );
+      
+      // Update appointment status to "Quotation Created" if first quotation
+      // For subsequent quotations, status remains "Quotation Created" (allows multiple quotations)
+      if (quotationsForAppointment.length === 0 || appointment.status !== "Quotation Created") {
+        appointments[appointmentIndex] = {
+          ...appointment,
+          status: "Quotation Created",
+        };
+        safeStorage.setItem("appointments", appointments);
+      }
+    }
+  }
 };
 
 const sendQuotationToCustomerById = async (

@@ -35,6 +35,7 @@ export interface Quotation {
   customerId: string;
   vehicleId?: string;
   serviceAdvisorId?: string;
+  appointmentId?: string | number; // Link to source appointment
   documentType: "Quotation" | "Proforma Invoice";
   quotationDate: string;
   validUntil?: string;
