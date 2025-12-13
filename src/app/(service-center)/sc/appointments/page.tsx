@@ -1,10 +1,10 @@
 "use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
-import Image from "next/image";
-import { Calendar, Clock, User, Car, X, Phone, CheckCircle, AlertCircle, Eye, MapPin, Building2, AlertTriangle, Upload, FileText, Image as ImageIcon, Trash2, UserCheck, Camera, Mail } from "lucide-react";
+import { Calendar, Clock, X, Phone, CheckCircle, AlertCircle, Mail, User, Car } from "lucide-react";
 import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
 import { CameraModal } from "../components/shared";
+import { AppointmentGrid, Toast, AppointmentDetailModal, CustomerSearchModal } from "../components/appointments";
 import { useCustomerSearch } from "@/app/(service-center)/sc/components/customers";
 import { useRole } from "@/shared/hooks";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,8 +14,7 @@ import {
   canEditServiceDetails,
   canEditDocumentation,
   canEditOperationalDetails,
-  canEditBillingPayment,
-  canEditPostService,
+  canCreateAppointment,
 } from "@/shared/constants/roles";
 import {
   filterByServiceCenter,
@@ -24,174 +23,24 @@ import {
   staticServiceCenters,
 } from "@/app/(service-center)/sc/components/service-center";
 import { defaultJobCards } from "@/__mocks__/data/job-cards.mock";
+import { defaultAppointments } from "@/__mocks__/data/appointments.mock";
+import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
-import { populateJobCardPart1, createEmptyJobCardPart1, generateSrNoForPart2Items, createEmptyJobCardPart2A } from "@/shared/utils/jobCardData.util";
+import { populateJobCardPart1, createEmptyJobCardPart1 } from "@/shared/utils/jobCardData.util";
 import { customerService } from "@/features/customers/services/customer.service";
-import type { JobCardPart2Item } from "@/shared/types/job-card.types";
 import { AppointmentFormModal } from "../components/appointment/AppointmentFormModal";
 import type { AppointmentForm as AppointmentFormType } from "../components/appointment/types";
 import { getInitialAppointmentForm, formatTime } from "../components/appointment/utils";
-import { canCreateAppointment } from "@/shared/constants/roles";
+import type { AppointmentRecord, ServiceIntakeForm, ToastType, CustomerArrivalStatus } from "./types";
+import { convertAppointmentToFormData, formatVehicleString } from "./utils";
+import { SERVICE_CENTER_CODE_MAP, TOAST_DURATION, JOB_CARD_STORAGE_KEY, INITIAL_SERVICE_INTAKE_FORM } from "./constants";
 
-// ==================== Types ====================
-interface AppointmentRecord {
-  id: number;
-  customerName: string;
-  vehicle: string;
-  phone: string;
-  serviceType: string;
-  date: string;
-  time: string;
-  duration: string;
-  status: string;
-  customerExternalId?: string;
-  vehicleExternalId?: string;
-  serviceCenterId?: number | string;
-  serviceCenterName?: string;
-  assignedServiceCenter?: string; // Legacy field for backward compatibility
-  customerType?: "B2C" | "B2B";
-  customerComplaintIssue?: string;
-  previousServiceHistory?: string;
-  estimatedServiceTime?: string;
-  estimatedCost?: string;
-  odometerReading?: string;
-  isMajorIssue?: boolean;
-  documentationFiles?: {
-    customerIdProof?: number;
-    vehicleRCCopy?: number;
-    warrantyCardServiceBook?: number;
-    photosVideos?: number;
-  };
-  estimatedDeliveryDate?: string;
-  assignedServiceAdvisor?: string;
-  assignedTechnician?: string;
-  pickupDropRequired?: boolean;
-  pickupAddress?: string;
-  pickupState?: string;
-  pickupCity?: string;
-  pickupPincode?: string;
-  dropAddress?: string;
-  dropState?: string;
-  dropCity?: string;
-  dropPincode?: string;
-  preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
-  paymentMethod?: "Cash" | "Card" | "UPI" | "Online" | "Cheque";
-  gstRequirement?: boolean;
-  businessNameForInvoice?: string;
-  feedbackRating?: number;
-  nextServiceDueDate?: string;
-  amcSubscriptionStatus?: string;
-  createdByRole?: "call_center" | "service_advisor" | "service_manager"; // Track who created the appointment
-}
-
-// Import AppointmentForm from canonical types - no duplicate interface needed
-
-interface Complaint {
-  id: number;
-  customerName: string;
-  vehicle: string;
-  phone: string;
-  complaint: string;
-  severity: "Low" | "Medium" | "High" | "Critical";
-  status: "Open" | "In Progress" | "Resolved" | "Closed";
-  serviceCenterId?: number;
-  serviceCenterName?: string;
-  createdAt: string;
-}
-
-interface ComplaintForm {
-  customerName: string;
-  vehicle: string;
-  phone: string;
-  complaint: string;
-  severity: "Low" | "Medium" | "High" | "Critical";
-  serviceCenterId?: number;
-}
-
-interface DocumentationFiles {
-  files: File[];
-  urls: string[]; // For preview URLs
-}
-
-interface ServiceIntakeForm {
-  // Documentation
-  customerIdProof: DocumentationFiles;
-  vehicleRCCopy: DocumentationFiles;
-  warrantyCardServiceBook: DocumentationFiles;
-  photosVideos: DocumentationFiles;
-
-  // Vehicle Information
-  vehicleBrand: string;
-  vehicleModel: string;
-  registrationNumber: string;
-  vinChassisNumber: string;
-  variantBatteryCapacity: string;
-  motorNumber: string;
-  chargerSerialNumber: string;
-  dateOfPurchase: string;
-  warrantyStatus: string;
-  insuranceStartDate: string;
-  insuranceEndDate: string;
-  insuranceCompanyName: string;
-
-  // Service Details
-  serviceType: string;
-  customerComplaintIssue: string;
-  previousServiceHistory: string;
-  estimatedServiceTime: string;
-  estimatedCost: string;
-  odometerReading: string;
-
-  // Operational Details (Job Card)
-  estimatedDeliveryDate: string;
-  assignedServiceAdvisor: string;
-  assignedTechnician: string;
-  pickupDropRequired: boolean;
-  pickupAddress: string;
-  dropAddress: string;
-  preferredCommunicationMode: "Phone" | "Email" | "SMS" | "WhatsApp" | "";
-
-  // Billing & Payment
-  paymentMethod: "Cash" | "Card" | "UPI" | "Online" | "Cheque" | "";
-  gstRequirement: boolean;
-  businessNameForInvoice: string;
-  jobCardId?: string;
-  arrivalMode?: "vehicle_present" | "vehicle_absent" | "";
-  checkInNotes?: string;
-  checkInSlipNumber?: string;
-  checkInDate?: string;
-  checkInTime?: string;
-}
-
-interface ServiceIntakeRequest {
-  id: string;
-  appointmentId: number;
-  appointment: AppointmentRecord;
-  serviceIntakeForm: ServiceIntakeForm;
-  status: "pending" | "approved" | "rejected";
-  submittedAt: string;
-  submittedBy?: string;
-  approvedAt?: string;
-  approvedBy?: string;
-  rejectedAt?: string;
-  rejectedBy?: string;
-  rejectionReason?: string;
-  serviceCenterId?: number | string;
-  serviceCenterName?: string;
-}
-
-type ToastType = "success" | "error";
-const JOB_CARD_STORAGE_KEY = "jobCards";
-
+// ==================== Utility Functions ====================
 const loadJobCards = (): JobCard[] => {
   if (typeof window === "undefined") return [];
   const stored = safeStorage.getItem<JobCard[]>(JOB_CARD_STORAGE_KEY, []);
   return stored.length > 0 ? stored : [...defaultJobCards];
-};
-
-const persistJobCards = (cards: JobCard[]) => {
-  safeStorage.setItem(JOB_CARD_STORAGE_KEY, cards);
 };
 
 const deriveServiceCenterCode = (serviceCenterName?: string | null): string => {
@@ -220,429 +69,7 @@ const generateJobCardNumber = (serviceCenterCode: string, existing: JobCard[]): 
   return `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
 };
 
-const formatVehicleLabel = (vehicle: Vehicle): string => {
-  return `${vehicle.vehicleMake} ${vehicle.vehicleModel} (${vehicle.vehicleYear})`;
-};
 
-const findVehicleForAppointment = (
-  customer: CustomerWithVehicles | null,
-  appointmentVehicleLabel: string
-): Vehicle | undefined => {
-  if (!customer) return undefined;
-  return customer.vehicles.find((vehicle) => formatVehicleLabel(vehicle) === appointmentVehicleLabel);
-};
-
-const getCurrentTimeValue = (): string => {
-  const now = new Date();
-  return now.toTimeString().slice(0, 5);
-};
-type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
-type CustomerArrivalStatus = "arrived" | "not_arrived" | null;
-
-// ==================== Constants ====================
-// INITIAL_APPOINTMENT_FORM is now imported from canonical types file
-
-
-const INITIAL_DOCUMENTATION_FILES: DocumentationFiles = {
-  files: [],
-  urls: [],
-};
-
-const INITIAL_SERVICE_INTAKE_FORM: ServiceIntakeForm = {
-  // Documentation
-  customerIdProof: { ...INITIAL_DOCUMENTATION_FILES },
-  vehicleRCCopy: { ...INITIAL_DOCUMENTATION_FILES },
-  warrantyCardServiceBook: { ...INITIAL_DOCUMENTATION_FILES },
-  photosVideos: { ...INITIAL_DOCUMENTATION_FILES },
-
-  // Vehicle Information
-  vehicleBrand: "",
-  vehicleModel: "",
-  registrationNumber: "",
-  vinChassisNumber: "",
-  variantBatteryCapacity: "",
-  motorNumber: "",
-  chargerSerialNumber: "",
-  dateOfPurchase: "",
-  warrantyStatus: "",
-  insuranceStartDate: "",
-  insuranceEndDate: "",
-  insuranceCompanyName: "",
-
-  // Service Details
-  serviceType: "",
-  customerComplaintIssue: "",
-  previousServiceHistory: "",
-  estimatedServiceTime: "",
-  estimatedCost: "",
-  odometerReading: "",
-
-  // Operational Details (Job Card)
-  estimatedDeliveryDate: "",
-  assignedServiceAdvisor: "",
-  assignedTechnician: "",
-  pickupDropRequired: false,
-  pickupAddress: "",
-  dropAddress: "",
-  preferredCommunicationMode: "",
-
-  // Billing & Payment
-  paymentMethod: "",
-  gstRequirement: false,
-  businessNameForInvoice: "",
-  jobCardId: "",
-  arrivalMode: "",
-  checkInNotes: "",
-  checkInSlipNumber: "",
-  checkInDate: "",
-  checkInTime: "",
-};
-
-import { defaultAppointments } from "@/__mocks__/data/appointments.mock";
-import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
-import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
-
-const SERVICE_TYPES = SERVICE_TYPE_OPTIONS;
-
-const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
-  "1": "SC001",
-  "2": "SC002",
-  "3": "SC003",
-  "sc-001": "SC001",
-  "sc-002": "SC002",
-  "sc-003": "SC003",
-};
-
-const STATUS_CONFIG: Record<AppointmentStatus, { bg: string; text: string }> = {
-  Confirmed: { bg: "bg-green-100", text: "text-green-800" },
-  Pending: { bg: "bg-yellow-100", text: "text-yellow-800" },
-  Cancelled: { bg: "bg-red-100", text: "text-red-800" },
-};
-
-const TOAST_DURATION = 3000;
-const DEFAULT_MAX_APPOINTMENTS_PER_DAY = 20; // Default limit if not configured
-
-// ==================== Utility Functions ====================
-const formatVehicleString = (vehicle: Vehicle): string => {
-  return `${vehicle.vehicleMake} ${vehicle.vehicleModel} (${vehicle.vehicleYear})`;
-};
-
-const isCustomerWithVehicles = (customer: unknown): customer is CustomerWithVehicles => {
-  if (!customer || typeof customer !== "object") {
-    return false;
-  }
-  return "id" in customer && "name" in customer && "phone" in customer;
-};
-
-const getStatusBadgeClass = (status: string): string => {
-  const config = STATUS_CONFIG[status as AppointmentStatus] || { bg: "bg-gray-100", text: "text-gray-800" };
-  return `px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`;
-};
-
-// Convert AppointmentRecord to AppointmentFormType for editing
-const convertAppointmentToFormData = (appointment: AppointmentRecord): Partial<AppointmentFormType> => {
-  return {
-    customerName: appointment.customerName,
-    vehicle: appointment.vehicle,
-    phone: appointment.phone,
-    serviceType: appointment.serviceType,
-    date: appointment.date,
-    time: appointment.time,
-    duration: appointment.duration.replace(" hours", "").replace(" hour", ""),
-    serviceCenterId: appointment.serviceCenterId ? Number(appointment.serviceCenterId) : undefined,
-    serviceCenterName: appointment.serviceCenterName || undefined,
-    customerType: appointment.customerType,
-    customerComplaintIssue: appointment.customerComplaintIssue,
-    previousServiceHistory: appointment.previousServiceHistory,
-    estimatedServiceTime: appointment.estimatedServiceTime,
-    estimatedCost: appointment.estimatedCost?.replace("₹", "").replace(",", ""),
-    odometerReading: appointment.odometerReading,
-    isMajorIssue: appointment.isMajorIssue,
-    estimatedDeliveryDate: appointment.estimatedDeliveryDate,
-    assignedServiceAdvisor: appointment.assignedServiceAdvisor,
-    assignedTechnician: appointment.assignedTechnician,
-    pickupDropRequired: appointment.pickupDropRequired,
-    pickupAddress: appointment.pickupAddress,
-    pickupState: (appointment as any).pickupState,
-    pickupCity: (appointment as any).pickupCity,
-    pickupPincode: (appointment as any).pickupPincode,
-    dropAddress: appointment.dropAddress,
-    dropState: (appointment as any).dropState,
-    dropCity: (appointment as any).dropCity,
-    dropPincode: (appointment as any).dropPincode,
-    preferredCommunicationMode: appointment.preferredCommunicationMode,
-    paymentMethod: appointment.paymentMethod,
-    gstRequirement: appointment.gstRequirement,
-    businessNameForInvoice: appointment.businessNameForInvoice,
-    feedbackRating: appointment.feedbackRating,
-    nextServiceDueDate: appointment.nextServiceDueDate,
-    amcSubscriptionStatus: appointment.amcSubscriptionStatus,
-    serviceStatus: (appointment as any).serviceStatus,
-    // Vehicle Information Fields
-    vehicleBrand: (appointment as any).vehicleBrand,
-    vehicleModel: (appointment as any).vehicleModel,
-    registrationNumber: (appointment as any).registrationNumber,
-    vinChassisNumber: (appointment as any).vinChassisNumber,
-    variantBatteryCapacity: (appointment as any).variantBatteryCapacity,
-    motorNumber: (appointment as any).motorNumber,
-    chargerSerialNumber: (appointment as any).chargerSerialNumber,
-    dateOfPurchase: (appointment as any).dateOfPurchase,
-    warrantyStatus: (appointment as any).warrantyStatus,
-    insuranceStartDate: (appointment as any).insuranceStartDate,
-    insuranceEndDate: (appointment as any).insuranceEndDate,
-    insuranceCompanyName: (appointment as any).insuranceCompanyName,
-    vehicleColor: (appointment as any).vehicleColor,
-    // Documentation files (if stored as URLs)
-    customerIdProof: (appointment as any).customerIdProof,
-    vehicleRCCopy: (appointment as any).vehicleRCCopy,
-    warrantyCardServiceBook: (appointment as any).warrantyCardServiceBook,
-    photosVideos: (appointment as any).photosVideos,
-  };
-};
-
-// validateAppointmentForm is now imported from canonical types file
-
-
-// ==================== Reusable Components ====================
-// Form Input Component
-const FormInput = ({
-  label,
-  required,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  maxLength,
-  readOnly,
-  className = "",
-  ...props
-}: {
-  label: string;
-  required?: boolean;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  placeholder?: string;
-  type?: string;
-  maxLength?: number;
-  readOnly?: boolean;
-  className?: string;
-  [key: string]: any;
-}) => (
-  <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-2">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      readOnly={readOnly}
-      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 ${readOnly ? "bg-gray-100 cursor-not-allowed" : "bg-gray-50/50 focus:bg-white"
-        } ${className}`}
-      {...props}
-    />
-  </div>
-);
-
-// Form Select Component
-const FormSelect = ({
-  label,
-  required,
-  value,
-  onChange,
-  options,
-  placeholder,
-  className = "",
-  ...props
-}: {
-  label: string;
-  required?: boolean;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-  className?: string;
-  [key: string]: any;
-}) => (
-  <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-2">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
-    <select
-      value={value}
-      onChange={onChange}
-      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none text-gray-900 transition-all duration-200 ${className}`}
-      {...props}
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  </div>
-);
-
-// Customer Info Card Component
-const CustomerInfoCard = ({ customer, title = "Customer Information" }: { customer: CustomerWithVehicles; title?: string }) => (
-  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-    <h3 className="text-sm font-semibold text-indigo-900 mb-3">{title}</h3>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-      <div>
-        <p className="text-indigo-600 font-medium">Name</p>
-        <p className="text-gray-800 font-semibold">{customer.name}</p>
-      </div>
-      <div>
-        <p className="text-indigo-600 font-medium">Phone</p>
-        <p className="text-gray-800 font-semibold">{customer.phone}</p>
-      </div>
-      {customer.email && (
-        <div>
-          <p className="text-indigo-600 font-medium">Email</p>
-          <p className="text-gray-800 font-semibold">{customer.email}</p>
-        </div>
-      )}
-      {customer.address && (
-        <div>
-          <p className="text-indigo-600 font-medium">Address</p>
-          <p className="text-gray-800 font-semibold">{customer.address}</p>
-        </div>
-      )}
-      {customer.lastServiceCenterName && (
-        <div className="sm:col-span-2">
-          <p className="text-indigo-600 font-medium flex items-center gap-1">
-            <Building2 size={14} />
-            Last Service Center
-          </p>
-          <p className="text-gray-800 font-semibold">{customer.lastServiceCenterName}</p>
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-// Error Alert Component
-const ErrorAlert = ({ message }: { message: string }) => (
-  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
-    <AlertCircle className="text-red-600" size={20} strokeWidth={2} />
-    <p className="text-red-600 text-sm">{message}</p>
-  </div>
-);
-
-// ==================== Components ====================
-interface ToastProps {
-  show: boolean;
-  message: string;
-  type: ToastType;
-}
-
-const Toast = ({ show, message, type }: ToastProps) => {
-  if (!show) return null;
-
-  return (
-    <div
-      className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[10000] transition-all duration-300"
-      style={{ animation: "fadeInDown 0.3s ease-out" }}
-    >
-      <div
-        className={`${type === "success" ? "bg-green-600" : "bg-red-600"
-          } text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] max-w-md`}
-      >
-        {type === "success" ? (
-          <CheckCircle size={20} className="flex-shrink-0" />
-        ) : (
-          <AlertCircle size={20} className="flex-shrink-0" />
-        )}
-        <p className="font-medium">{message}</p>
-      </div>
-    </div>
-  );
-};
-
-interface StatusBadgeProps {
-  status: string;
-  size?: "sm" | "md";
-}
-
-const StatusBadge = ({ status, size = "sm" }: StatusBadgeProps) => {
-  const sizeClass = size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-1 text-sm";
-  return <span className={`${getStatusBadgeClass(status)} ${sizeClass}`}>{status}</span>;
-};
-
-interface ModalProps {
-  show: boolean;
-  onClose: () => void;
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-  maxWidth?: "md" | "lg" | "xl" | "2xl" | "4xl";
-}
-
-const Modal = ({ show, onClose, title, subtitle, children, maxWidth = "2xl" }: ModalProps) => {
-  if (!show) return null;
-
-  const maxWidthClass = {
-    md: "max-w-md",
-    lg: "max-w-lg",
-    xl: "max-w-xl",
-    "2xl": "max-w-2xl",
-    "4xl": "max-w-4xl",
-  }[maxWidth];
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
-      <div
-        className={`bg-white rounded-xl md:rounded-2xl shadow-2xl w-full ${maxWidthClass} mx-2 max-h-[90vh] overflow-y-auto p-4 md:p-6 z-[101]`}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-            {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition p-2 rounded-lg hover:bg-gray-100"
-          >
-            <X size={24} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-};
-
-// ==================== Utility Functions ====================
-/**
- * Find nearest service center based on customer address
- * Uses simple city matching for mock implementation
- */
-const findNearestServiceCenter = (customerAddress: string | undefined): number | null => {
-  if (!customerAddress) return null;
-
-  const addressLower = customerAddress.toLowerCase();
-
-  // Extract city from address (simple pattern matching)
-  const cities = [
-    { city: "delhi", centerId: 1 },
-    { city: "mumbai", centerId: 2 },
-    { city: "bangalore", centerId: 3 },
-    { city: "bengaluru", centerId: 3 },
-  ];
-
-  for (const { city, centerId } of cities) {
-    if (addressLower.includes(city)) {
-      return centerId;
-    }
-  }
-
-  // If no match, return first active service center
-  const activeCenters = defaultServiceCenters.filter((sc) => sc.status === "Active");
-  return activeCenters.length > 0 ? activeCenters[0].id : null;
-};
 
 // ==================== Main Component ====================
 function AppointmentsContent() {
@@ -653,9 +80,6 @@ function AppointmentsContent() {
   const isServiceManager = userRole === "sc_manager";
   const isInventoryManager = userRole === "inventory_manager";
   const canViewCostEstimation = isServiceAdvisor || isServiceManager || isInventoryManager;
-  const canAccessBillingSection = isServiceAdvisor || isServiceManager || isInventoryManager;
-  const canAccessBusinessName = canAccessBillingSection;
-
   // Permission checks for appointments - SC Manager restrictions
   const canCreateNewAppointment = canCreateAppointment(userRole);
   const canEditCustomerInformation = canEditCustomerInfo(userRole);
@@ -663,8 +87,6 @@ function AppointmentsContent() {
   const canEditServiceDetailsSection = canEditServiceDetails(userRole);
   const canEditDocumentationSection = canEditDocumentation(userRole);
   const canEditOperationalDetailsSection = canEditOperationalDetails(userRole);
-  const canEditBillingPaymentSection = canEditBillingPayment(userRole);
-  const canEditPostServiceSection = canEditPostService(userRole);
 
   // State Management
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
@@ -721,10 +143,10 @@ function AppointmentsContent() {
   // Customer search for appointment creation (separate from detail modal search)
   const appointmentCustomerSearch = useCustomerSearch();
   const appointmentCustomerSearchResults: CustomerWithVehicles[] = appointmentCustomerSearch.results as CustomerWithVehicles[];
-  const typedAppointmentCustomerSearchResults = appointmentCustomerSearchResults as CustomerWithVehicles[];
   const appointmentCustomerSearchLoading = appointmentCustomerSearch.loading;
   const searchAppointmentCustomer = appointmentCustomerSearch.search;
   const clearAppointmentCustomerSearch = appointmentCustomerSearch.clear;
+  const [customerSearchValue, setCustomerSearchValue] = useState("");
 
   // Initialize workflow mock data on first load
   useEffect(() => {
@@ -1334,6 +756,7 @@ function AppointmentsContent() {
     setSelectedAppointmentCustomer(null);
     setSelectedAppointmentVehicle(null);
     setAppointmentFormData(getInitialAppointmentForm());
+    setCustomerSearchValue("");
     clearAppointmentCustomerSearch();
   }, [clearAppointmentCustomerSearch]);
 
@@ -1381,7 +804,13 @@ function AppointmentsContent() {
       duration: `${form.duration} hours`,
       status: selectedAppointment?.status || "Confirmed", // Preserve existing status
       customerType: selectedAppointmentCustomer?.customerType || form.customerType,
-      alternateMobile: (form as any).alternateMobile,
+      // Customer Contact & Address Fields
+      whatsappNumber: form.whatsappNumber,
+      alternateMobile: form.alternateMobile,
+      email: form.email,
+      address: form.address,
+      cityState: form.cityState,
+      pincode: form.pincode,
       customerComplaintIssue: form.customerComplaintIssue,
       previousServiceHistory: form.previousServiceHistory,
       estimatedServiceTime: form.estimatedServiceTime,
@@ -1404,13 +833,6 @@ function AppointmentsContent() {
       dropCity: (form as any).dropCity,
       dropPincode: (form as any).dropPincode,
       preferredCommunicationMode: form.preferredCommunicationMode,
-      paymentMethod: form.paymentMethod,
-      gstRequirement: form.gstRequirement,
-      businessNameForInvoice: form.businessNameForInvoice,
-      serviceStatus: form.serviceStatus,
-      feedbackRating: form.feedbackRating,
-      nextServiceDueDate: form.nextServiceDueDate,
-      amcSubscriptionStatus: form.amcSubscriptionStatus,
       documentationFiles: {
         customerIdProof: form.customerIdProof?.files.length || 0,
         vehicleRCCopy: form.vehicleRCCopy?.files.length || 0,
@@ -1420,6 +842,7 @@ function AppointmentsContent() {
       // Vehicle Information Fields
       vehicleBrand: form.vehicleBrand,
       vehicleModel: form.vehicleModel,
+      vehicleYear: form.vehicleYear,
       registrationNumber: form.registrationNumber,
       vinChassisNumber: form.vinChassisNumber,
       variantBatteryCapacity: form.variantBatteryCapacity,
@@ -1431,6 +854,18 @@ function AppointmentsContent() {
       insuranceEndDate: form.insuranceEndDate,
       insuranceCompanyName: form.insuranceCompanyName,
       vehicleColor: form.vehicleColor,
+      // Job Card Conversion Fields
+      batterySerialNumber: form.batterySerialNumber,
+      mcuSerialNumber: form.mcuSerialNumber,
+      vcuSerialNumber: form.vcuSerialNumber,
+      otherPartSerialNumber: form.otherPartSerialNumber,
+      technicianObservation: form.technicianObservation,
+      // Service Intake/Check-in Fields
+      arrivalMode: form.arrivalMode,
+      checkInNotes: form.checkInNotes,
+      checkInSlipNumber: form.checkInSlipNumber,
+      checkInDate: form.checkInDate,
+      checkInTime: form.checkInTime,
       // Store documentation files for later retrieval
       customerIdProof: form.customerIdProof,
       vehicleRCCopy: form.vehicleRCCopy,
@@ -1931,558 +1366,38 @@ function AppointmentsContent() {
 
         {/* Appointments Grid */}
         <div className="bg-white rounded-2xl shadow-md p-6">
-          {visibleAppointments.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="mx-auto text-gray-400 mb-4" size={48} />
-              <p className="text-gray-500 text-lg">No appointments scheduled</p>
-              <p className="text-gray-400 text-sm mt-2">No appointments available</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {visibleAppointments.map((apt) => (
-                <div
-                  key={apt.id}
-                  className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all duration-200 bg-white hover:bg-blue-50/30 relative group"
-                >
-                  {/* Delete Icon */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Are you sure you want to delete the appointment for ${apt.customerName}?`)) {
-                        handleDeleteAppointment(apt.id);
-                      }
-                    }}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-red-50 text-red-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 z-10"
-                    title="Delete appointment"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                  
-                  <div onClick={() => handleAppointmentClick(apt)}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Clock size={16} className="text-blue-600" />
-                        <span className="font-semibold text-sm">{apt.time}</span>
-                      </div>
-                      <StatusBadge status={apt.status} />
-                    </div>
-                    <p className="font-medium text-gray-800 text-sm mb-1">{apt.customerName}</p>
-                    <div className="flex items-center gap-1 mb-1">
-                      <Car size={12} className="text-gray-400" />
-                      <p className="text-xs text-gray-600">{apt.vehicle}</p>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">{apt.serviceType}</p>
-                    <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">
-                      <Phone size={12} className="text-gray-400" />
-                      <p className="text-xs text-gray-500">{apt.phone}</p>
-                    </div>
-                    {isCallCenter && apt.serviceCenterName && (
-                      <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">
-                        <Building2 size={12} className="text-indigo-500" />
-                        <p className="text-xs text-indigo-600 font-medium">{apt.serviceCenterName}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <AppointmentGrid
+            appointments={visibleAppointments}
+            onAppointmentClick={handleAppointmentClick}
+            onDeleteAppointment={handleDeleteAppointment}
+            isCallCenter={isCallCenter}
+          />
         </div>
       </div>
 
       {/* Appointment Detail Modal */}
-      <Modal
-        show={showDetailModal}
+      <AppointmentDetailModal
+        isOpen={showDetailModal}
         onClose={closeDetailModal}
-        title="Appointment Details"
-        maxWidth={isServiceAdvisor && customerArrivalStatus === "arrived" ? "4xl" : "2xl"}
-      >
-        {selectedAppointment && (
-          <div className="space-y-6">
-            {/* Customer Information */}
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <User size={20} />
-                Customer Information
-              </h3>
-              <div className="space-y-5">
-                {detailCustomer ? (
-                  <CustomerInfoCard customer={detailCustomer} title="Customer Details" />
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Customer Name</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.customerName}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Phone Number</p>
-                      <p className="font-medium text-gray-800 flex items-center gap-2">
-                        <Phone size={14} />
-                        {selectedAppointment.phone}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Vehicle</p>
-                    <p className="font-medium text-gray-800 flex items-center gap-2">
-                      <Car size={14} />
-                      {selectedAppointment.vehicle}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Customer Type</p>
-                    <p className="font-medium text-gray-800">
-                      {selectedAppointment.customerType ?? "Not captured"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Preferred Communication</p>
-                    <p className="font-medium text-gray-800">
-                      {selectedAppointment.preferredCommunicationMode ?? "Not captured"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Pickup / Drop Required</p>
-                    <p className="font-medium text-gray-800">
-                      {selectedAppointment.pickupDropRequired ? "Yes" : "No"}
-                    </p>
-                  </div>
-                  {selectedAppointment.pickupAddress && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Pickup Address</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.pickupAddress}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.dropAddress && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Drop Address</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.dropAddress}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Service Center Assignment (for Call Center) */}
-            {isCallCenter && selectedAppointment.serviceCenterName && (
-              <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <Building2 className="text-indigo-600" size={20} />
-                  Assigned Service Center
-                </h3>
-                <div className="flex items-center gap-3">
-                  <MapPin className="text-indigo-600" size={18} strokeWidth={2} />
-                  <div>
-                    <p className="font-semibold text-gray-900">{selectedAppointment.serviceCenterName}</p>
-                    {(() => {
-                      const center = availableServiceCenters.find(
-                        (sc) => sc.name === selectedAppointment.serviceCenterName
-                      );
-                      return center && <p className="text-sm text-gray-600">{center.location}</p>;
-                    })()}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Service Details */}
-            {(selectedAppointment.customerComplaintIssue || 
-              selectedAppointment.previousServiceHistory || 
-              selectedAppointment.estimatedServiceTime || 
-              selectedAppointment.estimatedCost || 
-              selectedAppointment.odometerReading || 
-              selectedAppointment.estimatedDeliveryDate ||
-              selectedAppointment.isMajorIssue !== undefined) && (
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <FileText size={20} className="text-purple-600" />
-                  Service Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedAppointment.isMajorIssue !== undefined && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Major Issue</p>
-                      <p className="font-medium text-gray-800">
-                        {selectedAppointment.isMajorIssue ? (
-                          <span className="flex items-center gap-1 text-red-600">
-                            <AlertTriangle size={14} />
-                            Yes
-                          </span>
-                        ) : (
-                          <span className="text-green-600">No</span>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                  {selectedAppointment.customerComplaintIssue && (
-                    <div className="md:col-span-2">
-                      <p className="text-sm text-gray-500 mb-1">Customer Complaint / Issue</p>
-                      <p className="font-medium text-gray-800 whitespace-pre-wrap">{selectedAppointment.customerComplaintIssue}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.previousServiceHistory && (
-                    <div className="md:col-span-2">
-                      <p className="text-sm text-gray-500 mb-1">Previous Service History</p>
-                      <p className="font-medium text-gray-800 whitespace-pre-wrap">{selectedAppointment.previousServiceHistory}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.estimatedServiceTime && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Estimated Service Time</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.estimatedServiceTime}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.estimatedCost && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Estimated Cost</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.estimatedCost}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.odometerReading && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Odometer Reading</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.odometerReading}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.estimatedDeliveryDate && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Estimated Delivery Date</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.estimatedDeliveryDate}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Operational Details */}
-            {(selectedAppointment.assignedServiceAdvisor || 
-              selectedAppointment.assignedTechnician || 
-              selectedAppointment.documentationFiles) && (
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <UserCheck size={20} className="text-blue-600" />
-                  Operational Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedAppointment.assignedServiceAdvisor && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Assigned Service Advisor</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.assignedServiceAdvisor}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.assignedTechnician && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Assigned Technician</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.assignedTechnician}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.documentationFiles && (
-                    <div className="md:col-span-2">
-                      <p className="text-sm text-gray-500 mb-1">Documentation Files</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                        {selectedAppointment.documentationFiles.customerIdProof !== undefined && (
-                          <div className="bg-white p-2 rounded border border-gray-200">
-                            <p className="text-xs text-gray-500">Customer ID Proof</p>
-                            <p className="font-medium text-gray-800">{selectedAppointment.documentationFiles.customerIdProof} file(s)</p>
-                          </div>
-                        )}
-                        {selectedAppointment.documentationFiles.vehicleRCCopy !== undefined && (
-                          <div className="bg-white p-2 rounded border border-gray-200">
-                            <p className="text-xs text-gray-500">Vehicle RC Copy</p>
-                            <p className="font-medium text-gray-800">{selectedAppointment.documentationFiles.vehicleRCCopy} file(s)</p>
-                          </div>
-                        )}
-                        {selectedAppointment.documentationFiles.warrantyCardServiceBook !== undefined && (
-                          <div className="bg-white p-2 rounded border border-gray-200">
-                            <p className="text-xs text-gray-500">Warranty Card</p>
-                            <p className="font-medium text-gray-800">{selectedAppointment.documentationFiles.warrantyCardServiceBook} file(s)</p>
-                          </div>
-                        )}
-                        {selectedAppointment.documentationFiles.photosVideos !== undefined && (
-                          <div className="bg-white p-2 rounded border border-gray-200">
-                            <p className="text-xs text-gray-500">Photos/Videos</p>
-                            <p className="font-medium text-gray-800">{selectedAppointment.documentationFiles.photosVideos} file(s)</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Pickup/Drop Details */}
-            {selectedAppointment.pickupDropRequired && (
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <MapPin size={20} className="text-green-600" />
-                  Pickup / Drop Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedAppointment.pickupAddress && (
-                    <div className="md:col-span-2">
-                      <p className="text-sm text-gray-500 mb-1">Pickup Address</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.pickupAddress}</p>
-                      {((selectedAppointment as any).pickupState || (selectedAppointment as any).pickupCity || (selectedAppointment as any).pickupPincode) && (
-                        <div className="mt-1 text-sm text-gray-600">
-                          {[(selectedAppointment as any).pickupCity, (selectedAppointment as any).pickupState, (selectedAppointment as any).pickupPincode].filter(Boolean).join(", ")}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {selectedAppointment.dropAddress && (
-                    <div className="md:col-span-2">
-                      <p className="text-sm text-gray-500 mb-1">Drop Address</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.dropAddress}</p>
-                      {((selectedAppointment as any).dropState || (selectedAppointment as any).dropCity || (selectedAppointment as any).dropPincode) && (
-                        <div className="mt-1 text-sm text-gray-600">
-                          {[(selectedAppointment as any).dropCity, (selectedAppointment as any).dropState, (selectedAppointment as any).dropPincode].filter(Boolean).join(", ")}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Billing & Payment Details */}
-            {(selectedAppointment.paymentMethod || 
-              selectedAppointment.gstRequirement !== undefined || 
-              selectedAppointment.businessNameForInvoice) && (
-              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <FileText size={20} className="text-yellow-600" />
-                  Billing & Payment Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedAppointment.paymentMethod && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Payment Method</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.paymentMethod}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.gstRequirement !== undefined && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">GST Requirement</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.gstRequirement ? "Yes" : "No"}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.businessNameForInvoice && (
-                    <div className="md:col-span-2">
-                      <p className="text-sm text-gray-500 mb-1">Business Name for Invoice</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.businessNameForInvoice}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Post-Service Feedback */}
-            {(selectedAppointment.feedbackRating !== undefined || 
-              selectedAppointment.nextServiceDueDate || 
-              selectedAppointment.amcSubscriptionStatus) && (
-              <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <CheckCircle size={20} className="text-indigo-600" />
-                  Post-Service Feedback
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedAppointment.feedbackRating !== undefined && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Feedback Rating</p>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-800">{selectedAppointment.feedbackRating}/5</p>
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <span
-                              key={star}
-                              className={`text-lg ${star <= selectedAppointment.feedbackRating! ? "text-yellow-400" : "text-gray-300"}`}
-                            >
-                              ★
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {selectedAppointment.nextServiceDueDate && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Next Service Due Date</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.nextServiceDueDate}</p>
-                    </div>
-                  )}
-                  {selectedAppointment.amcSubscriptionStatus && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">AMC Subscription Status</p>
-                      <p className="font-medium text-gray-800">{selectedAppointment.amcSubscriptionStatus}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Appointment Details */}
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <Calendar size={20} />
-                Appointment Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Service Type</p>
-                  <p className="font-medium text-gray-800">{selectedAppointment.serviceType}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Date</p>
-                  <p className="font-medium text-gray-800">{selectedAppointment.date}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Time</p>
-                  <p className="font-medium text-gray-800 flex items-center gap-2">
-                    <Clock size={14} />
-                    {selectedAppointment.time}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Duration</p>
-                  <p className="font-medium text-gray-800">{selectedAppointment.duration}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Status</p>
-                  <StatusBadge status={selectedAppointment.status} size="md" />
-                </div>
-              </div>
-            </div>
-
-            {/* Customer Arrival Section (Service Advisor Only) - Only show if customer hasn't arrived yet */}
-            {isServiceAdvisor &&
-              customerArrivalStatus !== "arrived" &&
-              selectedAppointment.status !== "In Progress" &&
-              selectedAppointment.status !== "Sent to Manager" && (
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <CheckCircle size={20} className="text-blue-600" />
-                    Customer Arrival Status
-                  </h3>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => {
-                        if (!selectedAppointment) return;
-
-                        try {
-                          // Check if pickup/drop service was selected
-                          const hasPickupDropService = selectedAppointment.pickupDropRequired &&
-                            (selectedAppointment.pickupAddress || selectedAppointment.dropAddress);
-
-                          if (hasPickupDropService) {
-                            // Create pickup/drop charges and send to customer
-                            const pickupDropCharges = {
-                              id: `PDC-${Date.now()}`,
-                              appointmentId: selectedAppointment.id,
-                              customerName: selectedAppointment.customerName,
-                              phone: selectedAppointment.phone,
-                              pickupAddress: selectedAppointment.pickupAddress,
-                              dropAddress: selectedAppointment.dropAddress,
-                              amount: 500, // Default pickup/drop charge (can be configurable)
-                              status: "pending",
-                              createdAt: new Date().toISOString(),
-                            };
-
-                            // Store pickup/drop charges
-                            const existingCharges = safeStorage.getItem<any[]>("pickupDropCharges", []);
-                            safeStorage.setItem("pickupDropCharges", [...existingCharges, pickupDropCharges]);
-
-                            // Send charges to customer via WhatsApp
-                            const message = `Hello ${selectedAppointment.customerName}, your pickup/drop service charges are ₹${pickupDropCharges.amount}.\n\nPickup Address: ${selectedAppointment.pickupAddress || "N/A"}\nDrop Address: ${selectedAppointment.dropAddress || "N/A"}\n\nPlease confirm to proceed.`;
-                            const whatsappUrl = `https://wa.me/${selectedAppointment.phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
-                            window.open(whatsappUrl, "_blank");
-
-                            showToast("Pickup/drop charges created and sent to customer via WhatsApp.", "success");
-                          }
-
-                          // Update appointment status to "In Progress"
-                          const updatedAppointments = appointments.map((apt) =>
-                            apt.id === selectedAppointment.id
-                              ? { ...apt, status: "In Progress" }
-                              : apt
-                          );
-                          setAppointments(updatedAppointments);
-                          safeStorage.setItem("appointments", updatedAppointments);
-
-                          // Update selectedAppointment state
-                          setSelectedAppointment({ ...selectedAppointment, status: "In Progress" });
-
-                          // Set arrival status (NO JOB CARD CREATED YET)
-                          setCustomerArrivalStatus("arrived");
-
-                          // Pre-fill form with appointment data (no job card yet)
-                          setServiceIntakeForm({
-                            ...INITIAL_SERVICE_INTAKE_FORM,
-                            serviceType: selectedAppointment.serviceType || "",
-                            vehicleBrand: selectedAppointment.vehicle.split(" ")[0] || "",
-                            vehicleModel: selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "",
-                            estimatedDeliveryDate: selectedAppointment.estimatedDeliveryDate || "",
-                            customerComplaintIssue: selectedAppointment.customerComplaintIssue || "",
-                          });
-
-                          showToast("Customer arrival recorded. Please select an action: Create Quotation, Pass to Manager, or Generate Check-in Slip.", "success");
-                        } catch (error) {
-                          console.error("Error recording customer arrival:", error);
-                          showToast("Failed to record customer arrival. Please try again.", "error");
-                        }
-                      }}
-                      className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-white text-gray-700 border border-gray-300 hover:bg-green-50"
-                    >
-                      <CheckCircle size={18} className="inline mr-2" />
-                      Customer Arrived
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCustomerArrivalStatus("not_arrived");
-                        setServiceIntakeForm(INITIAL_SERVICE_INTAKE_FORM);
-                        setArrivalMode(null);
-                        setCurrentJobCard(null);
-                        setCheckInSlipData(null);
-                        setShowCheckInSlipModal(false);
-                      }}
-                      className={`flex-1 px-4 py-3 rounded-lg font-medium transition ${customerArrivalStatus === "not_arrived"
-                          ? "bg-red-600 text-white"
-                          : "bg-white text-gray-700 border border-gray-300 hover:bg-red-50"
-                        }`}
-                    >
-                      <AlertCircle size={18} className="inline mr-2" />
-                      Customer Not Arrived
-                    </button>
-                  </div>
-                </div>
-              )}
-
-            {/* Customer Arrival Confirmation (Service Advisor Only) - Show when customer has arrived */}
-            {isServiceAdvisor &&
-              selectedAppointment &&
-              (customerArrivalStatus === "arrived" ||
-                selectedAppointment.status === "In Progress" ||
-                selectedAppointment.status === "Sent to Manager") && (
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="text-green-600" size={24} />
-                    <div>
-                      <h3 className="text-lg font-semibold text-green-800">Customer Arrived</h3>
-                      <p className="text-sm text-green-700">
-                        Appointment status: <span className="font-medium">{selectedAppointment.status}</span>
-                        {currentJobCard && (
-                          <span className="ml-2">• Job Card: <span className="font-medium">{currentJobCard.jobCardNumber}</span></span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-          </div>
-        )}
-      </Modal>
+        appointment={selectedAppointment}
+        detailCustomer={detailCustomer}
+        isCallCenter={isCallCenter}
+        isServiceAdvisor={isServiceAdvisor}
+        customerArrivalStatus={customerArrivalStatus}
+        currentJobCard={currentJobCard}
+        availableServiceCenters={availableServiceCenters}
+        onCustomerArrived={() => setCustomerArrivalStatus("arrived")}
+        onCustomerNotArrived={() => setCustomerArrivalStatus("not_arrived")}
+        setServiceIntakeForm={setServiceIntakeForm}
+        setArrivalMode={setArrivalMode}
+        setCurrentJobCard={setCurrentJobCard}
+        setCheckInSlipData={setCheckInSlipData}
+        setShowCheckInSlipModal={setShowCheckInSlipModal}
+        setAppointments={setAppointments}
+        setSelectedAppointment={setSelectedAppointment}
+        showToast={showToast}
+        appointments={appointments}
+      />
 
       {showCheckInSlipModal && checkInSlipData && (
         <CheckInSlip data={checkInSlipData} onClose={() => setShowCheckInSlipModal(false)} />
@@ -2507,92 +1422,17 @@ function AppointmentsContent() {
       )}
 
       {/* Customer Search Modal for Appointment Creation (only show when creating new, not editing) */}
-      {showAppointmentFormModal && !selectedAppointmentCustomer && !selectedAppointment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white p-6 flex items-center justify-between rounded-t-2xl z-10 border-b border-gray-200">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">Select Customer</h2>
-                <p className="text-sm text-gray-600 mt-1">Search for a customer to schedule an appointment</p>
-              </div>
-              <button
-                onClick={handleCloseAppointmentForm}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
-              >
-                <X size={24} strokeWidth={2} />
-              </button>
-            </div>
-            <div className="p-6">
-              <div className="mb-4">
-                <input
-                  type="text"
-                  placeholder="Search by name, phone, or email..."
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value.trim().length >= 2) {
-                      searchAppointmentCustomer(value, "name");
-                    } else {
-                      clearAppointmentCustomerSearch();
-                    }
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-                {appointmentCustomerSearchLoading && (
-                  <div className="mt-2 text-center">
-                    <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                  </div>
-                )}
-              </div>
-              {appointmentCustomerSearchResults.length > 0 && (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {typedAppointmentCustomerSearchResults.map((customer) => (
-                    <div
-                      key={customer.id}
-                      onClick={() => handleCustomerSelectForAppointment(customer)}
-                      className="p-4 border border-gray-200 rounded-lg hover:bg-indigo-50 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-indigo-100">
-                          <User className="text-indigo-600" size={20} strokeWidth={2} />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-900">{customer.name}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                            <span className="flex items-center gap-1">
-                              <Phone size={14} />
-                              {customer.phone}
-                            </span>
-                            {customer.email && (
-                              <span className="flex items-center gap-1">
-                                <Mail size={14} />
-                                {customer.email}
-                              </span>
-                            )}
-                            {customer.vehicles && customer.vehicles.length > 0 && (
-                              <span className="flex items-center gap-1">
-                                <Car size={14} />
-                                {customer.vehicles.length} vehicle{customer.vehicles.length > 1 ? "s" : ""}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <CheckCircle className="text-indigo-600 shrink-0" size={20} strokeWidth={2} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {!appointmentCustomerSearchLoading && appointmentCustomerSearchResults.length === 0 && (
-                <div className="text-center py-12">
-                  <AlertCircle className="mx-auto text-gray-400 mb-4" size={48} />
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">No Customers Found</h3>
-                  <p className="text-gray-600">Start typing to search for customers</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <CustomerSearchModal
+        isOpen={showAppointmentFormModal && !selectedAppointmentCustomer && !selectedAppointment}
+        onClose={handleCloseAppointmentForm}
+        searchValue={customerSearchValue}
+        onSearchChange={setCustomerSearchValue}
+        onSearch={searchAppointmentCustomer}
+        onClearSearch={clearAppointmentCustomerSearch}
+        customers={appointmentCustomerSearchResults}
+        loading={appointmentCustomerSearchLoading}
+        onSelectCustomer={handleCustomerSelectForAppointment}
+      />
 
     </div>
   );

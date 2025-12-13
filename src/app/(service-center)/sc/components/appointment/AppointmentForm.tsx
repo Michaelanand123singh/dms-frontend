@@ -31,7 +31,7 @@ import {
   getMinTime,
 } from "@/shared/utils/date";
 import { validatePhone } from "@/shared/utils/validation";
-import { getInitialAppointmentForm } from "./utils";
+import { getInitialAppointmentForm, mapVehicleToFormData, mapCustomerToFormData } from "./utils";
 
 export interface AppointmentFormProps {
   initialData?: Partial<AppointmentFormType>;
@@ -92,9 +92,6 @@ export const AppointmentForm = ({
   const canAccessPreferredCommunication = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
   const canAccessPickupAddress = hasRoleAccess(["call_center", "service_advisor"]);
   const canAssignServiceCenter = canAccessOperationalDetails;
-  const canAccessPostServiceSurvey = hasRoleAccess(["call_center", "service_advisor", "sc_manager", "service_engineer"]);
-  const canAccessServiceStatus = hasRoleAccess(["call_center", "service_advisor", "sc_manager", "service_engineer"]);
-  const canAccessAMCStatus = hasRoleAccess(["call_center", "service_advisor", "sc_manager"]);
   const canViewCostEstimation = canAccessEstimatedCost || isInventoryManager;
 
   // Form state
@@ -170,10 +167,19 @@ export const AppointmentForm = ({
   // Update form when customer/vehicle info changes
   useEffect(() => {
     if (selectedCustomer) {
+      const customerData = mapCustomerToFormData(selectedCustomer);
       setFormData((prev) => ({
         ...prev,
-        customerName: selectedCustomer.name || prev.customerName,
-        phone: selectedCustomer.phone || prev.phone,
+        // Only populate if field is empty (preserve user edits)
+        customerName: prev.customerName || customerData.customerName || "",
+        phone: prev.phone || customerData.phone || "",
+        whatsappNumber: prev.whatsappNumber || customerData.whatsappNumber || "",
+        alternateMobile: prev.alternateMobile || customerData.alternateMobile || "",
+        email: prev.email || customerData.email || "",
+        address: prev.address || customerData.address || "",
+        cityState: prev.cityState || customerData.cityState || "",
+        pincode: prev.pincode || customerData.pincode || "",
+        customerType: prev.customerType || customerData.customerType || undefined,
       }));
       
       // Auto-select first vehicle if none selected and customer has vehicles
@@ -211,6 +217,31 @@ export const AppointmentForm = ({
       }
     }
   }, [formData.vehicle, selectedCustomer, onVehicleChange]);
+
+  // Auto-populate vehicle fields from selectedVehicle (preserve user edits)
+  useEffect(() => {
+    if (selectedVehicle) {
+      const vehicleData = mapVehicleToFormData(selectedVehicle);
+      setFormData((prev) => ({
+        ...prev,
+        // Only populate if field is empty (preserve user edits)
+        vehicleBrand: prev.vehicleBrand || vehicleData.vehicleBrand || "",
+        vehicleModel: prev.vehicleModel || vehicleData.vehicleModel || "",
+        vehicleYear: prev.vehicleYear || vehicleData.vehicleYear || undefined,
+        registrationNumber: prev.registrationNumber || vehicleData.registrationNumber || "",
+        vinChassisNumber: prev.vinChassisNumber || vehicleData.vinChassisNumber || "",
+        variantBatteryCapacity: prev.variantBatteryCapacity || vehicleData.variantBatteryCapacity || "",
+        motorNumber: prev.motorNumber || vehicleData.motorNumber || "",
+        chargerSerialNumber: prev.chargerSerialNumber || vehicleData.chargerSerialNumber || "",
+        vehicleColor: prev.vehicleColor || vehicleData.vehicleColor || "",
+        dateOfPurchase: prev.dateOfPurchase || vehicleData.dateOfPurchase || "",
+        warrantyStatus: prev.warrantyStatus || vehicleData.warrantyStatus || "",
+        insuranceStartDate: prev.insuranceStartDate || vehicleData.insuranceStartDate || "",
+        insuranceEndDate: prev.insuranceEndDate || vehicleData.insuranceEndDate || "",
+        insuranceCompanyName: prev.insuranceCompanyName || vehicleData.insuranceCompanyName || "",
+      }));
+    }
+  }, [selectedVehicle]);
 
   const handleAssignNearestServiceCenter = useCallback(() => {
     if (!selectedCustomer?.address) return;
@@ -434,7 +465,124 @@ export const AppointmentForm = ({
           </p>
         )}
       </div>
-
+  {/* Vehicle Information Section */}
+  <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
+        <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
+          <span className="w-1 h-6 bg-green-600 rounded"></span>
+          Vehicle Information
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Vehicle Brand"
+            value={formData.vehicleBrand || ""}
+            onChange={(e) => updateFormData({ vehicleBrand: e.target.value })}
+            placeholder="Enter vehicle brand"
+          />
+          <FormInput
+            label="Vehicle Model"
+            value={formData.vehicleModel || ""}
+            onChange={(e) => updateFormData({ vehicleModel: e.target.value })}
+            placeholder="Enter vehicle model"
+          />
+          <FormInput
+            label="Registration Number"
+            value={formData.registrationNumber || ""}
+            onChange={(e) => updateFormData({ registrationNumber: e.target.value.toUpperCase() })}
+            placeholder="Enter registration number"
+          />
+          <FormInput
+            label="VIN / Chassis Number"
+            value={formData.vinChassisNumber || ""}
+            onChange={(e) => updateFormData({ vinChassisNumber: e.target.value.toUpperCase() })}
+            placeholder="Enter VIN/Chassis number"
+          />
+          <FormInput
+            label="Variant / Battery Capacity"
+            value={formData.variantBatteryCapacity || ""}
+            onChange={(e) => updateFormData({ variantBatteryCapacity: e.target.value })}
+            placeholder="Enter variant/battery capacity"
+          />
+          <FormInput
+            label="Motor Number"
+            value={formData.motorNumber || ""}
+            onChange={(e) => updateFormData({ motorNumber: e.target.value })}
+            placeholder="Enter motor number"
+          />
+          <FormInput
+            label="Charger Serial Number"
+            value={formData.chargerSerialNumber || ""}
+            onChange={(e) => updateFormData({ chargerSerialNumber: e.target.value })}
+            placeholder="Enter charger serial number"
+          />
+          <div>
+            <FormInput
+              label="Date of Purchase"
+              type="date"
+              value={formData.dateOfPurchase || ""}
+              onChange={(e) => updateFormData({ dateOfPurchase: e.target.value })}
+            />
+            {formData.dateOfPurchase && (() => {
+              const purchaseDate = new Date(formData.dateOfPurchase);
+              const today = new Date();
+              const yearsDiff = today.getFullYear() - purchaseDate.getFullYear();
+              const monthsDiff = today.getMonth() - purchaseDate.getMonth();
+              let vehicleAge = "";
+              if (yearsDiff > 0) {
+                vehicleAge = monthsDiff >= 0
+                  ? `${yearsDiff} year${yearsDiff > 1 ? 's' : ''}`
+                  : `${yearsDiff - 1} year${yearsDiff - 1 > 1 ? 's' : ''}`;
+              } else if (monthsDiff > 0) {
+                vehicleAge = `${monthsDiff} month${monthsDiff > 1 ? 's' : ''}`;
+              } else {
+                vehicleAge = "Less than 1 month";
+              }
+              return (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">Vehicle Age:</span> {vehicleAge}
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+          <FormSelect
+            label="Warranty Status"
+            value={formData.warrantyStatus || ""}
+            onChange={(e) => updateFormData({ warrantyStatus: e.target.value })}
+            placeholder="Select warranty status"
+            options={[
+              { value: "", label: "Select warranty status" },
+              { value: "Active", label: "Active" },
+              { value: "Expired", label: "Expired" },
+              { value: "Not Applicable", label: "Not Applicable" },
+            ]}
+          />
+          <FormInput
+            label="Insurance Start Date"
+            type="date"
+            value={formData.insuranceStartDate || ""}
+            onChange={(e) => updateFormData({ insuranceStartDate: e.target.value })}
+          />
+          <FormInput
+            label="Insurance End Date"
+            type="date"
+            value={formData.insuranceEndDate || ""}
+            onChange={(e) => updateFormData({ insuranceEndDate: e.target.value })}
+          />
+          <FormInput
+            label="Insurance Company Name"
+            value={formData.insuranceCompanyName || ""}
+            onChange={(e) => updateFormData({ insuranceCompanyName: e.target.value })}
+            placeholder="Enter insurance company name"
+          />
+          <FormInput
+            label="Vehicle Color"
+            value={formData.vehicleColor || ""}
+            onChange={(e) => updateFormData({ vehicleColor: e.target.value })}
+            placeholder="Enter vehicle color"
+          />
+        </div>
+      </div>
       {/* Service Type */}
       <FormSelect
         label="Service Type"
@@ -560,6 +708,7 @@ export const AppointmentForm = ({
           </div>
         </div>
       )}
+
 
       {/* Documentation Section */}
       {(hasDocUploadAccess || hasDropoffMediaAccess) && (
@@ -819,124 +968,7 @@ export const AppointmentForm = ({
         />
       )}
 
-      {/* Vehicle Information Section */}
-      <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200">
-        <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center gap-2">
-          <span className="w-1 h-6 bg-green-600 rounded"></span>
-          Vehicle Information
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormInput
-            label="Vehicle Brand"
-            value={formData.vehicleBrand || ""}
-            onChange={(e) => updateFormData({ vehicleBrand: e.target.value })}
-            placeholder="Enter vehicle brand"
-          />
-          <FormInput
-            label="Vehicle Model"
-            value={formData.vehicleModel || ""}
-            onChange={(e) => updateFormData({ vehicleModel: e.target.value })}
-            placeholder="Enter vehicle model"
-          />
-          <FormInput
-            label="Registration Number"
-            value={formData.registrationNumber || ""}
-            onChange={(e) => updateFormData({ registrationNumber: e.target.value.toUpperCase() })}
-            placeholder="Enter registration number"
-          />
-          <FormInput
-            label="VIN / Chassis Number"
-            value={formData.vinChassisNumber || ""}
-            onChange={(e) => updateFormData({ vinChassisNumber: e.target.value.toUpperCase() })}
-            placeholder="Enter VIN/Chassis number"
-          />
-          <FormInput
-            label="Variant / Battery Capacity"
-            value={formData.variantBatteryCapacity || ""}
-            onChange={(e) => updateFormData({ variantBatteryCapacity: e.target.value })}
-            placeholder="Enter variant/battery capacity"
-          />
-          <FormInput
-            label="Motor Number"
-            value={formData.motorNumber || ""}
-            onChange={(e) => updateFormData({ motorNumber: e.target.value })}
-            placeholder="Enter motor number"
-          />
-          <FormInput
-            label="Charger Serial Number"
-            value={formData.chargerSerialNumber || ""}
-            onChange={(e) => updateFormData({ chargerSerialNumber: e.target.value })}
-            placeholder="Enter charger serial number"
-          />
-          <div>
-            <FormInput
-              label="Date of Purchase"
-              type="date"
-              value={formData.dateOfPurchase || ""}
-              onChange={(e) => updateFormData({ dateOfPurchase: e.target.value })}
-            />
-            {formData.dateOfPurchase && (() => {
-              const purchaseDate = new Date(formData.dateOfPurchase);
-              const today = new Date();
-              const yearsDiff = today.getFullYear() - purchaseDate.getFullYear();
-              const monthsDiff = today.getMonth() - purchaseDate.getMonth();
-              let vehicleAge = "";
-              if (yearsDiff > 0) {
-                vehicleAge = monthsDiff >= 0
-                  ? `${yearsDiff} year${yearsDiff > 1 ? 's' : ''}`
-                  : `${yearsDiff - 1} year${yearsDiff - 1 > 1 ? 's' : ''}`;
-              } else if (monthsDiff > 0) {
-                vehicleAge = `${monthsDiff} month${monthsDiff > 1 ? 's' : ''}`;
-              } else {
-                vehicleAge = "Less than 1 month";
-              }
-              return (
-                <div className="mt-2">
-                  <p className="text-sm text-gray-600">
-                    <span className="font-medium">Vehicle Age:</span> {vehicleAge}
-                  </p>
-                </div>
-              );
-            })()}
-          </div>
-          <FormSelect
-            label="Warranty Status"
-            value={formData.warrantyStatus || ""}
-            onChange={(e) => updateFormData({ warrantyStatus: e.target.value })}
-            placeholder="Select warranty status"
-            options={[
-              { value: "", label: "Select warranty status" },
-              { value: "Active", label: "Active" },
-              { value: "Expired", label: "Expired" },
-              { value: "Not Applicable", label: "Not Applicable" },
-            ]}
-          />
-          <FormInput
-            label="Insurance Start Date"
-            type="date"
-            value={formData.insuranceStartDate || ""}
-            onChange={(e) => updateFormData({ insuranceStartDate: e.target.value })}
-          />
-          <FormInput
-            label="Insurance End Date"
-            type="date"
-            value={formData.insuranceEndDate || ""}
-            onChange={(e) => updateFormData({ insuranceEndDate: e.target.value })}
-          />
-          <FormInput
-            label="Insurance Company Name"
-            value={formData.insuranceCompanyName || ""}
-            onChange={(e) => updateFormData({ insuranceCompanyName: e.target.value })}
-            placeholder="Enter insurance company name"
-          />
-          <FormInput
-            label="Vehicle Color"
-            value={formData.vehicleColor || ""}
-            onChange={(e) => updateFormData({ vehicleColor: e.target.value })}
-            placeholder="Enter vehicle color"
-          />
-        </div>
-      </div>
+    
 
       {/* Date and Time */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,0 +1,115 @@
+export interface AppointmentRecord {
+  id: number;
+  customerName: string;
+  vehicle: string;
+  phone: string;
+  serviceType: string;
+  date: string;
+  time: string;
+  duration: string;
+  status: string;
+  customerExternalId?: string;
+  vehicleExternalId?: string;
+  serviceCenterId?: number | string;
+  serviceCenterName?: string;
+  assignedServiceCenter?: string; // Legacy field for backward compatibility
+  customerType?: "B2C" | "B2B";
+  customerComplaintIssue?: string;
+  previousServiceHistory?: string;
+  estimatedServiceTime?: string;
+  estimatedCost?: string;
+  odometerReading?: string;
+  documentationFiles?: {
+    customerIdProof?: number;
+    vehicleRCCopy?: number;
+    warrantyCardServiceBook?: number;
+    photosVideos?: number;
+  };
+  estimatedDeliveryDate?: string;
+  assignedServiceAdvisor?: string;
+  assignedTechnician?: string;
+  pickupDropRequired?: boolean;
+  pickupAddress?: string;
+  pickupState?: string;
+  pickupCity?: string;
+  pickupPincode?: string;
+  dropAddress?: string;
+  dropState?: string;
+  dropCity?: string;
+  dropPincode?: string;
+  preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
+  createdByRole?: "call_center" | "service_advisor" | "service_manager"; // Track who created the appointment
+}
+
+export interface DocumentationFiles {
+  files: File[];
+  urls: string[]; // For preview URLs
+}
+
+export interface ServiceIntakeForm {
+  // Documentation
+  customerIdProof: DocumentationFiles;
+  vehicleRCCopy: DocumentationFiles;
+  warrantyCardServiceBook: DocumentationFiles;
+  photosVideos: DocumentationFiles;
+
+  // Vehicle Information
+  vehicleBrand: string;
+  vehicleModel: string;
+  registrationNumber: string;
+  vinChassisNumber: string;
+  variantBatteryCapacity: string;
+  motorNumber: string;
+  chargerSerialNumber: string;
+  dateOfPurchase: string;
+  warrantyStatus: string;
+  insuranceStartDate: string;
+  insuranceEndDate: string;
+  insuranceCompanyName: string;
+
+  // Service Details
+  serviceType: string;
+  customerComplaintIssue: string;
+  previousServiceHistory: string;
+  estimatedServiceTime: string;
+  estimatedCost: string;
+  odometerReading: string;
+
+  // Operational Details (Job Card)
+  estimatedDeliveryDate: string;
+  assignedServiceAdvisor: string;
+  assignedTechnician: string;
+  pickupDropRequired: boolean;
+  pickupAddress: string;
+  dropAddress: string;
+  preferredCommunicationMode: "Phone" | "Email" | "SMS" | "WhatsApp" | "";
+
+  jobCardId?: string;
+  arrivalMode?: "vehicle_present" | "vehicle_absent" | "";
+  checkInNotes?: string;
+  checkInSlipNumber?: string;
+  checkInDate?: string;
+  checkInTime?: string;
+}
+
+export interface ServiceIntakeRequest {
+  id: string;
+  appointmentId: number;
+  appointment: AppointmentRecord;
+  serviceIntakeForm: ServiceIntakeForm;
+  status: "pending" | "approved" | "rejected";
+  submittedAt: string;
+  submittedBy?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
+  serviceCenterId?: number | string;
+  serviceCenterName?: string;
+}
+
+export type ToastType = "success" | "error";
+export type CustomerArrivalStatus = "arrived" | "not_arrived" | null;
+export type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
+

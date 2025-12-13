@@ -21,7 +21,6 @@ export interface Appointment {
   estimatedServiceTime?: string;
   estimatedCost?: string;
   odometerReading?: string;
-  isMajorIssue?: boolean;
   documentationFiles?: {
     customerIdProof?: number;
     vehicleRCCopy?: number;
@@ -41,12 +40,7 @@ export interface Appointment {
   dropCity?: string;
   dropPincode?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
-  paymentMethod?: "Cash" | "Card" | "UPI" | "Online" | "Cheque";
-  gstRequirement?: boolean;
-  businessNameForInvoice?: string;
-  feedbackRating?: number;
-  nextServiceDueDate?: string;
-  amcSubscriptionStatus?: string;
+  feedbackRating?: number; // Customer feedback rating (1-5 stars)
 }
 
 export interface DocumentationFiles {
@@ -70,7 +64,6 @@ export interface AppointmentForm {
   estimatedServiceTime?: string;
   estimatedCost?: string;
   odometerReading?: string;
-  isMajorIssue?: boolean;
   customerIdProof?: DocumentationFiles;
   vehicleRCCopy?: DocumentationFiles;
   warrantyCardServiceBook?: DocumentationFiles;
@@ -88,16 +81,19 @@ export interface AppointmentForm {
   dropCity?: string;
   dropPincode?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
-  paymentMethod?: "Cash" | "Card" | "UPI" | "Online" | "Cheque";
-  gstRequirement?: boolean;
-  businessNameForInvoice?: string;
-  feedbackRating?: number;
-  nextServiceDueDate?: string;
-  amcSubscriptionStatus?: string;
-  serviceStatus?: string; // Post-Service Feedback: Service Status (Pending, In Service, Ready for Delivery, Delivered, Cancelled)
+  
+  // Customer Contact & Address Fields
+  whatsappNumber?: string;
+  alternateMobile?: string;
+  email?: string;
+  address?: string;
+  cityState?: string;
+  pincode?: string;
+  
   // Vehicle Information Fields
   vehicleBrand?: string;
   vehicleModel?: string;
+  vehicleYear?: number;
   registrationNumber?: string;
   vinChassisNumber?: string;
   variantBatteryCapacity?: string;
@@ -109,6 +105,20 @@ export interface AppointmentForm {
   insuranceEndDate?: string;
   insuranceCompanyName?: string;
   vehicleColor?: string;
+  
+  // Job Card Conversion Fields
+  batterySerialNumber?: string;
+  mcuSerialNumber?: string;
+  vcuSerialNumber?: string;
+  otherPartSerialNumber?: string;
+  technicianObservation?: string;
+  
+  // Service Intake/Check-in Fields
+  arrivalMode?: "vehicle_present" | "vehicle_absent" | "check_in_only";
+  checkInNotes?: string;
+  checkInSlipNumber?: string;
+  checkInDate?: string;
+  checkInTime?: string;
 }
 
 export const INITIAL_DOCUMENTATION_FILES: DocumentationFiles = {
@@ -132,7 +142,6 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   estimatedServiceTime: undefined,
   estimatedCost: undefined,
   odometerReading: undefined,
-  isMajorIssue: undefined,
   customerIdProof: undefined,
   vehicleRCCopy: undefined,
   warrantyCardServiceBook: undefined,
@@ -150,15 +159,17 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   dropCity: undefined,
   dropPincode: undefined,
   preferredCommunicationMode: undefined,
-  paymentMethod: undefined,
-  gstRequirement: undefined,
-  businessNameForInvoice: undefined,
-  feedbackRating: undefined,
-  nextServiceDueDate: undefined,
-  amcSubscriptionStatus: undefined,
-  serviceStatus: undefined,
+  // Customer Contact & Address Fields
+  whatsappNumber: undefined,
+  alternateMobile: undefined,
+  email: undefined,
+  address: undefined,
+  cityState: undefined,
+  pincode: undefined,
+  // Vehicle Information Fields
   vehicleBrand: undefined,
   vehicleModel: undefined,
+  vehicleYear: undefined,
   registrationNumber: undefined,
   vinChassisNumber: undefined,
   variantBatteryCapacity: undefined,
@@ -170,6 +181,18 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   insuranceEndDate: undefined,
   insuranceCompanyName: undefined,
   vehicleColor: undefined,
+  // Job Card Conversion Fields
+  batterySerialNumber: undefined,
+  mcuSerialNumber: undefined,
+  vcuSerialNumber: undefined,
+  otherPartSerialNumber: undefined,
+  technicianObservation: undefined,
+  // Service Intake/Check-in Fields
+  arrivalMode: undefined,
+  checkInNotes: undefined,
+  checkInSlipNumber: undefined,
+  checkInDate: undefined,
+  checkInTime: undefined,
 };
 
 export const DEFAULT_MAX_APPOINTMENTS_PER_DAY = 20;
@@ -180,9 +203,6 @@ export const validateAppointmentForm = (form: AppointmentForm, isCallCenter: boo
   }
   if (!/^\d{10}$/.test(form.phone.replace(/\s|[-+_]/g, "").replace(/^91/, ""))) {
     return "Please enter a valid 10-digit phone number.";
-  }
-  if (isCallCenter && form.isMajorIssue && !form.customerComplaintIssue) {
-    return "Customer Complaint/Issue Description is required for major issues.";
   }
   return null;
 };
