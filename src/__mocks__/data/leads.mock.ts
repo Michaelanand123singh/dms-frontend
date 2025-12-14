@@ -15,9 +15,11 @@ export interface Lead {
   inquiryType: string;
   serviceType?: string;
   source?: string;
-  status: "new" | "in_discussion" | "converted" | "lost";
-  convertedTo?: "appointment" | "quotation";
+  status: "new" | "in_discussion" | "job_card_in_progress" | "converted" | "lost";
+  convertedTo?: "appointment" | "quotation" | "job_card";
   convertedId?: string;
+  quotationId?: string; // Link to quotation
+  jobCardId?: string; // Link to job card
   notes?: string;
   followUpDate?: string;
   assignedTo?: string;

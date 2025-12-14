@@ -36,9 +36,11 @@ interface Lead {
   inquiryType: string;
   serviceType?: string;
   source?: string;
-  status: "new" | "in_discussion" | "converted" | "lost";
-  convertedTo?: "appointment" | "quotation";
+  status: "new" | "in_discussion" | "job_card_in_progress" | "converted" | "lost";
+  convertedTo?: "appointment" | "quotation" | "job_card";
   convertedId?: string;
+  quotationId?: string; // Link to quotation
+  jobCardId?: string; // Link to job card
   notes?: string;
   followUpDate?: string;
   assignedTo?: string;
@@ -47,7 +49,7 @@ interface Lead {
   updatedAt: string;
 }
 
-type LeadStatus = "new" | "in_discussion" | "converted" | "lost";
+type LeadStatus = "new" | "in_discussion" | "job_card_in_progress" | "converted" | "lost";
 type LeadFilterType = "all" | LeadStatus;
 
 export default function Leads() {
@@ -275,6 +277,8 @@ export default function Leads() {
         return "bg-blue-100 text-blue-700 border-blue-300";
       case "in_discussion":
         return "bg-yellow-100 text-yellow-700 border-yellow-300";
+      case "job_card_in_progress":
+        return "bg-purple-100 text-purple-700 border-purple-300";
       case "converted":
         return "bg-green-100 text-green-700 border-green-300";
       case "lost":
@@ -319,7 +323,7 @@ export default function Leads() {
               />
             </div>
             <div className="flex gap-2">
-              {(["all", "new", "in_discussion", "converted", "lost"] as LeadFilterType[]).map((f) => (
+              {(["all", "new", "in_discussion", "job_card_in_progress", "converted", "lost"] as LeadFilterType[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
@@ -394,7 +398,9 @@ export default function Leads() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(lead.status)}`}>
-                          {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
+                          {lead.status === "job_card_in_progress" 
+                            ? "Job Card In Progress"
+                            : lead.status.charAt(0).toUpperCase() + lead.status.slice(1).replace(/_/g, " ")}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -412,24 +418,6 @@ export default function Leads() {
                           >
                             <Eye size={18} />
                           </button>
-                          {lead.status !== "converted" && lead.status !== "lost" && (
-                            <>
-                              <button
-                                onClick={() => handleConvertToAppointment(lead)}
-                                className="text-green-600 hover:text-green-900"
-                                title="Convert to Appointment"
-                              >
-                                <Calendar size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleConvertToQuotation(lead)}
-                                className="text-purple-600 hover:text-purple-900"
-                                title="Convert to Quotation"
-                              >
-                                <FileText size={18} />
-                              </button>
-                            </>
-                          )}
                           <button
                             onClick={() => {
                               setEditingLead(lead);

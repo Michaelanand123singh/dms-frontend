@@ -22,6 +22,7 @@ export const ROUTES = {
   PARTS_ENTRY: "/inventory-manager/parts-entry",
   PARTS_ORDER_ENTRY: "/inventory-manager/parts-order-entry",
   PARTS_ORDER_VIEW: "/inventory-manager/parts-order-view",
+  INVENTORY_MANAGER_OTC_ORDERS: "/inventory-manager/otc-orders",
   // Central Inventory Manager routes
   CENTRAL_INVENTORY_DASHBOARD: "/central-inventory/dashboard",
   CENTRAL_INVENTORY_PURCHASE_ORDERS: "/central-inventory/purchase-orders",
