@@ -700,6 +700,27 @@ export default function JobCards() {
     setJobCards(updatedJobCards);
     safeStorage.setItem("jobCards", updatedJobCards);
     
+    // Update lead status to converted when service is invoiced (completed)
+    if (selectedJob.id) {
+      const existingLeads = safeStorage.getItem<any[]>("leads", []);
+      const leadIndex = existingLeads.findIndex((l) => l.jobCardId === selectedJob.id);
+      
+      if (leadIndex !== -1) {
+        const lead = existingLeads[leadIndex];
+        const updatedNotes = lead.notes 
+          ? `${lead.notes}\nService completed and invoiced on ${new Date().toLocaleString()}. Invoice: ${invoiceNumber}`
+          : `Service completed and invoiced on ${new Date().toLocaleString()}. Invoice: ${invoiceNumber}`;
+        
+        existingLeads[leadIndex] = {
+          ...lead,
+          status: "converted" as const,
+          notes: updatedNotes,
+          updatedAt: new Date().toISOString(),
+        };
+        safeStorage.setItem("leads", existingLeads);
+      }
+    }
+    
     alert(`Invoice ${invoiceNumber} created and sent to service advisor.`);
   };
 
@@ -826,18 +847,43 @@ export default function JobCards() {
       //   }
       // );
 
-      setJobCards(
-        jobCards.map((job) =>
-          job.id === jobId
-            ? {
+      const updatedJobCards = jobCards.map((job) =>
+        job.id === jobId
+          ? {
               ...job,
               status,
               startTime: status === "In Progress" ? (typeof window !== "undefined" ? new Date().toLocaleString() : new Date().toISOString()) : job.startTime,
               completedAt: status === "Completed" ? (typeof window !== "undefined" ? new Date().toLocaleString() : new Date().toISOString()) : job.completedAt,
             }
-            : job
-        )
+          : job
       );
+      setJobCards(updatedJobCards);
+      safeStorage.setItem("jobCards", updatedJobCards);
+      
+      // Update lead status to converted when service is completed or invoiced
+      if ((status === "Completed" || status === "Invoiced") && jobId) {
+        const existingLeads = safeStorage.getItem<any[]>("leads", []);
+        const leadIndex = existingLeads.findIndex((l) => l.jobCardId === jobId);
+        
+        if (leadIndex !== -1) {
+          const lead = existingLeads[leadIndex];
+          const completionNote = status === "Invoiced" 
+            ? `Service completed and invoiced on ${new Date().toLocaleString()}`
+            : `Service completed on ${new Date().toLocaleString()}`;
+          const updatedNotes = lead.notes 
+            ? `${lead.notes}\n${completionNote}`
+            : completionNote;
+          
+          existingLeads[leadIndex] = {
+            ...lead,
+            status: "converted" as const,
+            notes: updatedNotes,
+            updatedAt: new Date().toISOString(),
+          };
+          safeStorage.setItem("leads", existingLeads);
+        }
+      }
+      
       setShowStatusUpdateModal(false);
       setUpdatingStatusJobId(null);
     } catch (error) {

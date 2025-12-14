@@ -41,6 +41,8 @@ export interface Quotation {
   validUntil?: string;
   hasInsurance: boolean;
   insurerId?: string;
+  insuranceStartDate?: string;
+  insuranceEndDate?: string;
   subtotal: number;
   discount: number;
   discountPercent: number;
@@ -128,6 +130,9 @@ export interface CreateQuotationForm {
   validUntilDays: number; // 15, 30, or custom
   hasInsurance: boolean;
   insurerId?: string;
+  insuranceCompanyName?: string; // For display when insurer not matched
+  insuranceStartDate?: string;
+  insuranceEndDate?: string;
   items: QuotationItem[];
   discount: number;
   notes?: string;
