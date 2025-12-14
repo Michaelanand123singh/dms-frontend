@@ -23,6 +23,7 @@ import {
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import type { Part, PartFormData } from "@/shared/types/inventory.types";
 import * as XLSX from "xlsx";
+import { InventoryPartForm, type InventoryPartFormData } from "../../../components/inventory/InventoryPartForm";
 
 export default function PartsMasterPage() {
   const [parts, setParts] = useState<Part[]>([]);
@@ -39,15 +40,52 @@ export default function PartsMasterPage() {
     failed: number;
     errors: string[];
   } | null>(null);
-  const [formData, setFormData] = useState<PartFormData>({
+  const [formData, setFormData] = useState<InventoryPartFormData & {
+    partId: string;
+    partNumber: string;
+    description: string;
+    minStockLevel: number;
+    unit: string;
+    price: number | string; // Support both for compatibility
+  }>({
     partId: "",
     partName: "",
     partNumber: "",
+    sku: "",
+    partCode: "",
     category: "",
-    price: 0,
+    quantity: "",
+    price: "",
+    status: "In Stock",
     description: "",
     minStockLevel: 0,
     unit: "piece",
+    // Basic Part Info
+    brandName: "",
+    variant: "",
+    partType: "NEW",
+    color: "NA",
+    // Purchase (Incoming)
+    preGstAmountToUs: "",
+    gstRateInput: "",
+    gstInputAmount: "",
+    postGstAmountToUs: "",
+    // Sale (Outgoing)
+    salePricePreGst: "",
+    gstRateOutput: "",
+    gstOutputAmount: "",
+    postGstSaleAmount: "",
+    // Labour Association
+    associatedLabourName: "",
+    associatedLabourCode: "",
+    workTime: "",
+    labourRate: "",
+    labourGstRate: "",
+    labourGstAmount: "",
+    labourPostGstAmount: "",
+    // High Value Part
+    highValuePart: false,
+    partSerialNumber: "",
   });
 
   useEffect(() => {
@@ -92,10 +130,20 @@ export default function PartsMasterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const partData: PartFormData = {
+        partId: formData.partId || "",
+        partName: formData.partName,
+        partNumber: formData.partNumber || "",
+        category: formData.category,
+        price: typeof formData.price === 'string' ? parseFloat(formData.price) || 0 : (formData.price || 0),
+        description: formData.description || "",
+        minStockLevel: formData.minStockLevel || 0,
+        unit: formData.unit || "piece",
+      };
       if (editingPart) {
-        await partsMasterService.update(editingPart.id, formData);
+        await partsMasterService.update(editingPart.id, partData);
       } else {
-        await partsMasterService.create(formData);
+        await partsMasterService.create(partData);
       }
       setShowModal(false);
       setEditingPart(null);
@@ -113,11 +161,41 @@ export default function PartsMasterPage() {
       partId: part.partId,
       partName: part.partName,
       partNumber: part.partNumber,
+      sku: (part as any).sku || "",
+      partCode: (part as any).partCode || "",
       category: part.category,
-      price: part.price,
+      quantity: String((part as any).stockQuantity || ""),
+      price: String(part.price || ""),
+      status: (part as any).status || "In Stock",
       description: part.description || "",
       minStockLevel: part.minStockLevel,
       unit: part.unit,
+      // Basic Part Info
+      brandName: (part as any).brandName || "",
+      variant: (part as any).variant || "",
+      partType: (part as any).partType || "NEW",
+      color: (part as any).color || "NA",
+      // Purchase (Incoming)
+      preGstAmountToUs: (part as any).preGstAmountToUs || "",
+      gstRateInput: (part as any).gstRateInput || "",
+      gstInputAmount: (part as any).gstInputAmount || "",
+      postGstAmountToUs: (part as any).postGstAmountToUs || "",
+      // Sale (Outgoing)
+      salePricePreGst: (part as any).salePricePreGst || "",
+      gstRateOutput: (part as any).gstRateOutput || "",
+      gstOutputAmount: (part as any).gstOutputAmount || "",
+      postGstSaleAmount: (part as any).postGstSaleAmount || "",
+      // Labour Association
+      associatedLabourName: (part as any).associatedLabourName || "",
+      associatedLabourCode: (part as any).associatedLabourCode || "",
+      workTime: (part as any).workTime || "",
+      labourRate: (part as any).labourRate || "",
+      labourGstRate: (part as any).labourGstRate || "",
+      labourGstAmount: (part as any).labourGstAmount || "",
+      labourPostGstAmount: (part as any).labourPostGstAmount || "",
+      // High Value Part
+      highValuePart: (part as any).highValuePart || false,
+      partSerialNumber: (part as any).partSerialNumber || "",
     });
     setShowModal(true);
   };
@@ -139,11 +217,41 @@ export default function PartsMasterPage() {
       partId: "",
       partName: "",
       partNumber: "",
+      sku: "",
+      partCode: "",
       category: "",
-      price: 0,
+      quantity: "",
+      price: "",
+      status: "In Stock",
       description: "",
       minStockLevel: 0,
       unit: "piece",
+      // Basic Part Info
+      brandName: "",
+      variant: "",
+      partType: "NEW",
+      color: "NA",
+      // Purchase (Incoming)
+      preGstAmountToUs: "",
+      gstRateInput: "",
+      gstInputAmount: "",
+      postGstAmountToUs: "",
+      // Sale (Outgoing)
+      salePricePreGst: "",
+      gstRateOutput: "",
+      gstOutputAmount: "",
+      postGstSaleAmount: "",
+      // Labour Association
+      associatedLabourName: "",
+      associatedLabourCode: "",
+      workTime: "",
+      labourRate: "",
+      labourGstRate: "",
+      labourGstAmount: "",
+      labourPostGstAmount: "",
+      // High Value Part
+      highValuePart: false,
+      partSerialNumber: "",
     });
   };
 
@@ -203,7 +311,33 @@ export default function PartsMasterPage() {
           description: String(getValue(["Description", "description", "Desc"]) || ""),
           minStockLevel: parseInt(getValue(["Min Stock", "MinStock", "min_stock", "Min Stock Level", "min_stock_level"]) || "0") || 0,
           unit: String(getValue(["Unit", "unit", "UOM"]) || "piece"),
-        };
+          // Basic Part Info
+          brandName: String(getValue(["Brand Name", "BrandName", "brand_name", "Brand"]) || ""),
+          variant: String(getValue(["Variant", "variation"]) || ""),
+          partType: (getValue(["Part Type", "PartType", "part_type"]) || "NEW") as "NEW" | "OLD",
+          color: String(getValue(["Color", "colour"]) || "NA"),
+          // Purchase (Incoming)
+          preGstAmountToUs: String(getValue(["Pre GST Amount To Us", "PreGstAmountToUs", "pre_gst_amount"]) || ""),
+          gstRateInput: String(getValue(["GST Rate Input", "GstRateInput", "gst_rate_input"]) || ""),
+          gstInputAmount: "",
+          postGstAmountToUs: "",
+          // Sale (Outgoing)
+          salePricePreGst: String(getValue(["Sale Price Pre GST", "SalePricePreGst", "sale_price_pre_gst"]) || ""),
+          gstRateOutput: String(getValue(["GST Rate Output", "GstRateOutput", "gst_rate_output"]) || ""),
+          gstOutputAmount: "",
+          postGstSaleAmount: "",
+          // Labour Association
+          associatedLabourName: String(getValue(["Associated Labour Name", "AssociatedLabourName", "labour_name"]) || ""),
+          associatedLabourCode: String(getValue(["Associated Labour Code", "AssociatedLabourCode", "labour_code"]) || ""),
+          workTime: String(getValue(["Work Time", "WorkTime", "work_time", "Hours"]) || ""),
+          labourRate: String(getValue(["Labour Rate", "LabourRate", "labour_rate"]) || ""),
+          labourGstRate: String(getValue(["Labour GST Rate", "LabourGstRate", "labour_gst_rate"]) || ""),
+          labourGstAmount: "",
+          labourPostGstAmount: "",
+          // High Value Part
+          highValuePart: getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "true" || getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "yes" || false,
+          partSerialNumber: String(getValue(["Part Serial Number", "PartSerialNumber", "serial_number"]) || ""),
+        } as any;
       });
 
       // Filter out empty rows
@@ -247,6 +381,21 @@ export default function PartsMasterPage() {
         "Description": "Front brake pad set",
         "Min Stock": 10,
         "Unit": "piece",
+        "Brand Name": "Example Brand",
+        "Variant": "Variant A",
+        "Part Type": "NEW",
+        "Color": "NA",
+        "Pre GST Amount To Us": "1000",
+        "GST Rate Input": "18",
+        "Sale Price Pre GST": "1200",
+        "GST Rate Output": "18",
+        "Associated Labour Name": "Labour 1",
+        "Associated Labour Code": "LAB001",
+        "Work Time": "2",
+        "Labour Rate": "500",
+        "Labour GST Rate": "18",
+        "High Value Part": "false",
+        "Part Serial Number": "",
       },
       {
         "Part ID": "PART-002",
@@ -257,6 +406,21 @@ export default function PartsMasterPage() {
         "Description": "Synthetic engine oil",
         "Min Stock": 20,
         "Unit": "liter",
+        "Brand Name": "Example Brand",
+        "Variant": "Variant B",
+        "Part Type": "NEW",
+        "Color": "NA",
+        "Pre GST Amount To Us": "800",
+        "GST Rate Input": "18",
+        "Sale Price Pre GST": "1000",
+        "GST Rate Output": "18",
+        "Associated Labour Name": "",
+        "Associated Labour Code": "",
+        "Work Time": "",
+        "Labour Rate": "",
+        "Labour GST Rate": "",
+        "High Value Part": "false",
+        "Part Serial Number": "",
       },
     ];
 
@@ -445,6 +609,12 @@ export default function PartsMasterPage() {
                         Part Number
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Brand
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Part Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Category
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -455,6 +625,9 @@ export default function PartsMasterPage() {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Min Level
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        High Value
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Status
@@ -488,6 +661,14 @@ export default function PartsMasterPage() {
                             <div className="text-sm text-gray-900">{part.partNumber}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{(part as any).brandName || "-"}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge variant={(part as any).partType === "NEW" ? "info" : "default"}>
+                              {(part as any).partType || "NEW"}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <Badge variant="info">{part.category}</Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -500,6 +681,15 @@ export default function PartsMasterPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">{part.minStockLevel} {part.unit}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {(part as any).highValuePart ? (
+                              <Badge variant="warning" className="flex items-center gap-1 w-fit">
+                                Yes
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-400 text-xs">No</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {isOutOfStock ? (
@@ -557,99 +747,20 @@ export default function PartsMasterPage() {
           }}
           title={editingPart ? "Edit Part" : "Add New Part"}
         >
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Part ID</label>
-              <Input
-                value={formData.partId}
-                onChange={(e) => setFormData({ ...formData, partId: e.target.value })}
-                className="border border-gray-200"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Part Name</label>
-              <Input
-                value={formData.partName}
-                onChange={(e) => setFormData({ ...formData, partName: e.target.value })}
-                className="border border-gray-200"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Part Number</label>
-              <Input
-                value={formData.partNumber}
-                onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
-                className="border border-gray-200"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <Input
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="border border-gray-200"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                className="border border-gray-200"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Min Stock Level</label>
-              <Input
-                type="number"
-                value={formData.minStockLevel}
-                onChange={(e) => setFormData({ ...formData, minStockLevel: parseInt(e.target.value) || 0 })}
-                className="border border-gray-200"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-              <Input
-                value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                className="border border-gray-200"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full p-2 border border-gray-200 rounded-lg"
-                rows={3}
-              />
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                {editingPart ? "Update" : "Create"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowModal(false);
-                  setEditingPart(null);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
+          <InventoryPartForm
+            formData={{ ...formData, price: String(formData.price || "") } as unknown as InventoryPartFormData}
+            onFormChange={(data: InventoryPartFormData) => setFormData({ ...data, price: typeof data.price === 'string' ? parseFloat(data.price) || 0 : data.price } as unknown as typeof formData)}
+            onSubmit={handleSubmit}
+            onClose={() => {
+              setShowModal(false);
+              setEditingPart(null);
+              resetForm();
+            }}
+            isEditing={!!editingPart}
+            showServiceCenter={false}
+            submitButtonText={editingPart ? "Update" : "Create"}
+            submitButtonClass="bg-indigo-600 hover:bg-indigo-700 text-white"
+          />
         </Modal>
 
         {/* Bulk Upload Modal */}
@@ -669,14 +780,14 @@ export default function PartsMasterPage() {
                 Your Excel file should have the following columns:
               </p>
               <ul className="text-xs text-blue-700 list-disc list-inside space-y-1">
-                <li>Part ID (required)</li>
-                <li>Part Name (required)</li>
-                <li>Part Number (required)</li>
-                <li>Category (required)</li>
-                <li>Price (optional, default: 0)</li>
-                <li>Description (optional)</li>
-                <li>Min Stock (optional, default: 0)</li>
-                <li>Unit (optional, default: "piece")</li>
+                <li><strong>Required:</strong> Part ID, Part Name, Part Number, Category</li>
+                <li><strong>Basic Info (optional):</strong> Price (default: 0), Description, Min Stock (default: 0), Unit (default: "piece")</li>
+                <li><strong>Basic Part Info (optional):</strong> Brand Name, Variant, Part Type (NEW/OLD), Color (default: "NA")</li>
+                <li><strong>Purchase (Incoming) - optional:</strong> Pre GST Amount To Us, GST Rate Input</li>
+                <li><strong>Sale (Outgoing) - optional:</strong> Sale Price Pre GST, GST Rate Output</li>
+                <li><strong>Labour Association - optional:</strong> Associated Labour Name, Associated Labour Code, Work Time (Hours), Labour Rate, Labour GST Rate</li>
+                <li><strong>High Value Part - optional:</strong> High Value Part (true/false/yes/no), Part Serial Number (required if High Value Part is true)</li>
+                <li><strong>Note:</strong> GST amounts are auto-calculated from base amounts and rates</li>
               </ul>
             </div>
 

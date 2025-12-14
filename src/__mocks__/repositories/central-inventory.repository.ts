@@ -96,6 +96,20 @@ class CentralInventoryRepository {
     );
   }
 
+  async createStock(data: Omit<CentralStock, "id" | "lastUpdated" | "lastUpdatedBy"> & { lastUpdatedBy: string }): Promise<CentralStock> {
+    const newStock: CentralStock = {
+      ...data,
+      id: `cs-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      lastUpdated: new Date().toISOString(),
+      lastUpdatedBy: data.lastUpdatedBy,
+      // Auto-calculate status based on quantity
+      status: data.currentQty === 0 ? "Out of Stock" : (data.currentQty < data.minStock ? "Low Stock" : "In Stock"),
+    };
+    this.centralStock.push(newStock);
+    this.saveStock();
+    return { ...newStock };
+  }
+
   async updateStock(id: string, data: Partial<CentralStock>): Promise<CentralStock> {
     const index = this.centralStock.findIndex((s) => s.id === id);
     if (index === -1) {
@@ -123,6 +137,15 @@ class CentralInventoryRepository {
 
     this.saveStock();
     return { ...this.centralStock[index] };
+  }
+
+  async deleteStock(id: string): Promise<void> {
+    const index = this.centralStock.findIndex((s) => s.id === id);
+    if (index === -1) {
+      throw new Error("Stock not found");
+    }
+    this.centralStock.splice(index, 1);
+    this.saveStock();
   }
 
   async adjustStock(

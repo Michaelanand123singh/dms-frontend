@@ -25,6 +25,33 @@ export interface CentralStock {
   lastUpdated: string;
   lastUpdatedBy: string;
   notes?: string;
+  // Extended fields for admin inventory
+  // Basic Part Info
+  brandName?: string;
+  variant?: string;
+  partType?: "NEW" | "OLD";
+  color?: string;
+  // Purchase (Incoming)
+  preGstAmountToUs?: string;
+  gstRateInput?: string;
+  gstInputAmount?: string;
+  postGstAmountToUs?: string;
+  // Sale (Outgoing)
+  salePricePreGst?: string;
+  gstRateOutput?: string;
+  gstOutputAmount?: string;
+  postGstSaleAmount?: string;
+  // Labour Association
+  associatedLabourName?: string;
+  associatedLabourCode?: string;
+  workTime?: string;
+  labourRate?: string;
+  labourGstRate?: string;
+  labourGstAmount?: string;
+  labourPostGstAmount?: string;
+  // High Value Part
+  highValuePart?: boolean;
+  partSerialNumber?: string;
 }
 
 /**

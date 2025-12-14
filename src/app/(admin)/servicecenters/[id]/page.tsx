@@ -28,6 +28,8 @@ import {
   Edit,
   Eye,
 } from "lucide-react";
+import { InventoryPartFormModal } from "../../../../components/inventory/InventoryPartFormModal";
+import type { InventoryPartFormData } from "../../../../components/inventory/InventoryPartForm";
 
 // Convert array to object for easier lookup
 const centersData: Record<number, typeof defaultServiceCenters[0]> = {};
@@ -193,6 +195,32 @@ export default function ServiceCenterDetailPage() {
     quantity: "",
     price: "",
     status: "In Stock",
+    // Basic Part Info
+    brandName: "",
+    variant: "",
+    partType: "NEW" as "NEW" | "OLD",
+    color: "NA",
+    // Purchase (Incoming)
+    preGstAmountToUs: "",
+    gstRateInput: "",
+    gstInputAmount: "",
+    postGstAmountToUs: "",
+    // Sale (Outgoing)
+    salePricePreGst: "",
+    gstRateOutput: "",
+    gstOutputAmount: "",
+    postGstSaleAmount: "",
+    // Labour Association
+    associatedLabourName: "",
+    associatedLabourCode: "",
+    workTime: "",
+    labourRate: "",
+    labourGstRate: "",
+    labourGstAmount: "",
+    labourPostGstAmount: "",
+    // High Value Part
+    highValuePart: false,
+    partSerialNumber: "",
   });
 
   const [otcOrderForm, setOtcOrderForm] = useState({
@@ -1502,6 +1530,32 @@ export default function ServiceCenterDetailPage() {
                       quantity: "",
                       price: "",
                       status: "In Stock",
+                      // Basic Part Info
+                      brandName: "",
+                      variant: "",
+                      partType: "NEW",
+                      color: "NA",
+                      // Purchase (Incoming)
+                      preGstAmountToUs: "",
+                      gstRateInput: "",
+                      gstInputAmount: "",
+                      postGstAmountToUs: "",
+                      // Sale (Outgoing)
+                      salePricePreGst: "",
+                      gstRateOutput: "",
+                      gstOutputAmount: "",
+                      postGstSaleAmount: "",
+                      // Labour Association
+                      associatedLabourName: "",
+                      associatedLabourCode: "",
+                      workTime: "",
+                      labourRate: "",
+                      labourGstRate: "",
+                      labourGstAmount: "",
+                      labourPostGstAmount: "",
+                      // High Value Part
+                      highValuePart: false,
+                      partSerialNumber: "",
                     });
                     setShowInventoryAddEdit(true);
                   }}
@@ -1587,6 +1641,32 @@ export default function ServiceCenterDetailPage() {
                                   quantity: item.currentQty.toString(),
                                   price: item.unitPrice.replace('₹', ''),
                                   status: item.status,
+                                  // Basic Part Info
+                                  brandName: (item as any).brandName || "",
+                                  variant: (item as any).variant || "",
+                                  partType: (item as any).partType || "NEW",
+                                  color: (item as any).color || "NA",
+                                  // Purchase (Incoming)
+                                  preGstAmountToUs: (item as any).preGstAmountToUs || "",
+                                  gstRateInput: (item as any).gstRateInput || "",
+                                  gstInputAmount: (item as any).gstInputAmount || "",
+                                  postGstAmountToUs: (item as any).postGstAmountToUs || "",
+                                  // Sale (Outgoing)
+                                  salePricePreGst: (item as any).salePricePreGst || "",
+                                  gstRateOutput: (item as any).gstRateOutput || "",
+                                  gstOutputAmount: (item as any).gstOutputAmount || "",
+                                  postGstSaleAmount: (item as any).postGstSaleAmount || "",
+                                  // Labour Association
+                                  associatedLabourName: (item as any).associatedLabourName || "",
+                                  associatedLabourCode: (item as any).associatedLabourCode || "",
+                                  workTime: (item as any).workTime || "",
+                                  labourRate: (item as any).labourRate || "",
+                                  labourGstRate: (item as any).labourGstRate || "",
+                                  labourGstAmount: (item as any).labourGstAmount || "",
+                                  labourPostGstAmount: (item as any).labourPostGstAmount || "",
+                                  // High Value Part
+                                  highValuePart: (item as any).highValuePart || false,
+                                  partSerialNumber: (item as any).partSerialNumber || "",
                                 });
                                 setShowInventoryAddEdit(true);
                               }}
@@ -2727,59 +2807,58 @@ export default function ServiceCenterDetailPage() {
       )}
 
       {/* Inventory Add/Edit Popup */}
-      {showInventoryAddEdit && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
-            <button
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-              onClick={() => {
-                setShowInventoryAddEdit(false);
-                setEditingInventoryItem(null);
-                setInventoryForm({
-                  partName: "",
-                  sku: "",
-                  partCode: "",
-                  category: "",
-                  quantity: "",
-                  price: "",
-                  status: "In Stock",
-                });
-              }}
-            >
-              <X size={24} />
-            </button>
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 pr-8">
-              {editingInventoryItem ? "Edit Part" : "Add New Part"}
-            </h2>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (editingInventoryItem) {
-                  setInventory(inventory.map(item =>
-                    item.id === editingInventoryItem.id
-                      ? {
-                          ...item,
-                          partName: inventoryForm.partName,
-                          sku: inventoryForm.sku,
-                          partCode: inventoryForm.partCode,
-                          category: inventoryForm.category,
-                          currentQty: parseInt(inventoryForm.quantity),
-                          minStock: 10,
-                          unitPrice: `₹${inventoryForm.price}`,
-                          costPrice: `₹${parseInt(inventoryForm.price) * 0.8}`,
-                          supplier: "Supplier",
-                          location: "Shelf",
-                          status: inventoryForm.status as "In Stock" | "Low Stock",
-                        }
-                      : item
-                  ));
-                  showToast("Part updated successfully!");
-                } else {
-                  const newPart: typeof inventory[0] = {
-                    id: inventory.length + 1,
+      <InventoryPartFormModal
+        isOpen={showInventoryAddEdit}
+        onClose={() => {
+          setShowInventoryAddEdit(false);
+          setEditingInventoryItem(null);
+          setInventoryForm({
+            partName: "",
+            sku: "",
+            partCode: "",
+            category: "",
+            quantity: "",
+            price: "",
+            status: "In Stock",
+            // Basic Part Info
+            brandName: "",
+            variant: "",
+            partType: "NEW",
+            color: "NA",
+            // Purchase (Incoming)
+            preGstAmountToUs: "",
+            gstRateInput: "",
+            gstInputAmount: "",
+            postGstAmountToUs: "",
+            // Sale (Outgoing)
+            salePricePreGst: "",
+            gstRateOutput: "",
+            gstOutputAmount: "",
+            postGstSaleAmount: "",
+            // Labour Association
+            associatedLabourName: "",
+            associatedLabourCode: "",
+            workTime: "",
+            labourRate: "",
+            labourGstRate: "",
+            labourGstAmount: "",
+            labourPostGstAmount: "",
+            // High Value Part
+            highValuePart: false,
+            partSerialNumber: "",
+          });
+        }}
+        formData={inventoryForm as InventoryPartFormData}
+        onFormChange={(data: InventoryPartFormData) => setInventoryForm(data as typeof inventoryForm)}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (editingInventoryItem) {
+            setInventory(inventory.map(item =>
+              item.id === editingInventoryItem.id
+                ? {
+                    ...item,
                     partName: inventoryForm.partName,
                     sku: inventoryForm.sku,
-                    selectedQuantity: 0,
                     partCode: inventoryForm.partCode,
                     category: inventoryForm.category,
                     currentQty: parseInt(inventoryForm.quantity),
@@ -2788,108 +2867,72 @@ export default function ServiceCenterDetailPage() {
                     costPrice: `₹${parseInt(inventoryForm.price) * 0.8}`,
                     supplier: "Supplier",
                     location: "Shelf",
-                    status: inventoryForm.status as "In Stock" | "Low Stock",
-                  };
-                  setInventory([...inventory, newPart]);
-                  showToast("Part added successfully!");
-                }
-                setShowInventoryAddEdit(false);
-                setEditingInventoryItem(null);
-                setInventoryForm({
-                  partName: "",
-                  sku: "",
-                  partCode: "",
-                  category: "",
-                  quantity: "",
-                  price: "",
-                  status: "In Stock",
-                });
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Part Name</label>
-                <input
-                  type="text"
-                  value={inventoryForm.partName}
-                  onChange={(e) => setInventoryForm({ ...inventoryForm, partName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
-                <input
-                  type="text"
-                  value={inventoryForm.sku}
-                  onChange={(e) => setInventoryForm({ ...inventoryForm, sku: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Part Code</label>
-                <input
-                  type="text"
-                  value={inventoryForm.partCode}
-                  onChange={(e) => setInventoryForm({ ...inventoryForm, partCode: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
-                  placeholder="Enter part code"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <input
-                  type="text"
-                  value={inventoryForm.category}
-                  onChange={(e) => setInventoryForm({ ...inventoryForm, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                <input
-                  type="number"
-                  value={inventoryForm.quantity}
-                  onChange={(e) => setInventoryForm({ ...inventoryForm, quantity: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
-                <input
-                  type="number"
-                  value={inventoryForm.price}
-                  onChange={(e) => setInventoryForm({ ...inventoryForm, price: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={inventoryForm.status}
-                  onChange={(e) => setInventoryForm({ ...inventoryForm, status: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-900"
-                  required
-                >
-                  <option value="In Stock">In Stock</option>
-                  <option value="Low Stock">Low Stock</option>
-                  <option value="Out of Stock">Out of Stock</option>
-                </select>
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition"
-              >
-                {editingInventoryItem ? "Update Part" : "Add Part"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+                    status: (inventoryForm.status === "Out of Stock" ? "Low Stock" : inventoryForm.status) as "In Stock" | "Low Stock",
+                  }
+                : item
+            ));
+            showToast("Part updated successfully!");
+          } else {
+            const newPart: typeof inventory[0] = {
+              id: inventory.length + 1,
+              partName: inventoryForm.partName,
+              sku: inventoryForm.sku,
+              selectedQuantity: 0,
+              partCode: inventoryForm.partCode,
+              category: inventoryForm.category,
+              currentQty: parseInt(inventoryForm.quantity),
+              minStock: 10,
+              unitPrice: `₹${inventoryForm.price}`,
+              costPrice: `₹${parseInt(inventoryForm.price) * 0.8}`,
+              supplier: "Supplier",
+              location: "Shelf",
+              status: (inventoryForm.status === "Out of Stock" ? "Low Stock" : inventoryForm.status) as "In Stock" | "Low Stock",
+            };
+            setInventory([...inventory, newPart]);
+            showToast("Part added successfully!");
+          }
+          setShowInventoryAddEdit(false);
+          setEditingInventoryItem(null);
+          setInventoryForm({
+            partName: "",
+            sku: "",
+            partCode: "",
+            category: "",
+            quantity: "",
+            price: "",
+            status: "In Stock",
+            // Basic Part Info
+            brandName: "",
+            variant: "",
+            partType: "NEW",
+            color: "NA",
+            // Purchase (Incoming)
+            preGstAmountToUs: "",
+            gstRateInput: "",
+            gstInputAmount: "",
+            postGstAmountToUs: "",
+            // Sale (Outgoing)
+            salePricePreGst: "",
+            gstRateOutput: "",
+            gstOutputAmount: "",
+            postGstSaleAmount: "",
+            // Labour Association
+            associatedLabourName: "",
+            associatedLabourCode: "",
+            workTime: "",
+            labourRate: "",
+            labourGstRate: "",
+            labourGstAmount: "",
+            labourPostGstAmount: "",
+            // High Value Part
+            highValuePart: false,
+            partSerialNumber: "",
+          });
+        }}
+        isEditing={!!editingInventoryItem}
+        showServiceCenter={false}
+        submitButtonClass="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition mt-4"
+      />
     </div>
   );
 }
