@@ -1,6 +1,7 @@
 "use client";
 import { useRef } from "react";
-import { Printer, Download, X, Building2, User, Car, Calendar, Clock, Hash } from "lucide-react";
+import { Printer, Download, X, Building2, User, Car, Calendar, Clock, Hash, CheckCircle, AlertCircle, MessageCircle } from "lucide-react";
+import type { EnhancedCheckInSlipData } from "@/shared/types/check-in-slip.types";
 
 export interface CheckInSlipData {
   slipNumber: string;
@@ -25,12 +26,13 @@ export interface CheckInSlipData {
 }
 
 interface CheckInSlipProps {
-  data: CheckInSlipData;
+  data: CheckInSlipData | EnhancedCheckInSlipData;
   onClose?: () => void;
   showActions?: boolean;
+  onSendToCustomer?: () => void;
 }
 
-export default function CheckInSlip({ data, onClose, showActions = true }: CheckInSlipProps) {
+export default function CheckInSlip({ data, onClose, showActions = true, onSendToCustomer }: CheckInSlipProps) {
   const slipRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
@@ -86,6 +88,15 @@ export default function CheckInSlip({ data, onClose, showActions = true }: Check
                 <Download size={16} />
                 Download PDF
               </button>
+              {onSendToCustomer && (
+                <button
+                  onClick={onSendToCustomer}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium text-sm inline-flex items-center gap-2"
+                >
+                  <MessageCircle size={16} />
+                  Send to Customer
+                </button>
+              )}
               {onClose && (
                 <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
                   <X size={24} />
