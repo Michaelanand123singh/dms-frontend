@@ -40,11 +40,18 @@ import type {
   NoteTemplate,
   CreateQuotationForm,
   CustomerWithVehicles,
+  Vehicle,
 } from "@/shared/types";
 import { useCustomerSearch } from "../../../../hooks/api";
 import { defaultQuotations, defaultInsurers, defaultNoteTemplates } from "@/__mocks__/data/quotations.mock";
 import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
+import type { CheckInSlipFormData } from "@/shared/types/check-in-slip.types";
+import { CheckInSlipForm } from "../components/check-in-slip/CheckInSlipForm";
+import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/components/check-in-slip/CheckInSlip";
+import type { EnhancedCheckInSlipData } from "@/shared/types/check-in-slip.types";
+import { convertCheckInSlipFormToData } from "../components/check-in-slip/utils";
+import { SERVICE_CENTER_CODE_MAP } from "../appointments/constants";
 
 const createEmptyCustomer = (): CustomerWithVehicles => ({
   id: "",
@@ -54,12 +61,6 @@ const createEmptyCustomer = (): CustomerWithVehicles => ({
   createdAt: new Date().toISOString(),
   vehicles: [],
 });
-
-const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
-  "sc-001": "SC001",
-  "sc-002": "SC002",
-  "sc-003": "SC003",
-};
 
 const normalizeServiceCenterId = (id?: string | number | null): string => {
   if (!id) return "sc-001";
@@ -97,6 +98,8 @@ function QuotationsContent() {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showViewModal, setShowViewModal] = useState<boolean>(false);
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
+  const [showCheckInSlipModal, setShowCheckInSlipModal] = useState<boolean>(false);
+  const [checkInSlipData, setCheckInSlipData] = useState<CheckInSlipData | null>(null);
   
   // Form state
   const [form, setForm] = useState<CreateQuotationForm>({
@@ -121,6 +124,7 @@ function QuotationsContent() {
   const [noteTemplates, setNoteTemplates] = useState<NoteTemplate[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithVehicles | null>(null);
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>("");
+  const [checkInSlipFormData, setCheckInSlipFormData] = useState<CheckInSlipFormData>({} as CheckInSlipFormData);
   const customerSearch = useCustomerSearch();
   const customerSearchResults = customerSearch.results as CustomerWithVehicles[];
   const performCustomerSearch = customerSearch.search;
@@ -595,10 +599,132 @@ const sendQuotationToCustomerById = async (
     }
   };
 
-// Submit quotation
+// Submit quotation or check-in slip
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
+  // Handle check-in slip
+  if (form.documentType === "Check-in Slip") {
+    if (!selectedCustomer) {
+      alert("Please select a customer");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const vehicle = selectedCustomer.vehicles?.find((v) => String(v.id) === form.vehicleId) || selectedCustomer.vehicles?.[0] || null;
+      
+      // Get appointment data if available
+      const quotationDataFromStorage = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
+      const appointmentData = quotationDataFromStorage?.appointmentData;
+
+      // Get service center info
+      const normalizedServiceCenterId = activeServiceCenterId || serviceCenterContext.serviceCenterId?.toString() || "sc-001";
+      const serviceCenter = staticServiceCenters.find(
+        (sc) => (sc as any).serviceCenterId === normalizedServiceCenterId || sc.id?.toString() === normalizedServiceCenterId
+      );
+      const serviceCenterName = serviceCenter?.name || serviceCenterContext.serviceCenterName || "Service Center";
+
+      // Convert form data to enhanced check-in slip data
+      const enhancedData = convertCheckInSlipFormToData(
+        checkInSlipFormData,
+        selectedCustomer,
+        vehicle,
+        appointmentData,
+        normalizedServiceCenterId,
+        serviceCenterName
+      );
+
+      setCheckInSlipData(enhancedData);
+      
+      // Convert check-in slip to quotation format and save it
+      const checkInSlipQuotation: Quotation = {
+        id: `checkin-${Date.now()}`,
+        quotationNumber: enhancedData.slipNumber,
+        serviceCenterId: normalizedServiceCenterId,
+        customerId: selectedCustomer.id?.toString() || "",
+        vehicleId: vehicle?.id?.toString(),
+        serviceAdvisorId: userInfo?.id || "",
+        appointmentId: appointmentData?.id || quotationDataFromStorage?.appointmentId,
+        documentType: "Check-in Slip",
+        quotationDate: enhancedData.checkInDate,
+        validUntil: undefined,
+        hasInsurance: false,
+        insurerId: undefined,
+        subtotal: 0,
+        discount: 0,
+        discountPercent: 0,
+        preGstAmount: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        totalAmount: 0,
+        notes: enhancedData.notes || enhancedData.customerFeedback || "",
+        batterySerialNumber: enhancedData.batterySerialNumber,
+        customNotes: enhancedData.technicalObservation || "",
+        noteTemplateId: undefined,
+        status: "draft",
+        passedToManager: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        items: [],
+        customer: {
+          id: selectedCustomer.id?.toString() || "",
+          firstName: selectedCustomer.name?.split(" ")[0] || "Customer",
+          lastName: selectedCustomer.name?.split(" ").slice(1).join(" ") || "",
+          phone: selectedCustomer.phone || "",
+          email: selectedCustomer.email,
+          address: selectedCustomer.address,
+          city: selectedCustomer.cityState?.split(",")[0] || "",
+          state: selectedCustomer.cityState?.split(",")[1]?.trim() || "",
+          pincode: selectedCustomer.pincode || "",
+        },
+        vehicle: vehicle ? {
+          id: vehicle.id?.toString() || "",
+          make: vehicle.vehicleMake || "",
+          model: vehicle.vehicleModel || "",
+          registration: vehicle.registration || "",
+          vin: vehicle.vin || "",
+        } : undefined,
+        serviceCenter: {
+          id: normalizedServiceCenterId,
+          name: serviceCenterName,
+          code: SERVICE_CENTER_CODE_MAP[normalizedServiceCenterId] || "SC001",
+          address: enhancedData.serviceCenterAddress,
+          city: enhancedData.serviceCenterCity,
+          state: enhancedData.serviceCenterState,
+          pincode: enhancedData.serviceCenterPincode,
+          phone: enhancedData.serviceCenterPhone,
+        },
+      };
+
+      // Save check-in slip as quotation
+      persistQuotation(checkInSlipQuotation);
+      
+      // Store enhanced check-in slip data for display
+      safeStorage.setItem(`checkInSlip_${checkInSlipQuotation.id}`, enhancedData);
+      
+      setShowCheckInSlipModal(true);
+      // Keep form open so user can send via WhatsApp
+      // setShowCreateModal(false);
+      
+      // Clear stored appointment data if exists
+      if (quotationDataFromStorage) {
+        safeStorage.removeItem("pendingQuotationFromAppointment");
+      }
+      
+      alert("Check-in slip generated successfully! You can now send it to the customer via WhatsApp.");
+    } catch (error) {
+      console.error("Error creating check-in slip:", error);
+      alert("Failed to create check-in slip. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+    return;
+  }
+
+  // Handle quotation/proforma invoice
   if (!validateQuotationForm()) {
     return;
   }
@@ -642,6 +768,227 @@ const handleCreateAndSendToCustomer = async () => {
     setLoading(false);
   }
 };
+
+  // Generate and Send Check-in Slip to Customer
+  const handleGenerateAndSendCheckInSlip = async () => {
+    if (!selectedCustomer) {
+      alert("Please select a customer");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const vehicle = selectedCustomer.vehicles?.find((v) => String(v.id) === form.vehicleId) || selectedCustomer.vehicles?.[0] || null;
+      
+      // Get appointment data if available
+      const quotationDataFromStorage = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
+      const appointmentData = quotationDataFromStorage?.appointmentData;
+
+      // Get service center info
+      const normalizedServiceCenterId = activeServiceCenterId || serviceCenterContext.serviceCenterId?.toString() || "sc-001";
+      const serviceCenter = staticServiceCenters.find(
+        (sc) => (sc as any).serviceCenterId === normalizedServiceCenterId || sc.id?.toString() === normalizedServiceCenterId
+      );
+      const serviceCenterName = serviceCenter?.name || serviceCenterContext.serviceCenterName || "Service Center";
+
+      // Convert form data to enhanced check-in slip data
+      const enhancedData = convertCheckInSlipFormToData(
+        checkInSlipFormData,
+        selectedCustomer,
+        vehicle,
+        appointmentData,
+        normalizedServiceCenterId,
+        serviceCenterName
+      );
+
+      setCheckInSlipData(enhancedData);
+      
+      // Convert check-in slip to quotation format and save it
+      const checkInSlipQuotation: Quotation = {
+        id: `checkin-${Date.now()}`,
+        quotationNumber: enhancedData.slipNumber,
+        serviceCenterId: normalizedServiceCenterId,
+        customerId: selectedCustomer.id?.toString() || "",
+        vehicleId: vehicle?.id?.toString(),
+        serviceAdvisorId: userInfo?.id || "",
+        appointmentId: appointmentData?.id || quotationDataFromStorage?.appointmentId,
+        documentType: "Check-in Slip",
+        quotationDate: enhancedData.checkInDate,
+        validUntil: undefined,
+        hasInsurance: false,
+        insurerId: undefined,
+        subtotal: 0,
+        discount: 0,
+        discountPercent: 0,
+        preGstAmount: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        totalAmount: 0,
+        notes: enhancedData.notes || enhancedData.customerFeedback || "",
+        batterySerialNumber: enhancedData.batterySerialNumber,
+        customNotes: enhancedData.technicalObservation || "",
+        noteTemplateId: undefined,
+        status: "draft",
+        passedToManager: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        items: [],
+        customer: {
+          id: selectedCustomer.id?.toString() || "",
+          firstName: selectedCustomer.name?.split(" ")[0] || "Customer",
+          lastName: selectedCustomer.name?.split(" ").slice(1).join(" ") || "",
+          phone: selectedCustomer.phone || "",
+          email: selectedCustomer.email,
+          address: selectedCustomer.address,
+          city: selectedCustomer.cityState?.split(",")[0] || "",
+          state: selectedCustomer.cityState?.split(",")[1]?.trim() || "",
+          pincode: selectedCustomer.pincode || "",
+        },
+        vehicle: vehicle ? {
+          id: vehicle.id?.toString() || "",
+          make: vehicle.vehicleMake || "",
+          model: vehicle.vehicleModel || "",
+          registration: vehicle.registration || "",
+          vin: vehicle.vin || "",
+        } : undefined,
+        serviceCenter: {
+          id: normalizedServiceCenterId,
+          name: serviceCenterName,
+          code: SERVICE_CENTER_CODE_MAP[normalizedServiceCenterId] || "SC001",
+          address: enhancedData.serviceCenterAddress,
+          city: enhancedData.serviceCenterCity,
+          state: enhancedData.serviceCenterState,
+          pincode: enhancedData.serviceCenterPincode,
+          phone: enhancedData.serviceCenterPhone,
+        },
+      };
+
+      // Save check-in slip as quotation
+      persistQuotation(checkInSlipQuotation);
+      
+      // Store enhanced check-in slip data for display
+      safeStorage.setItem(`checkInSlip_${checkInSlipQuotation.id}`, enhancedData);
+      
+      // Clear stored appointment data if exists
+      if (quotationDataFromStorage) {
+        safeStorage.removeItem("pendingQuotationFromAppointment");
+      }
+
+      // Send to customer via WhatsApp
+      const rawWhatsapp =
+        (selectedCustomer as any)?.whatsappNumber ||
+        selectedCustomer?.phone ||
+        "";
+      const customerWhatsapp = rawWhatsapp.replace(/\D/g, "");
+
+      if (!customerWhatsapp) {
+        alert("Customer WhatsApp number not found. Check-in slip generated but could not send via WhatsApp.");
+        setShowCheckInSlipModal(true);
+        return;
+      }
+
+      // Format check-in date and time
+      const checkInDate = new Date(enhancedData.checkInDate).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      const checkInTime = enhancedData.checkInTime.includes(":")
+        ? (() => {
+            const [hours, minutes] = enhancedData.checkInTime.split(":");
+            const hour = parseInt(hours, 10);
+            const ampm = hour >= 12 ? "PM" : "AM";
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes} ${ampm}`;
+          })()
+        : enhancedData.checkInTime;
+
+      // Create WhatsApp message
+      const message = `Hello ${enhancedData.customerName}, your check-in slip ${enhancedData.slipNumber} has been generated.
+
+Vehicle: ${enhancedData.vehicleMake} ${enhancedData.vehicleModel} - ${enhancedData.registrationNumber}
+Service Center: ${enhancedData.serviceCenterName}
+Check-in Date: ${checkInDate} at ${checkInTime}
+
+Please keep this slip safe for vehicle collection.`;
+
+      const whatsappUrl = `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(message)}`;
+
+      // Open WhatsApp
+      window.open(whatsappUrl, "_blank");
+      
+      alert("Check-in slip generated and sent to customer via WhatsApp!");
+      setShowCreateModal(false);
+      resetForm();
+    } catch (error) {
+      console.error("Error generating and sending check-in slip:", error);
+      alert("Failed to generate and send check-in slip. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send Check-in Slip to Customer via WhatsApp
+  const handleSendCheckInSlipToCustomer = async () => {
+    if (!checkInSlipData || !selectedCustomer) {
+      alert("Please generate a check-in slip first");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Get customer WhatsApp number
+      const rawWhatsapp =
+        (selectedCustomer as any)?.whatsappNumber ||
+        selectedCustomer?.phone ||
+        "";
+      const customerWhatsapp = rawWhatsapp.replace(/\D/g, "");
+
+      if (!customerWhatsapp) {
+        alert("Customer WhatsApp number not found");
+        return;
+      }
+
+      // Format check-in date and time
+      const checkInDate = new Date(checkInSlipData.checkInDate).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      const checkInTime = checkInSlipData.checkInTime.includes(":")
+        ? (() => {
+            const [hours, minutes] = checkInSlipData.checkInTime.split(":");
+            const hour = parseInt(hours, 10);
+            const ampm = hour >= 12 ? "PM" : "AM";
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes} ${ampm}`;
+          })()
+        : checkInSlipData.checkInTime;
+
+      // Create WhatsApp message
+      const message = `Hello ${checkInSlipData.customerName}, your check-in slip ${checkInSlipData.slipNumber} has been generated.
+
+Vehicle: ${checkInSlipData.vehicleMake} ${checkInSlipData.vehicleModel} - ${checkInSlipData.registrationNumber}
+Service Center: ${checkInSlipData.serviceCenterName}
+Check-in Date: ${checkInDate} at ${checkInTime}
+
+Please keep this slip safe for vehicle collection.`;
+
+      const whatsappUrl = `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(message)}`;
+
+      // Open WhatsApp
+      window.open(whatsappUrl, "_blank");
+      alert("Check-in slip details sent to customer via WhatsApp!");
+    } catch (error) {
+      console.error("Error sending check-in slip:", error);
+      alert("Failed to send check-in slip via WhatsApp. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Send to Customer via WhatsApp
   const handleSendToCustomer = async (quotationId: string) => {
@@ -1103,6 +1450,7 @@ const handleCreateAndSendToCustomer = async () => {
       customNotes: "",
       noteTemplateId: "",
     });
+    setCheckInSlipFormData({});
     setSelectedCustomer(null);
     setActiveCustomerId("");
     setCustomerSearchQuery("");
@@ -1248,44 +1596,127 @@ const handleCreateAndSendToCustomer = async () => {
                         {new Date(quotation.quotationDate).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          ₹{quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </div>
+                        {quotation.documentType === "Check-in Slip" ? (
+                          <div className="text-sm text-gray-500">N/A</div>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-900">
+                            ₹{quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(quotation.status)}`}>
-                          {quotation.status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full border ${quotation.documentType === "Check-in Slip" ? "bg-indigo-100 text-indigo-700 border-indigo-300" : getStatusColor(quotation.status)}`}>
+                          {quotation.documentType === "Check-in Slip" ? "Check-in Slip" : quotation.status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedQuotation(quotation);
-                              setShowViewModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          {isServiceAdvisor && quotation.status === "draft" && (
-                            <button
-                              onClick={() => handleSendToCustomer(quotation.id)}
-                              className="text-green-600 hover:text-green-900"
-                              title="Send to Customer"
-                            >
-                              <MessageCircle size={18} />
-                            </button>
-                          )}
-                          {isServiceAdvisor && quotation.status === "customer_approved" && (
-                            <button
-                              onClick={() => handleSendToManager(quotation.id)}
-                              className="text-purple-600 hover:text-purple-900"
-                              title="Send to Manager"
-                            >
-                              <ArrowRight size={18} />
-                            </button>
+                          {quotation.documentType === "Check-in Slip" ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  // Load check-in slip data and display
+                                  const storedCheckInSlipData = safeStorage.getItem<any>(`checkInSlip_${quotation.id}`, null) as EnhancedCheckInSlipData | null;
+                                  if (storedCheckInSlipData) {
+                                    setCheckInSlipData(storedCheckInSlipData);
+                                    // Find and set customer for WhatsApp sending
+                                    const customers = safeStorage.getItem<CustomerWithVehicles[]>("customers", []);
+                                    const customer = customers.find(c => c.id?.toString() === quotation.customerId);
+                                    if (customer) {
+                                      setSelectedCustomer(customer);
+                                    }
+                                    setShowCheckInSlipModal(true);
+                                  } else {
+                                    // Fallback: reconstruct from quotation data
+                                    const reconstructedData: EnhancedCheckInSlipData = {
+                                      slipNumber: quotation.quotationNumber,
+                                      customerName: `${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}`.trim(),
+                                      phone: quotation.customer?.phone || "",
+                                      email: quotation.customer?.email,
+                                      vehicleMake: quotation.vehicle?.make || "",
+                                      vehicleModel: quotation.vehicle?.model || "",
+                                      registrationNumber: quotation.vehicle?.registration || "",
+                                      vin: quotation.vehicle?.vin,
+                                      checkInDate: quotation.quotationDate,
+                                      checkInTime: new Date().toTimeString().slice(0, 5),
+                                      serviceCenterName: quotation.serviceCenter?.name || "",
+                                      serviceCenterAddress: quotation.serviceCenter?.address || "",
+                                      serviceCenterCity: quotation.serviceCenter?.city || "",
+                                      serviceCenterState: quotation.serviceCenter?.state || "",
+                                      serviceCenterPincode: quotation.serviceCenter?.pincode || "",
+                                      serviceCenterPhone: quotation.serviceCenter?.phone,
+                                      notes: quotation.notes,
+                                    };
+                                    setCheckInSlipData(reconstructedData);
+                                    const customers = safeStorage.getItem<CustomerWithVehicles[]>("customers", []);
+                                    const customer = customers.find(c => c.id?.toString() === quotation.customerId);
+                                    if (customer) {
+                                      setSelectedCustomer(customer);
+                                    }
+                                    setShowCheckInSlipModal(true);
+                                  }
+                                }}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="View Check-in Slip"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  // Load check-in slip data and send
+                                  const storedCheckInSlipData = safeStorage.getItem<any>(`checkInSlip_${quotation.id}`, null) as EnhancedCheckInSlipData | null;
+                                  if (storedCheckInSlipData) {
+                                    setCheckInSlipData(storedCheckInSlipData);
+                                    // Find customer from storage
+                                    const customers = safeStorage.getItem<CustomerWithVehicles[]>("customers", []);
+                                    const customer = customers.find(c => c.id?.toString() === quotation.customerId);
+                                    if (customer) {
+                                      setSelectedCustomer(customer);
+                                      handleSendCheckInSlipToCustomer();
+                                    } else {
+                                      alert("Customer not found");
+                                    }
+                                  } else {
+                                    alert("Check-in slip data not found");
+                                  }
+                                }}
+                                className="text-green-600 hover:text-green-900"
+                                title="Send to Customer via WhatsApp"
+                              >
+                                <MessageCircle size={18} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setSelectedQuotation(quotation);
+                                  setShowViewModal(true);
+                                }}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="View"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              {isServiceAdvisor && quotation.status === "draft" && (
+                                <button
+                                  onClick={() => handleSendToCustomer(quotation.id)}
+                                  className="text-green-600 hover:text-green-900"
+                                  title="Send to Customer"
+                                >
+                                  <MessageCircle size={18} />
+                                </button>
+                              )}
+                              {isServiceAdvisor && quotation.status === "customer_approved" && (
+                                <button
+                                  onClick={() => handleSendToManager(quotation.id)}
+                                  className="text-purple-600 hover:text-purple-900"
+                                  title="Send to Manager"
+                                >
+                                  <ArrowRight size={18} />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>
@@ -1320,11 +1751,28 @@ const handleCreateAndSendToCustomer = async () => {
           handleNoteTemplateChange={handleNoteTemplateChange}
           handleSubmit={handleSubmit}
           handleCreateAndSendToCustomer={handleCreateAndSendToCustomer}
+          handleGenerateAndSendCheckInSlip={handleGenerateAndSendCheckInSlip}
+          checkInSlipFormData={checkInSlipFormData}
+          setCheckInSlipFormData={setCheckInSlipFormData}
+          userInfo={userInfo}
           onClose={() => {
             setShowCreateModal(false);
             resetForm();
           }}
           loading={loading}
+        />
+      )}
+
+      {/* Check-in Slip Modal */}
+      {showCheckInSlipModal && checkInSlipData && (
+        <CheckInSlip
+          data={checkInSlipData as CheckInSlipData}
+          onClose={() => {
+            setShowCheckInSlipModal(false);
+            setCheckInSlipData(null);
+            resetForm();
+          }}
+          {...(selectedCustomer && { onSendToCustomer: () => { handleSendCheckInSlipToCustomer(); } })}
         />
       )}
 
@@ -1382,6 +1830,12 @@ function CreateQuotationModal({
   handleNoteTemplateChange,
   handleSubmit,
   handleCreateAndSendToCustomer,
+  handleGenerateAndSendCheckInSlip,
+  handleSendCheckInSlipToCustomer,
+  checkInSlipFormData,
+  setCheckInSlipFormData,
+  userInfo,
+  checkInSlipData,
   onClose,
   loading,
 }: any) {
@@ -1391,7 +1845,9 @@ function CreateQuotationModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-[101]">
-          <h2 className="text-2xl font-bold text-gray-900">Create Quotation</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {form.documentType === "Check-in Slip" ? "Create Check-in Slip" : "Create Quotation"}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={24} />
           </button>
@@ -1404,39 +1860,44 @@ function CreateQuotationModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
               <select
                 value={form.documentType}
-                onChange={(e) => setForm({ ...form, documentType: e.target.value })}
+                onChange={(e) => setForm({ ...form, documentType: e.target.value as any })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
                 <option value="Quotation">Quotation</option>
                 <option value="Proforma Invoice">Proforma Invoice</option>
+                <option value="Check-in Slip">Check-in Slip</option>
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Quotation Date</label>
-              <input
-                type="date"
-                value={form.quotationDate}
-                onChange={(e) => setForm({ ...form, quotationDate: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Valid Until (Days)</label>
-              <select
-                value={form.validUntilDays}
-                onChange={(e) => setForm({ ...form, validUntilDays: Number(e.target.value) })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value={15}>15 days</option>
-                <option value={30}>30 days</option>
-                <option value={60}>60 days</option>
-                <option value={90}>90 days</option>
-              </select>
-            </div>
+            {form.documentType !== "Check-in Slip" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Quotation Date</label>
+                  <input
+                    type="date"
+                    value={form.quotationDate}
+                    onChange={(e) => setForm({ ...form, quotationDate: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Valid Until (Days)</label>
+                  <select
+                    value={form.validUntilDays}
+                    onChange={(e) => setForm({ ...form, validUntilDays: Number(e.target.value) })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value={15}>15 days</option>
+                    <option value={30}>30 days</option>
+                    <option value={60}>60 days</option>
+                    <option value={90}>90 days</option>
+                  </select>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Customer Selection */}
+          {/* Customer Selection - Available for both Quotations and Check-in Slips */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Customer *</label>
             <div className="relative">
@@ -1455,7 +1916,7 @@ function CreateQuotationModal({
                       onClick={() => {
                         setSelectedCustomer(customer);
                         setForm({ ...form, customerId: customer.id.toString(), vehicleId: customer.vehicles?.[0]?.id?.toString() || "" });
-                      setActiveCustomerId(customer.id.toString());
+                        setActiveCustomerId(customer.id.toString());
                         setCustomerSearchQuery("");
                         clearCustomerSearch();
                       }}
@@ -1476,7 +1937,7 @@ function CreateQuotationModal({
             )}
           </div>
 
-          {/* Vehicle Selection */}
+          {/* Vehicle Selection - Available for both Quotations and Check-in Slips */}
           {selectedCustomer && selectedCustomer.vehicles && selectedCustomer.vehicles.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle</label>
@@ -1494,6 +1955,19 @@ function CreateQuotationModal({
               </select>
             </div>
           )}
+
+          {/* Check-in Slip Form */}
+          {form.documentType === "Check-in Slip" ? (
+            <CheckInSlipForm
+              formData={checkInSlipFormData}
+              onUpdate={(updates) => setCheckInSlipFormData((prev: CheckInSlipFormData) => ({ ...prev, ...updates }))}
+              customer={selectedCustomer}
+              vehicle={selectedCustomer?.vehicles?.find((v: Vehicle) => String(v.id) === form.vehicleId) || selectedCustomer?.vehicles?.[0] || null}
+              appointmentData={safeStorage.getItem<any>("pendingQuotationFromAppointment", null)?.appointmentData}
+              defaultServiceAdvisor={userInfo?.name}
+            />
+          ) : (
+            <>
 
           {/* Insurance Details */}
           <div className="border border-gray-200 rounded-lg p-4">
@@ -1730,6 +2204,8 @@ function CreateQuotationModal({
               </div>
             </div>
           </div>
+            </>
+          )}
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
@@ -1740,30 +2216,58 @@ function CreateQuotationModal({
             >
               Cancel
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                // Pass to manager logic
-                alert("Pass to manager functionality will be implemented");
-              }}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
-            >
-              Pass to Manager
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={handleCreateAndSendToCustomer}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
-            >
-              {loading ? "Sending..." : "Create & Send to Customer"}
-            </button>
+            {form.documentType === "Check-in Slip" && checkInSlipData && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleSendCheckInSlipToCustomer}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                <MessageCircle size={18} />
+                {loading ? "Sending..." : "Send to Customer via WhatsApp"}
+              </button>
+            )}
+            {form.documentType === "Check-in Slip" && selectedCustomer && handleGenerateAndSendCheckInSlip && (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleGenerateAndSendCheckInSlip}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
+              >
+                {loading ? "Sending..." : "Generate & Send to Customer"}
+              </button>
+            )}
+            {form.documentType !== "Check-in Slip" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Pass to manager logic
+                    alert("Pass to manager functionality will be implemented");
+                  }}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                >
+                  Pass to Manager
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleCreateAndSendToCustomer}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
+                >
+                  {loading ? "Sending..." : "Create & Send to Customer"}
+                </button>
+              </>
+            )}
             <button
               type="submit"
               disabled={loading}
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
             >
-              {loading ? "Creating..." : "Create Quotation"}
+              {loading 
+                ? (form.documentType === "Check-in Slip" ? "Generating..." : "Creating...") 
+                : (form.documentType === "Check-in Slip" ? "Generate Check-in Slip" : "Create Quotation")
+              }
             </button>
           </div>
         </form>

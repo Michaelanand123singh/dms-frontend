@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { CheckCircle, XCircle, Package, User, Clock } from "lucide-react";
 import type { JobCardPartsRequest } from "@/shared/types/jobcard-inventory.types";
+import { ApprovalForm } from "./ApprovalForm";
+import { getInitialApprovalFormData, type ApprovalFormData } from "./form.schema";
 
 export default function ApprovalsPage() {
   const { userInfo, userRole } = useRole();
@@ -18,9 +20,8 @@ export default function ApprovalsPage() {
   const [scApprovedRequests, setScApprovedRequests] = useState<JobCardPartsRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
-  const [notes, setNotes] = useState("");
+  const [approvalFormData, setApprovalFormData] = useState<ApprovalFormData>(getInitialApprovalFormData());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [assignedEngineer, setAssignedEngineer] = useState("");
 
   useEffect(() => {
     fetchRequests();
@@ -69,10 +70,10 @@ export default function ApprovalsPage() {
       await jobCardPartsRequestService.approveByScManager(
         id,
         userInfo?.name || "SC Manager",
-        notes || undefined
+        approvalFormData.notes || undefined
       );
       setSelectedRequest(null);
-      setNotes("");
+      setApprovalFormData(getInitialApprovalFormData());
       await fetchRequests();
       showSuccess("Request approved successfully! It will now appear in 'SC Manager Approved - Ready to Assign' section for Inventory Manager.");
     } catch (error) {
@@ -88,7 +89,7 @@ export default function ApprovalsPage() {
       showError("Only Inventory Manager can approve and assign parts.");
       return;
     }
-    if (!assignedEngineer.trim()) {
+    if (!approvalFormData.assignedEngineer?.trim()) {
       showWarning("Please enter the engineer name to assign parts to.");
       return;
     }
@@ -98,12 +99,11 @@ export default function ApprovalsPage() {
       await jobCardPartsRequestService.assignPartsByInventoryManager(
         id,
         userInfo?.name || "Inventory Manager",
-        assignedEngineer,
-        notes || undefined
+        approvalFormData.assignedEngineer,
+        approvalFormData.notes || undefined
       );
       setSelectedRequest(null);
-      setNotes("");
-      setAssignedEngineer("");
+      setApprovalFormData(getInitialApprovalFormData());
       await fetchRequests();
       showSuccess("Parts assigned successfully! Stock has been decreased.");
     } catch (error) {
@@ -127,14 +127,13 @@ export default function ApprovalsPage() {
         status: "rejected",
         rejectedBy: userInfo?.name || "Inventory Manager",
         rejectedAt: new Date().toISOString(),
-        notes: notes || allRequests[index].notes,
+        notes: approvalFormData.notes || allRequests[index].notes,
       };
       // Save using localStorage directly since service doesn't have update method
       const { localStorage: safeStorage } = await import("@/shared/lib/localStorage");
       safeStorage.setItem("jobCardPartsRequests", allRequests);
       setSelectedRequest(null);
-      setNotes("");
-      setAssignedEngineer("");
+      setApprovalFormData(getInitialApprovalFormData());
       await fetchRequests();
       showSuccess("Request rejected successfully.");
     } catch (error) {
@@ -266,54 +265,29 @@ export default function ApprovalsPage() {
           </div>
 
           {isSelected && !imApproved && (
-            <div className="border-t pt-4 mt-4">
+            <>
               {!scApproved ? (
                 // SC Manager Approval Section - Only visible to SC Manager
                 isScManager ? (
-                  <>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Add notes (optional)..."
-                      className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      rows={3}
-                    />
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={() => handleScManagerApprove(request.id)}
-                        disabled={isProcessing}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <CheckCircle size={16} className="mr-2" />
-                        Approve as SC Manager
-                      </Button>
-                      <Button
-                        onClick={() => handleReject(request.id)}
-                        disabled={isProcessing}
-                        variant="outline"
-                        className="border-red-500 text-red-600 hover:bg-red-50"
-                      >
-                        <XCircle size={16} className="mr-2" />
-                        Reject
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSelectedRequest(null);
-                          setNotes("");
-                        }}
-                        variant="outline"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </>
+                  <ApprovalForm
+                    formData={approvalFormData}
+                    onFormChange={setApprovalFormData}
+                    approvalType="sc_manager"
+                    onApprove={() => handleScManagerApprove(request.id)}
+                    onReject={() => handleReject(request.id)}
+                    onCancel={() => {
+                      setSelectedRequest(null);
+                      setApprovalFormData(getInitialApprovalFormData());
+                    }}
+                    isProcessing={isProcessing}
+                  />
                 ) : (
-                  <div className="text-center py-4 text-gray-500">
+                  <div className="border-t pt-4 mt-4 text-center py-4 text-gray-500">
                     <p>Only SC Manager can approve this request.</p>
                     <Button
                       onClick={() => {
                         setSelectedRequest(null);
-                        setNotes("");
+                        setApprovalFormData(getInitialApprovalFormData());
                       }}
                       variant="outline"
                       className="mt-3"
@@ -325,65 +299,25 @@ export default function ApprovalsPage() {
               ) : (
                 // Inventory Manager Approval Section - Only visible to Inventory Manager
                 isInventoryManager ? (
-                  <>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Assign to Engineer *
-                      </label>
-                      <input
-                        type="text"
-                        value={assignedEngineer}
-                        onChange={(e) => setAssignedEngineer(e.target.value)}
-                        placeholder="Enter engineer name"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        required
-                      />
-                    </div>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Add notes (optional)..."
-                      className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      rows={3}
-                    />
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={() => handleInventoryManagerApprove(request.id)}
-                        disabled={isProcessing || !assignedEngineer.trim()}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <CheckCircle size={16} className="mr-2" />
-                        Approve & Assign Parts as Inventory Manager
-                      </Button>
-                      <Button
-                        onClick={() => handleReject(request.id)}
-                        disabled={isProcessing}
-                        variant="outline"
-                        className="border-red-500 text-red-600 hover:bg-red-50"
-                      >
-                        <XCircle size={16} className="mr-2" />
-                        Reject
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSelectedRequest(null);
-                          setNotes("");
-                          setAssignedEngineer("");
-                        }}
-                        variant="outline"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </>
+                  <ApprovalForm
+                    formData={approvalFormData}
+                    onFormChange={setApprovalFormData}
+                    approvalType="inventory_manager"
+                    onApprove={() => handleInventoryManagerApprove(request.id)}
+                    onReject={() => handleReject(request.id)}
+                    onCancel={() => {
+                      setSelectedRequest(null);
+                      setApprovalFormData(getInitialApprovalFormData());
+                    }}
+                    isProcessing={isProcessing}
+                  />
                 ) : (
-                  <div className="text-center py-4 text-gray-500">
+                  <div className="border-t pt-4 mt-4 text-center py-4 text-gray-500">
                     <p>Only Inventory Manager can assign parts for this request.</p>
                     <Button
                       onClick={() => {
                         setSelectedRequest(null);
-                        setNotes("");
-                        setAssignedEngineer("");
+                        setApprovalFormData(getInitialApprovalFormData());
                       }}
                       variant="outline"
                       className="mt-3"
@@ -393,7 +327,7 @@ export default function ApprovalsPage() {
                   </div>
                 )
               )}
-            </div>
+            </>
           )}
 
           {!isSelected && !imApproved && (

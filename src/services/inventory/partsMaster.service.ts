@@ -4,9 +4,77 @@
 
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import type { Part, PartFormData } from "@/shared/types/inventory.types";
+import { PARTS_MASTER_STORAGE_KEYS } from "@/app/inventory-manager/parts-master/storage.constants";
+
+/**
+ * Generate unique part ID
+ */
+function generatePartId(prefix: string = ""): string {
+  return `PART-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}${prefix}`;
+}
+
+/**
+ * Generate unique internal part ID
+ */
+function generateInternalId(prefix: string = ""): string {
+  return `part-${Date.now()}-${Math.random().toString(36).substr(2, 9)}${prefix}`;
+}
+
+/**
+ * Map PartFormData to Part entity (only includes fields with values)
+ */
+function mapPartFormDataToPart(data: PartFormData, id: string): Part {
+  // Generate partId if not provided
+  const partId = data.partId?.trim() || generatePartId();
+  const partNumber = data.partNumber?.trim() || "";
+  const category = data.category?.trim() || "";
+  
+  const part: Part = {
+    id,
+    partId, // Always set (auto-generated if not provided)
+    partName: data.partName.trim(),
+    partNumber, // Always set (empty string if not provided)
+    category, // Always set (empty string if not provided)
+    price: data.price || 0,
+    stockQuantity: 0,
+    minStockLevel: data.minStockLevel || 0,
+    unit: data.unit || "piece",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    // Include all extended fields from data (only if they have values)
+    ...(data.sku && { sku: data.sku }),
+    ...(data.partCode && { partCode: data.partCode }),
+    ...(data.status && { status: data.status }),
+    ...(data.description && { description: data.description }),
+    ...(data.brandName && { brandName: data.brandName }),
+    ...(data.variant && { variant: data.variant }),
+    ...(data.partType && { partType: data.partType }),
+    ...(data.color && { color: data.color }),
+    ...(data.preGstAmountToUs && { preGstAmountToUs: data.preGstAmountToUs }),
+    ...(data.gstRateInput && { gstRateInput: data.gstRateInput }),
+    ...(data.gstInputAmount && { gstInputAmount: data.gstInputAmount }),
+    ...(data.postGstAmountToUs && { postGstAmountToUs: data.postGstAmountToUs }),
+    ...(data.salePricePreGst && { salePricePreGst: data.salePricePreGst }),
+    ...(data.gstRateOutput && { gstRateOutput: data.gstRateOutput }),
+    ...(data.gstOutputAmount && { gstOutputAmount: data.gstOutputAmount }),
+    ...(data.postGstSaleAmount && { postGstSaleAmount: data.postGstSaleAmount }),
+    ...(data.associatedLabourName && { associatedLabourName: data.associatedLabourName }),
+    ...(data.associatedLabourCode && { associatedLabourCode: data.associatedLabourCode }),
+    ...(data.workTime && { workTime: data.workTime }),
+    ...(data.labourRate && { labourRate: data.labourRate }),
+    ...(data.labourGstRate && { labourGstRate: data.labourGstRate }),
+    ...(data.labourGstAmount && { labourGstAmount: data.labourGstAmount }),
+    ...(data.labourPostGstAmount && { labourPostGstAmount: data.labourPostGstAmount }),
+    ...(data.highValuePart !== undefined && { highValuePart: data.highValuePart }),
+    ...(data.partSerialNumber && { partSerialNumber: data.partSerialNumber }),
+    ...(data.centerId && { centerId: data.centerId }),
+  };
+  
+  return part;
+}
 
 class PartsMasterService {
-  private storageKey = "partsMaster";
+  private storageKey = PARTS_MASTER_STORAGE_KEYS.PARTS_MASTER;
 
   async getAll(): Promise<Part[]> {
     const parts = safeStorage.getItem<Part[]>(this.storageKey, []);
@@ -19,14 +87,28 @@ class PartsMasterService {
   }
 
   async create(data: PartFormData): Promise<Part> {
+    // Only require partName for identification
+    if (!data.partName?.trim()) {
+      throw new Error("Part Name is required to save a part");
+    }
+    
     const parts = await this.getAll();
-    const newPart: Part = {
-      id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ...data,
-      stockQuantity: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    
+    // Generate partId if not provided
+    const partId = data.partId?.trim() || generatePartId();
+    const partNumber = data.partNumber?.trim() || "";
+    
+    // Check for duplicate partId
+    if (parts.some(p => p.partId === partId)) {
+      throw new Error(`Part with ID "${partId}" already exists`);
+    }
+    
+    // Check for duplicate partNumber only if provided
+    if (partNumber && parts.some(p => p.partNumber === partNumber)) {
+      throw new Error(`Part with Number "${partNumber}" already exists`);
+    }
+    
+    const newPart = mapPartFormDataToPart(data, generateInternalId());
     parts.push(newPart);
     safeStorage.setItem(this.storageKey, parts);
     return newPart;
@@ -88,41 +170,38 @@ class PartsMasterService {
     const newParts: Part[] = [];
 
     partsData.forEach((data, index) => {
-      // Validate required fields
-      if (!data.partId || !data.partName || !data.partNumber || !data.category) {
+      // Validate required field (only partName is required)
+      if (!data.partName?.trim()) {
         failed++;
-        errors.push(`Row ${index + 2}: Missing required fields (Part ID, Part Name, Part Number, or Category)`);
+        errors.push(`Row ${index + 2}: Part Name is required`);
         return;
       }
+
+      // Generate partId if not provided
+      const partId = data.partId?.trim() || generatePartId(`-${index}`);
+      const partNumber = data.partNumber?.trim() || "";
 
       // Check for duplicates
-      if (existingPartIds.has(data.partId)) {
+      if (existingPartIds.has(partId)) {
         failed++;
-        errors.push(`Row ${index + 2}: Part ID "${data.partId}" already exists`);
+        errors.push(`Row ${index + 2}: Part ID "${partId}" already exists`);
         return;
       }
 
-      if (existingPartNumbers.has(data.partNumber)) {
+      if (partNumber && existingPartNumbers.has(partNumber)) {
         failed++;
-        errors.push(`Row ${index + 2}: Part Number "${data.partNumber}" already exists`);
+        errors.push(`Row ${index + 2}: Part Number "${partNumber}" already exists`);
         return;
       }
 
-      // Create new part
-      const newPart: Part = {
-        id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`,
-        ...data,
-        stockQuantity: 0,
-        price: data.price || 0,
-        minStockLevel: data.minStockLevel || 0,
-        unit: data.unit || "piece",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      // Create new part using utility function
+      const newPart = mapPartFormDataToPart(data, generateInternalId(`-${index}`));
 
       newParts.push(newPart);
-      existingPartIds.add(data.partId);
-      existingPartNumbers.add(data.partNumber);
+      existingPartIds.add(newPart.partId);
+      if (newPart.partNumber) {
+        existingPartNumbers.add(newPart.partNumber);
+      }
       success++;
     });
 

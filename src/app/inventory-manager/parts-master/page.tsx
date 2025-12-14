@@ -1,10 +1,9 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { 
@@ -23,7 +22,9 @@ import {
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import type { Part, PartFormData } from "@/shared/types/inventory.types";
 import * as XLSX from "xlsx";
-import { InventoryPartForm, type InventoryPartFormData } from "../../../components/inventory/InventoryPartForm";
+import { PartsMasterForm } from "./PartsMasterForm";
+import { getInitialFormData, type PartsMasterFormData } from "./form.schema";
+import { mapPartToFormData, mapFormDataToPartFormData } from "./form.utils";
 
 export default function PartsMasterPage() {
   const [parts, setParts] = useState<Part[]>([]);
@@ -40,53 +41,7 @@ export default function PartsMasterPage() {
     failed: number;
     errors: string[];
   } | null>(null);
-  const [formData, setFormData] = useState<InventoryPartFormData & {
-    partId: string;
-    partNumber: string;
-    description: string;
-    minStockLevel: number;
-    unit: string;
-    price: number | string; // Support both for compatibility
-  }>({
-    partId: "",
-    partName: "",
-    partNumber: "",
-    sku: "",
-    partCode: "",
-    category: "",
-    quantity: "",
-    price: "",
-    status: "In Stock",
-    description: "",
-    minStockLevel: 0,
-    unit: "piece",
-    // Basic Part Info
-    brandName: "",
-    variant: "",
-    partType: "NEW",
-    color: "NA",
-    // Purchase (Incoming)
-    preGstAmountToUs: "",
-    gstRateInput: "",
-    gstInputAmount: "",
-    postGstAmountToUs: "",
-    // Sale (Outgoing)
-    salePricePreGst: "",
-    gstRateOutput: "",
-    gstOutputAmount: "",
-    postGstSaleAmount: "",
-    // Labour Association
-    associatedLabourName: "",
-    associatedLabourCode: "",
-    workTime: "",
-    labourRate: "",
-    labourGstRate: "",
-    labourGstAmount: "",
-    labourPostGstAmount: "",
-    // High Value Part
-    highValuePart: false,
-    partSerialNumber: "",
-  });
+  const [formData, setFormData] = useState<PartsMasterFormData>(getInitialFormData());
 
   useEffect(() => {
     initializeInventoryMockData();
@@ -129,17 +84,17 @@ export default function PartsMasterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     try {
-      const partData: PartFormData = {
-        partId: formData.partId || "",
-        partName: formData.partName,
-        partNumber: formData.partNumber || "",
-        category: formData.category,
-        price: typeof formData.price === 'string' ? parseFloat(formData.price) || 0 : (formData.price || 0),
-        description: formData.description || "",
-        minStockLevel: formData.minStockLevel || 0,
-        unit: formData.unit || "piece",
-      };
+      // Map form data to PartFormData (only includes fields with data)
+      const partData = mapFormDataToPartFormData(formData);
+      
+      // At minimum, require partName for identification
+      if (!partData.partName?.trim()) {
+        alert("Please enter a Part Name to save the part.");
+        return;
+      }
+      
       if (editingPart) {
         await partsMasterService.update(editingPart.id, partData);
       } else {
@@ -151,52 +106,13 @@ export default function PartsMasterPage() {
       fetchParts();
     } catch (error) {
       console.error("Failed to save part:", error);
-      alert("Failed to save part. Please try again.");
+      alert(error instanceof Error ? error.message : "Failed to save part. Please try again.");
     }
   };
 
   const handleEdit = (part: Part) => {
     setEditingPart(part);
-    setFormData({
-      partId: part.partId,
-      partName: part.partName,
-      partNumber: part.partNumber,
-      sku: (part as any).sku || "",
-      partCode: (part as any).partCode || "",
-      category: part.category,
-      quantity: String((part as any).stockQuantity || ""),
-      price: String(part.price || ""),
-      status: (part as any).status || "In Stock",
-      description: part.description || "",
-      minStockLevel: part.minStockLevel,
-      unit: part.unit,
-      // Basic Part Info
-      brandName: (part as any).brandName || "",
-      variant: (part as any).variant || "",
-      partType: (part as any).partType || "NEW",
-      color: (part as any).color || "NA",
-      // Purchase (Incoming)
-      preGstAmountToUs: (part as any).preGstAmountToUs || "",
-      gstRateInput: (part as any).gstRateInput || "",
-      gstInputAmount: (part as any).gstInputAmount || "",
-      postGstAmountToUs: (part as any).postGstAmountToUs || "",
-      // Sale (Outgoing)
-      salePricePreGst: (part as any).salePricePreGst || "",
-      gstRateOutput: (part as any).gstRateOutput || "",
-      gstOutputAmount: (part as any).gstOutputAmount || "",
-      postGstSaleAmount: (part as any).postGstSaleAmount || "",
-      // Labour Association
-      associatedLabourName: (part as any).associatedLabourName || "",
-      associatedLabourCode: (part as any).associatedLabourCode || "",
-      workTime: (part as any).workTime || "",
-      labourRate: (part as any).labourRate || "",
-      labourGstRate: (part as any).labourGstRate || "",
-      labourGstAmount: (part as any).labourGstAmount || "",
-      labourPostGstAmount: (part as any).labourPostGstAmount || "",
-      // High Value Part
-      highValuePart: (part as any).highValuePart || false,
-      partSerialNumber: (part as any).partSerialNumber || "",
-    });
+    setFormData(mapPartToFormData(part));
     setShowModal(true);
   };
 
@@ -213,46 +129,7 @@ export default function PartsMasterPage() {
   };
 
   const resetForm = () => {
-    setFormData({
-      partId: "",
-      partName: "",
-      partNumber: "",
-      sku: "",
-      partCode: "",
-      category: "",
-      quantity: "",
-      price: "",
-      status: "In Stock",
-      description: "",
-      minStockLevel: 0,
-      unit: "piece",
-      // Basic Part Info
-      brandName: "",
-      variant: "",
-      partType: "NEW",
-      color: "NA",
-      // Purchase (Incoming)
-      preGstAmountToUs: "",
-      gstRateInput: "",
-      gstInputAmount: "",
-      postGstAmountToUs: "",
-      // Sale (Outgoing)
-      salePricePreGst: "",
-      gstRateOutput: "",
-      gstOutputAmount: "",
-      postGstSaleAmount: "",
-      // Labour Association
-      associatedLabourName: "",
-      associatedLabourCode: "",
-      workTime: "",
-      labourRate: "",
-      labourGstRate: "",
-      labourGstAmount: "",
-      labourPostGstAmount: "",
-      // High Value Part
-      highValuePart: false,
-      partSerialNumber: "",
-    });
+    setFormData(getInitialFormData());
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -305,12 +182,16 @@ export default function PartsMasterPage() {
         return {
           partId: String(getValue(["Part ID", "PartID", "part_id", "PartId"]) || ""),
           partName: String(getValue(["Part Name", "PartName", "part_name", "Name"]) || ""),
-          partNumber: String(getValue(["Part Number", "PartNumber", "part_number", "Number", "SKU"]) || ""),
+          partNumber: String(getValue(["Part Number", "PartNumber", "part_number", "Number"]) || ""),
           category: String(getValue(["Category", "category", "Category Name"]) || ""),
           price: parseFloat(getValue(["Price", "price", "Unit Price", "unit_price"]) || "0") || 0,
           description: String(getValue(["Description", "description", "Desc"]) || ""),
           minStockLevel: parseInt(getValue(["Min Stock", "MinStock", "min_stock", "Min Stock Level", "min_stock_level"]) || "0") || 0,
           unit: String(getValue(["Unit", "unit", "UOM"]) || "piece"),
+          // Extended fields
+          sku: String(getValue(["SKU", "sku"]) || ""),
+          partCode: String(getValue(["Part Code", "PartCode", "part_code"]) || ""),
+          status: (getValue(["Status", "status"]) || "In Stock") as "In Stock" | "Low Stock" | "Out of Stock",
           // Basic Part Info
           brandName: String(getValue(["Brand Name", "BrandName", "brand_name", "Brand"]) || ""),
           variant: String(getValue(["Variant", "variation"]) || ""),
@@ -337,12 +218,12 @@ export default function PartsMasterPage() {
           // High Value Part
           highValuePart: getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "true" || getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "yes" || false,
           partSerialNumber: String(getValue(["Part Serial Number", "PartSerialNumber", "serial_number"]) || ""),
-        } as any;
+        } as PartFormData;
       });
 
-      // Filter out empty rows
+      // Filter out empty rows (only partName is required)
       const validPartsData = partsData.filter(
-        (p) => p.partId && p.partName && p.partNumber && p.category
+        (p) => p.partName?.trim()
       );
 
       if (validPartsData.length === 0) {
@@ -747,15 +628,10 @@ export default function PartsMasterPage() {
           }}
           title={editingPart ? "Edit Part" : "Add New Part"}
         >
-          <InventoryPartForm
-            formData={{ ...formData, price: String(formData.price || "") } as unknown as InventoryPartFormData}
-            onFormChange={(data: InventoryPartFormData) => setFormData({ ...data, price: typeof data.price === 'string' ? parseFloat(data.price) || 0 : data.price } as unknown as typeof formData)}
+          <PartsMasterForm
+            formData={formData}
+            onFormChange={setFormData}
             onSubmit={handleSubmit}
-            onClose={() => {
-              setShowModal(false);
-              setEditingPart(null);
-              resetForm();
-            }}
             isEditing={!!editingPart}
             showServiceCenter={false}
             submitButtonText={editingPart ? "Update" : "Create"}

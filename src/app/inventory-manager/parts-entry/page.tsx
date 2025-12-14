@@ -9,6 +9,8 @@ import { partsEntryService, type PartsEntry } from "@/features/inventory/service
 import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import type { Part } from "@/shared/types/inventory.types";
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
+import { PartsEntryForm } from "./PartsEntryForm";
+import { getInitialFormData, getInitialItemFormData, type PartsEntryFormData, type PartsEntryItemFormData } from "./form.schema";
 
 interface PartsEntryItem {
   partId: string;
@@ -18,19 +20,12 @@ interface PartsEntryItem {
 }
 
 export default function PartsEntryPage() {
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [vendor, setVendor] = useState("");
-  const [entryDate, setEntryDate] = useState(new Date().toISOString().split("T")[0]);
+  const [formData, setFormData] = useState<PartsEntryFormData>(getInitialFormData());
   const [parts, setParts] = useState<PartsEntryItem[]>([]);
   const [availableParts, setAvailableParts] = useState<Part[]>([]);
   const [recentEntries, setRecentEntries] = useState<PartsEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [currentPart, setCurrentPart] = useState({
-    partId: "",
-    partName: "",
-    quantity: "",
-    unitPrice: "",
-  });
+  const [currentPart, setCurrentPart] = useState<PartsEntryItemFormData>(getInitialItemFormData());
 
   useEffect(() => {
     initializeInventoryMockData();
@@ -65,6 +60,8 @@ export default function PartsEntryPage() {
         quantity: "",
         unitPrice: part.price.toString(),
       });
+    } else {
+      setCurrentPart(getInitialItemFormData());
     }
   };
 
@@ -90,12 +87,7 @@ export default function PartsEntryPage() {
       },
     ]);
 
-    setCurrentPart({
-      partId: "",
-      partName: "",
-      quantity: "",
-      unitPrice: "",
-    });
+    setCurrentPart(getInitialItemFormData());
   };
 
   const removePart = (index: number) => {
@@ -105,25 +97,24 @@ export default function PartsEntryPage() {
   const totalAmount = parts.reduce((sum, p) => sum + p.quantity * p.unitPrice, 0);
 
   const handleSubmit = async () => {
-    if (!invoiceNumber || !vendor || parts.length === 0) {
+    if (!formData.invoiceNumber || !formData.vendor || parts.length === 0) {
       alert("Please fill all required fields");
       return;
     }
 
     try {
       await partsEntryService.create(
-        invoiceNumber,
-        vendor,
-        entryDate,
+        formData.invoiceNumber,
+        formData.vendor,
+        formData.entryDate,
         parts,
         "Inventory Manager"
       );
       
       alert("Parts entry saved successfully! Stock has been updated.");
-      setInvoiceNumber("");
-      setVendor("");
-      setEntryDate(new Date().toISOString().split("T")[0]);
+      setFormData(getInitialFormData());
       setParts([]);
+      setCurrentPart(getInitialItemFormData());
       fetchRecentEntries();
       fetchAvailableParts(); // Refresh to show updated stock
     } catch (error) {
@@ -147,35 +138,7 @@ export default function PartsEntryPage() {
                 <h2 className="text-lg font-semibold">Entry Details</h2>
               </CardHeader>
               <CardBody>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number *</label>
-                    <Input
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="Enter invoice number"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
-                    <Input
-                      value={vendor}
-                      onChange={(e) => setVendor(e.target.value)}
-                      placeholder="Enter vendor name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Entry Date *</label>
-                    <Input
-                      type="date"
-                      value={entryDate}
-                      onChange={(e) => setEntryDate(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
+                <PartsEntryForm formData={formData} onFormChange={setFormData} />
               </CardBody>
             </Card>
 

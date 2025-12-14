@@ -30,10 +30,10 @@ export interface StockIndicator {
  */
 export interface Part {
   id: string;
-  partId: string;
-  partName: string;
-  partNumber: string;
-  category: string;
+  partId: string; // Required - auto-generated if not provided
+  partName: string; // Required
+  partNumber: string; // Required - can be empty string
+  category: string; // Required - can be empty string
   price: number;
   description?: string;
   stockQuantity: number;
@@ -41,20 +41,84 @@ export interface Part {
   unit: string;
   createdAt?: string;
   updatedAt?: string;
+  // Extended fields from form
+  sku?: string;
+  partCode?: string;
+  status?: "In Stock" | "Low Stock" | "Out of Stock";
+  // Basic Part Info
+  brandName?: string;
+  variant?: string;
+  partType?: "NEW" | "OLD";
+  color?: string;
+  // Purchase (Incoming)
+  preGstAmountToUs?: string;
+  gstRateInput?: string;
+  gstInputAmount?: string;
+  postGstAmountToUs?: string;
+  // Sale (Outgoing)
+  salePricePreGst?: string;
+  gstRateOutput?: string;
+  gstOutputAmount?: string;
+  postGstSaleAmount?: string;
+  // Labour Association
+  associatedLabourName?: string;
+  associatedLabourCode?: string;
+  workTime?: string;
+  labourRate?: string;
+  labourGstRate?: string;
+  labourGstAmount?: string;
+  labourPostGstAmount?: string;
+  // High Value Part
+  highValuePart?: boolean;
+  partSerialNumber?: string;
+  // Optional
+  centerId?: string;
 }
 
 /**
  * Part Form Data for create/update
  */
 export interface PartFormData {
-  partId: string;
-  partName: string;
-  partNumber: string;
-  category: string;
-  price: number;
+  partId?: string;
+  partName: string; // Only partName is required
+  partNumber?: string;
+  category?: string;
+  price?: number;
   description?: string;
-  minStockLevel: number;
-  unit: string;
+  minStockLevel?: number;
+  unit?: string;
+  // Extended fields
+  sku?: string;
+  partCode?: string;
+  status?: "In Stock" | "Low Stock" | "Out of Stock";
+  // Basic Part Info
+  brandName?: string;
+  variant?: string;
+  partType?: "NEW" | "OLD";
+  color?: string;
+  // Purchase (Incoming)
+  preGstAmountToUs?: string;
+  gstRateInput?: string;
+  gstInputAmount?: string;
+  postGstAmountToUs?: string;
+  // Sale (Outgoing)
+  salePricePreGst?: string;
+  gstRateOutput?: string;
+  gstOutputAmount?: string;
+  postGstSaleAmount?: string;
+  // Labour Association
+  associatedLabourName?: string;
+  associatedLabourCode?: string;
+  workTime?: string;
+  labourRate?: string;
+  labourGstRate?: string;
+  labourGstAmount?: string;
+  labourPostGstAmount?: string;
+  // High Value Part
+  highValuePart?: boolean;
+  partSerialNumber?: string;
+  // Optional
+  centerId?: string;
 }
 
 /**

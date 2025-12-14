@@ -4,22 +4,18 @@ import { partsMasterService } from "@/features/inventory/services/partsMaster.se
 import { partsOrderService, type PartsOrder } from "@/features/inventory/services/partsOrder.service";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Package, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
-import type { Part, PartsOrderFormData } from "@/shared/types/inventory.types";
+import type { Part } from "@/shared/types/inventory.types";
+import { PartsOrderEntryForm } from "./PartsOrderEntryForm";
+import { getInitialFormData, type PartsOrderEntryFormData } from "./form.schema";
 
 export default function PartsOrderEntryPage() {
   const [parts, setParts] = useState<Part[]>([]);
   const [orders, setOrders] = useState<PartsOrder[]>([]);
   const [showOrderView, setShowOrderView] = useState(true);
-  const [formData, setFormData] = useState<PartsOrderFormData>({
-    partId: "",
-    requiredQty: 0,
-    urgency: "medium",
-    notes: "",
-  });
+  const [formData, setFormData] = useState<PartsOrderEntryFormData>(getInitialFormData());
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
 
   const fetchParts = async () => {
@@ -63,17 +59,17 @@ export default function PartsOrderEntryPage() {
 
     try {
       const order = await partsOrderService.create(
-        formData,
+        {
+          partId: formData.partId,
+          requiredQty: formData.requiredQty,
+          urgency: formData.urgency,
+          notes: formData.notes,
+        },
         selectedPart.partName,
         "Inventory Manager"
       );
       alert(`Purchase order ${order.orderNumber} created successfully!`);
-      setFormData({
-        partId: "",
-        requiredQty: 0,
-        urgency: "medium",
-        notes: "",
-      });
+      setFormData(getInitialFormData());
       setSelectedPart(null);
       // Refresh orders and show order view
       await fetchOrders();
@@ -126,70 +122,15 @@ export default function PartsOrderEntryPage() {
               <h2 className="text-lg font-semibold">New Purchase Order</h2>
             </CardHeader>
             <CardBody>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Part *</label>
-                  <select
-                    value={formData.partId}
-                    onChange={(e) => handlePartSelect(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
-                    required
-                  >
-                    <option value="">Select a part</option>
-                    {parts.map((part) => (
-                      <option key={part.id} value={part.id}>
-                        {part.partName} ({part.partId}) - Stock: {part.stockQuantity}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {selectedPart && (
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="font-medium text-gray-900">{selectedPart.partName}</p>
-                    <p className="text-sm text-gray-600">
-                      Part Number: {selectedPart.partNumber} | Current Stock: {selectedPart.stockQuantity} {selectedPart.unit}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Required Quantity *</label>
-                  <Input
-                    type="number"
-                    value={formData.requiredQty}
-                    onChange={(e) => setFormData({ ...formData, requiredQty: parseInt(e.target.value) })}
-                    min="1"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Urgency *</label>
-                  <select
-                    value={formData.urgency}
-                    onChange={(e) => setFormData({ ...formData, urgency: e.target.value as "low" | "medium" | "high" })}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
-                    required
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    className="w-full p-3 border border-gray-300 rounded-lg"
-                    rows={3}
-                    placeholder="Additional notes..."
-                  />
-                </div>
-
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+              <form onSubmit={handleSubmit}>
+                <PartsOrderEntryForm
+                  formData={formData}
+                  onFormChange={setFormData}
+                  availableParts={parts}
+                  selectedPart={selectedPart}
+                  onPartSelect={handlePartSelect}
+                />
+                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white mt-4">
                   Create Purchase Order
                 </Button>
               </form>

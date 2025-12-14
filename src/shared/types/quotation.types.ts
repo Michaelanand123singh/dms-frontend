@@ -36,7 +36,7 @@ export interface Quotation {
   vehicleId?: string;
   serviceAdvisorId?: string;
   appointmentId?: string | number; // Link to source appointment
-  documentType: "Quotation" | "Proforma Invoice";
+  documentType: "Quotation" | "Proforma Invoice" | "Check-in Slip";
   quotationDate: string;
   validUntil?: string;
   hasInsurance: boolean;
@@ -122,7 +122,7 @@ export interface Quotation {
 export interface CreateQuotationForm {
   customerId: string;
   vehicleId?: string;
-  documentType: "Quotation" | "Proforma Invoice";
+  documentType: "Quotation" | "Proforma Invoice" | "Check-in Slip";
   quotationDate: string;
   validUntil?: string;
   validUntilDays: number; // 15, 30, or custom
