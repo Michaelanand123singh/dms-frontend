@@ -577,17 +577,17 @@ function AppointmentsContent() {
       return;
     }
 
-    // Ensure job card exists
-    if (!currentJobCardId) {
-      showToast("Please wait for job card to be created first.", "error");
-      return;
-    }
+      // Ensure job card exists
+      if (!currentJobCardId) {
+        showToast("Please wait for job card to be created first.", "error");
+        return;
+      }
 
-    // Generate check-in slip data
-    const slipData = generateCheckInSlipData();
-    if (slipData) {
-      setCheckInSlipData(slipData);
-      setShowCheckInSlipModal(true);
+      // Generate check-in slip data
+      const slipData = generateCheckInSlipData();
+      if (slipData) {
+        setCheckInSlipData(slipData);
+        setShowCheckInSlipModal(true);
       showToast("Check-in slip generated successfully.", "success");
     }
   }, [selectedAppointment, currentJobCardId, generateCheckInSlipData, showToast]);

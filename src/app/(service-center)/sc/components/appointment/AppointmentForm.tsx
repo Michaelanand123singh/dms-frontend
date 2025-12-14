@@ -1454,12 +1454,12 @@ export const AppointmentForm = ({
             Create Quotation
           </button>
         ) : (
-          <button
-            onClick={handleSubmit}
-            className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
-          >
-            {mode === "edit" ? "Update Appointment" : "Schedule Appointment"}
-          </button>
+        <button
+          onClick={handleSubmit}
+          className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
+        >
+          {mode === "edit" ? "Update Appointment" : "Schedule Appointment"}
+        </button>
         )}
       </div>
 

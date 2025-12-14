@@ -155,6 +155,28 @@ export default function Workshop() {
     );
     setJobCards(updatedJobs);
     safeStorage.setItem("jobCards", updatedJobs);
+    
+    // Update lead status to converted when service is completed
+    if (selectedJobForAction.id) {
+      const existingLeads = safeStorage.getItem<any[]>("leads", []);
+      const leadIndex = existingLeads.findIndex((l) => l.jobCardId === selectedJobForAction.id);
+      
+      if (leadIndex !== -1) {
+        const lead = existingLeads[leadIndex];
+        const updatedNotes = lead.notes 
+          ? `${lead.notes}\nService completed on ${new Date().toLocaleString()}`
+          : `Service completed on ${new Date().toLocaleString()}`;
+        
+        existingLeads[leadIndex] = {
+          ...lead,
+          status: "converted" as const,
+          notes: updatedNotes,
+          updatedAt: new Date().toISOString(),
+        };
+        safeStorage.setItem("leads", existingLeads);
+      }
+    }
+    
     setShowCompleteModal(false);
     setSelectedJobForAction(null);
     alert("Job marked as completed!");

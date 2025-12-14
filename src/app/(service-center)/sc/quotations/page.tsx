@@ -110,6 +110,9 @@ function QuotationsContent() {
     validUntilDays: 30,
     hasInsurance: false,
     insurerId: "",
+    insuranceCompanyName: "",
+    insuranceStartDate: "",
+    insuranceEndDate: "",
     items: [],
     discount: 0,
     notes: "",
@@ -200,6 +203,30 @@ function QuotationsContent() {
               if (customer) {
                 setSelectedCustomer(customer);
                 setActiveCustomerId(customer.id?.toString() || "");
+                
+                // Extract insurance data from appointment
+                const insuranceCompanyName = appointmentData.insuranceCompanyName || "";
+                const insuranceStartDate = appointmentData.insuranceStartDate || "";
+                const insuranceEndDate = appointmentData.insuranceEndDate || "";
+                const hasInsuranceData = !!(insuranceCompanyName || insuranceStartDate || insuranceEndDate);
+                
+                // Try to match insurance company name to insurer list
+                let matchedInsurerId = "";
+                if (insuranceCompanyName && insurers.length > 0) {
+                  const matchedInsurer = insurers.find((insurer) => {
+                    const insurerNameLower = insurer.name.toLowerCase().trim();
+                    const companyNameLower = insuranceCompanyName.toLowerCase().trim();
+                    return (
+                      insurerNameLower === companyNameLower ||
+                      insurerNameLower.includes(companyNameLower) ||
+                      companyNameLower.includes(insurerNameLower)
+                    );
+                  });
+                  if (matchedInsurer) {
+                    matchedInsurerId = matchedInsurer.id;
+                  }
+                }
+                
                 setForm((prev) => ({
                   ...prev,
                   customerId: String(customer.id),
@@ -207,6 +234,11 @@ function QuotationsContent() {
                   notes: appointmentData.customerComplaintIssue || "",
                   customNotes: appointmentData.previousServiceHistory || "",
                   batterySerialNumber: appointmentData.batterySerialNumber || appointmentData.chargerSerialNumber || "",
+                  hasInsurance: hasInsuranceData,
+                  insurerId: matchedInsurerId,
+                  insuranceCompanyName: insuranceCompanyName || "",
+                  insuranceStartDate: insuranceStartDate || "",
+                  insuranceEndDate: insuranceEndDate || "",
                 }));
                 
                 // Find matching vehicle
@@ -297,11 +329,6 @@ const validateQuotationForm = () => {
     return false;
   }
 
-  if (form.hasInsurance && !form.insurerId) {
-    alert("Please select an insurer");
-    return false;
-  }
-
   return true;
 };
 
@@ -350,6 +377,8 @@ const buildQuotationFromForm = (): Quotation => {
     validUntil: validUntil.toISOString().split("T")[0],
     hasInsurance: form.hasInsurance,
     insurerId: form.insurerId,
+    insuranceStartDate: form.insuranceStartDate,
+    insuranceEndDate: form.insuranceEndDate,
     subtotal: updatedTotals.subtotal,
     discount: updatedTotals.discount,
     discountPercent: updatedTotals.discountPercent,
@@ -1015,6 +1044,9 @@ Please keep this slip safe for vehicle collection.`;
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
       
+      // Create or update lead when quotation is sent to customer
+      createOrUpdateLeadFromQuotation(quotation);
+      
       // Prefer customer's WhatsApp number; fall back to phone if not available
       const rawWhatsapp =
         (quotation.customer as any)?.whatsappNumber ||
@@ -1178,6 +1210,111 @@ Please keep this slip safe for vehicle collection.`;
     return newJobCard;
   };
 
+  // Create or Update Lead from Quotation (when sent to customer)
+  const createOrUpdateLeadFromQuotation = (quotation: Quotation) => {
+    const existingLeads = safeStorage.getItem<any[]>("leads", []);
+    
+    // Check if lead already exists for this quotation
+    const existingLeadIndex = existingLeads.findIndex((l) => l.quotationId === quotation.id);
+    
+    const leadData: any = {
+      customerId: quotation.customerId,
+      customerName: quotation.customer?.firstName + " " + (quotation.customer?.lastName || "") || "Customer",
+      phone: quotation.customer?.phone || "",
+      email: quotation.customer?.email,
+      vehicleDetails: quotation.vehicle ? `${quotation.vehicle.make} ${quotation.vehicle.model}` : "",
+      vehicleMake: quotation.vehicle?.make,
+      vehicleModel: quotation.vehicle?.model,
+      inquiryType: "Service",
+      serviceType: quotation.items?.[0]?.partName || "Service",
+      source: "quotation_sent",
+      status: "in_discussion" as const,
+      quotationId: quotation.id,
+      notes: `Quotation ${quotation.quotationNumber} sent to customer. Amount: ₹${quotation.totalAmount.toLocaleString("en-IN")}.`,
+      assignedTo: quotation.serviceAdvisorId || userInfo?.id,
+      serviceCenterId: quotation.serviceCenterId,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    if (existingLeadIndex !== -1) {
+      // Update existing lead
+      existingLeads[existingLeadIndex] = {
+        ...existingLeads[existingLeadIndex],
+        ...leadData,
+        id: existingLeads[existingLeadIndex].id,
+        createdAt: existingLeads[existingLeadIndex].createdAt,
+      };
+      safeStorage.setItem("leads", existingLeads);
+      return existingLeads[existingLeadIndex];
+    } else {
+      // Create new lead
+      const newLead: any = {
+        id: `lead-${Date.now()}`,
+        ...leadData,
+        createdAt: new Date().toISOString(),
+      };
+      const updatedLeads = [...existingLeads, newLead];
+      safeStorage.setItem("leads", updatedLeads);
+      return newLead;
+    }
+  };
+
+  // Update Lead when Job Card is Created
+  const updateLeadOnJobCardCreation = (quotationId: string, jobCardId: string, jobCardNumber: string) => {
+    const existingLeads = safeStorage.getItem<any[]>("leads", []);
+    const leadIndex = existingLeads.findIndex((l) => l.quotationId === quotationId);
+    
+    if (leadIndex !== -1) {
+      const lead = existingLeads[leadIndex];
+      const updatedNotes = lead.notes 
+        ? `${lead.notes}\nJob card created: ${jobCardNumber}`
+        : `Job card created: ${jobCardNumber}`;
+      
+      existingLeads[leadIndex] = {
+        ...lead,
+        status: "job_card_in_progress" as const,
+        jobCardId: jobCardId,
+        convertedTo: "job_card" as const,
+        notes: updatedNotes,
+        updatedAt: new Date().toISOString(),
+      };
+      safeStorage.setItem("leads", existingLeads);
+      return existingLeads[leadIndex];
+    }
+    
+    // If no lead exists, create one with job_card_in_progress status
+    const quotation = quotations.find((q) => q.id === quotationId);
+    if (quotation) {
+      const newLead: any = {
+        id: `lead-${Date.now()}`,
+        customerId: quotation.customerId,
+        customerName: quotation.customer?.firstName + " " + (quotation.customer?.lastName || "") || "Customer",
+        phone: quotation.customer?.phone || "",
+        email: quotation.customer?.email,
+        vehicleDetails: quotation.vehicle ? `${quotation.vehicle.make} ${quotation.vehicle.model}` : "",
+        vehicleMake: quotation.vehicle?.make,
+        vehicleModel: quotation.vehicle?.model,
+        inquiryType: "Service",
+        serviceType: quotation.items?.[0]?.partName || "Service",
+        source: "quotation_approved",
+        status: "job_card_in_progress" as const,
+        quotationId: quotation.id,
+        jobCardId: jobCardId,
+        convertedTo: "job_card" as const,
+        notes: `Quotation ${quotation.quotationNumber} approved. Job card created: ${jobCardNumber}`,
+        assignedTo: quotation.serviceAdvisorId || userInfo?.id,
+        serviceCenterId: quotation.serviceCenterId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const updatedLeads = [...existingLeads, newLead];
+      safeStorage.setItem("leads", updatedLeads);
+      return newLead;
+    }
+    
+    return null;
+  };
+
   // Add Rejected Quotation to Leads
   const addRejectedQuotationToLeads = (quotation: Quotation) => {
     const existingLeads = safeStorage.getItem<any[]>("leads", []);
@@ -1243,6 +1380,9 @@ Please keep this slip safe for vehicle collection.`;
       
       // Convert to job card
       const jobCard = convertQuotationToJobCard(quotation);
+      
+      // Update lead status to job_card_in_progress
+      updateLeadOnJobCardCreation(quotation.id, jobCard.id, jobCard.jobCardNumber);
       
       // Automatically send job card to manager for technician assignment and parts monitoring
       const updatedJobCards = safeStorage.getItem<any[]>("jobCards", []);
@@ -1443,6 +1583,9 @@ Please keep this slip safe for vehicle collection.`;
       validUntilDays: 30,
       hasInsurance: false,
       insurerId: "",
+      insuranceCompanyName: "",
+      insuranceStartDate: "",
+      insuranceEndDate: "",
       items: [],
       discount: 0,
       notes: "",
@@ -1839,6 +1982,34 @@ function CreateQuotationModal({
   onClose,
   loading,
 }: any) {
+  // Get appointment data directly from localStorage as fallback
+  const appointmentDataFromStorage = typeof window !== "undefined" 
+    ? safeStorage.getItem<any>("pendingQuotationFromAppointment", null)?.appointmentData 
+    : null;
+  
+  // Get selected vehicle
+  const selectedVehicle = selectedCustomer?.vehicles?.find(
+    (v: Vehicle) => String(v.id) === form.vehicleId
+  ) || selectedCustomer?.vehicles?.[0] || null;
+  
+  // Get insurance data from form, vehicle, or appointment data (priority: form > vehicle > appointment)
+  const insuranceCompanyName = 
+    form.insuranceCompanyName || 
+    selectedVehicle?.insuranceCompanyName || 
+    appointmentDataFromStorage?.insuranceCompanyName || 
+    "";
+  const insuranceStartDate = 
+    form.insuranceStartDate || 
+    selectedVehicle?.insuranceStartDate || 
+    appointmentDataFromStorage?.insuranceStartDate || 
+    "";
+  const insuranceEndDate = 
+    form.insuranceEndDate || 
+    selectedVehicle?.insuranceEndDate || 
+    appointmentDataFromStorage?.insuranceEndDate || 
+    "";
+  const hasInsuranceData = !!(insuranceCompanyName || insuranceStartDate || insuranceEndDate);
+  
   // This is a placeholder - the full modal will be implemented
   // Due to size constraints, I'll create a comprehensive but focused version
   return (
@@ -1915,7 +2086,19 @@ function CreateQuotationModal({
                       key={customer.id}
                       onClick={() => {
                         setSelectedCustomer(customer);
-                        setForm({ ...form, customerId: customer.id.toString(), vehicleId: customer.vehicles?.[0]?.id?.toString() || "" });
+                        const firstVehicle = customer.vehicles?.[0];
+                        const vehicleId = firstVehicle?.id?.toString() || "";
+                        
+                        // Auto-populate insurance data from first vehicle if available
+                        setForm({ 
+                          ...form, 
+                          customerId: customer.id.toString(), 
+                          vehicleId: vehicleId,
+                          insuranceCompanyName: firstVehicle?.insuranceCompanyName || form.insuranceCompanyName || "",
+                          insuranceStartDate: firstVehicle?.insuranceStartDate || form.insuranceStartDate || "",
+                          insuranceEndDate: firstVehicle?.insuranceEndDate || form.insuranceEndDate || "",
+                          hasInsurance: !!(firstVehicle?.insuranceCompanyName || firstVehicle?.insuranceStartDate || firstVehicle?.insuranceEndDate || form.hasInsurance),
+                        });
                         setActiveCustomerId(customer.id.toString());
                         setCustomerSearchQuery("");
                         clearCustomerSearch();
@@ -1943,7 +2126,20 @@ function CreateQuotationModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle</label>
               <select
                 value={form.vehicleId}
-                onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}
+                onChange={(e) => {
+                  const vehicleId = e.target.value;
+                  const vehicle = selectedCustomer.vehicles?.find((v: any) => String(v.id) === vehicleId);
+                  
+                  // Auto-populate insurance data from selected vehicle
+                  setForm({ 
+                    ...form, 
+                    vehicleId: vehicleId,
+                    insuranceCompanyName: vehicle?.insuranceCompanyName || form.insuranceCompanyName || "",
+                    insuranceStartDate: vehicle?.insuranceStartDate || form.insuranceStartDate || "",
+                    insuranceEndDate: vehicle?.insuranceEndDate || form.insuranceEndDate || "",
+                    hasInsurance: !!(vehicle?.insuranceCompanyName || vehicle?.insuranceStartDate || vehicle?.insuranceEndDate || form.hasInsurance),
+                  });
+                }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
                 <option value="">Select Vehicle</option>
@@ -1969,36 +2165,76 @@ function CreateQuotationModal({
           ) : (
             <>
 
-          {/* Insurance Details */}
-          <div className="border border-gray-200 rounded-lg p-4">
-            <label className="flex items-center gap-2 mb-3">
-              <input
-                type="checkbox"
-                checked={form.hasInsurance}
-                onChange={(e) => setForm({ ...form, hasInsurance: e.target.checked, insurerId: e.target.checked ? form.insurerId : "" })}
-                className="w-4 h-4"
-              />
-              <span className="text-sm font-medium text-gray-700">Has Insurance</span>
-            </label>
-            {form.hasInsurance && (
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Insurer</label>
-                <select
-                  value={form.insurerId}
-                  onChange={(e) => setForm({ ...form, insurerId: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  required={form.hasInsurance}
-                >
-                  <option value="">Select Insurer</option>
-                  {insurers.map((insurer: Insurer) => (
-                    <option key={insurer.id} value={insurer.id}>
-                      {insurer.name}
-                    </option>
-                  ))}
-                </select>
+          {/* Insurance Details - Show pre-filled from appointment form */}
+          {hasInsuranceData && (
+            <div className="border border-gray-200 rounded-lg p-4 bg-blue-50">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <span>Insurance Details</span>
+                <span className="text-xs font-normal text-gray-500">(from appointment)</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {insuranceCompanyName && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Insurance Company Name</label>
+                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 font-medium">
+                      {insuranceCompanyName}
+                    </div>
+                    {!form.insurerId && (
+                      <div className="mt-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Select Matching Insurer (Optional)</label>
+                        <select
+                          value={form.insurerId || ""}
+                          onChange={(e) => setForm({ ...form, insurerId: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm bg-white"
+                        >
+                          <option value="">Select Insurer</option>
+                          {insurers.map((insurer: Insurer) => (
+                            <option key={insurer.id} value={insurer.id}>
+                              {insurer.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {form.insurerId && (
+                      <div className="mt-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Matched Insurer</label>
+                        <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 font-medium">
+                          {insurers.find((i: Insurer) => i.id === form.insurerId)?.name || "Selected Insurer"}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {insuranceStartDate && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Insurance Start Date</label>
+                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900">
+                      {new Date(insuranceStartDate).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {insuranceEndDate && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Insurance End Date</label>
+                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900">
+                      {new Date(insuranceEndDate).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Parts & Services Table */}
           <div>
@@ -2457,24 +2693,52 @@ function ViewQuotationModal({
           </div>
 
           {/* Insurance Details */}
-          {quotation.hasInsurance && quotation.insurer && (
+          {quotation.hasInsurance && (quotation.insurer || quotation.insuranceStartDate || quotation.insuranceEndDate) && (
             <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Insurance Details</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="font-semibold text-gray-700 mb-1">Insurer Name</p>
-                  <p className="text-gray-900">{quotation.insurer.name}</p>
-                </div>
-                {quotation.insurer.gstNumber && (
+                {quotation.insurer && (
+                  <>
+                    <div>
+                      <p className="font-semibold text-gray-700 mb-1">Insurer Name</p>
+                      <p className="text-gray-900">{quotation.insurer.name}</p>
+                    </div>
+                    {quotation.insurer.gstNumber && (
+                      <div>
+                        <p className="font-semibold text-gray-700 mb-1">Insurer GST Number</p>
+                        <p className="text-gray-900">{quotation.insurer.gstNumber}</p>
+                      </div>
+                    )}
+                    {quotation.insurer.address && (
+                      <div className="col-span-2">
+                        <p className="font-semibold text-gray-700 mb-1">Insurer Address</p>
+                        <p className="text-gray-900">{quotation.insurer.address}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+                {quotation.insuranceStartDate && (
                   <div>
-                    <p className="font-semibold text-gray-700 mb-1">Insurer GST Number</p>
-                    <p className="text-gray-900">{quotation.insurer.gstNumber}</p>
+                    <p className="font-semibold text-gray-700 mb-1">Insurance Start Date</p>
+                    <p className="text-gray-900">
+                      {new Date(quotation.insuranceStartDate).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
                   </div>
                 )}
-                {quotation.insurer.address && (
-                  <div className="col-span-2">
-                    <p className="font-semibold text-gray-700 mb-1">Insurer Address</p>
-                    <p className="text-gray-900">{quotation.insurer.address}</p>
+                {quotation.insuranceEndDate && (
+                  <div>
+                    <p className="font-semibold text-gray-700 mb-1">Insurance End Date</p>
+                    <p className="text-gray-900">
+                      {new Date(quotation.insuranceEndDate).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
                   </div>
                 )}
               </div>
