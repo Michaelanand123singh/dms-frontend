@@ -1,5 +1,8 @@
 import { defineConfig } from "eslint/config";
-import { configs } from "eslint-config-next/core-web-vitals.js";
+// @ts-ignore - Next.js ESLint config is CommonJS
+import nextConfig from "eslint-config-next/core-web-vitals.js";
+
+const configs = nextConfig?.configs || (Array.isArray(nextConfig) ? nextConfig : [nextConfig]);
 
 export default defineConfig([
   ...configs,
