@@ -269,7 +269,7 @@ export default function PartsIssueRequestsPage() {
                   <div>
                     <p className="font-medium text-gray-900">{item.partName}</p>
                     <p className="text-sm text-gray-600">
-                      SKU: {item.sku} | Part Number: {item.partNumber}
+                      HSN Code: {item.hsnCode} | Part Number: {item.partNumber}
                     </p>
                   </div>
                   <div className="text-right">

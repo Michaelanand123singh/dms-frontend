@@ -29,7 +29,7 @@ import { useSearchParams } from "next/navigation";
 interface IssueItem {
   partId: string;
   partName: string;
-  sku: string;
+  hsnCode: string;
   fromStock: string;
   quantity: number;
   unitPrice: number;
@@ -101,7 +101,7 @@ export default function StockIssuePage() {
                   autoFillItems.push({
                     partId: poItem.partId,
                     partName: poItem.partName,
-                    sku: poItem.sku,
+                    hsnCode: poItem.hsnCode,
                     fromStock: stockItem.id,
                     quantity: poItem.approvedQty,
                     unitPrice: poItem.unitPrice,
@@ -130,7 +130,7 @@ export default function StockIssuePage() {
                   autoFillItems.push({
                     partId: item.partId,
                     partName: stockItem.partName,
-                    sku: stockItem.sku,
+                    hsnCode: stockItem.hsnCode,
                     fromStock: stockItem.id,
                     quantity: item.quantity,
                     unitPrice: stockItem.unitPrice,
@@ -189,7 +189,7 @@ export default function StockIssuePage() {
         {
           partId: selectedPart.partId,
           partName: selectedPart.partName,
-          sku: selectedPart.sku,
+          hsnCode: selectedPart.hsnCode,
           fromStock: selectedPart.id,
           quantity,
           unitPrice: selectedPart.unitPrice,
@@ -280,7 +280,7 @@ export default function StockIssuePage() {
   const filteredStock = stock.filter(
     (s) =>
       s.partName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.hsnCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.partNumber.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -419,7 +419,7 @@ export default function StockIssuePage() {
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <p className="font-medium">{item.partName}</p>
-                              <p className="text-sm text-gray-500">{item.sku}</p>
+                              <p className="text-sm text-gray-500">{item.hsnCode}</p>
                             </div>
                             <div className="text-right">
                               <p className="font-medium">{item.currentQty}</p>
@@ -470,7 +470,7 @@ export default function StockIssuePage() {
                           <Package className="w-5 h-5 text-gray-400" />
                           <div className="flex-1">
                             <p className="font-medium">{item.partName}</p>
-                            <p className="text-sm text-gray-500">{item.sku}</p>
+                            <p className="text-sm text-gray-500">{item.hsnCode}</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <button

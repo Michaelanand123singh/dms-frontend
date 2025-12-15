@@ -47,7 +47,7 @@ export default function CentralStockPage() {
         (s) =>
           s.partName.toLowerCase().includes(query) ||
           s.partNumber.toLowerCase().includes(query) ||
-          s.sku.toLowerCase().includes(query) ||
+          s.hsnCode.toLowerCase().includes(query) ||
           s.category.toLowerCase().includes(query) ||
           s.location.toLowerCase().includes(query)
       );
@@ -206,7 +206,7 @@ export default function CentralStockPage() {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          <p className="text-sm">{item.sku}</p>
+                          <p className="text-sm">{item.hsnCode}</p>
                           <p className="text-xs text-gray-400">{item.partNumber}</p>
                         </td>
                         <td className="py-3 px-4 text-sm text-gray-600">{item.category}</td>

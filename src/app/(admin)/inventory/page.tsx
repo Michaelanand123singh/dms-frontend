@@ -39,7 +39,7 @@ export default function InventoryPage() {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(item => 
         item.partName.toLowerCase().includes(term) ||
-        item.sku.toLowerCase().includes(term) ||
+        item.hsnCode.toLowerCase().includes(term) ||
         item.partNumber?.toLowerCase().includes(term) ||
         item.category.toLowerCase().includes(term) ||
         item.location?.toLowerCase().includes(term) ||
@@ -180,7 +180,7 @@ export default function InventoryPage() {
                   Part Name
                 </th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  SKU
+                  HSN Code
                 </th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   Brand
@@ -222,7 +222,7 @@ export default function InventoryPage() {
                       <div className="line-clamp-2">{item.partName}</div>
                     </td>
                     <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-gray-600">
-                      {item.sku}
+                      {item.hsnCode}
                     </td>
                     <td className="px-4 sm:px-6 py-3 sm:py-4 text-sm text-gray-600">
                       {item.brandName || "-"}
@@ -303,7 +303,7 @@ export default function InventoryPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3">
                   <div>
-                    <span className="font-medium">SKU:</span> {item.sku}
+                    <span className="font-medium">HSN Code:</span> {item.hsnCode}
                   </div>
                   <div>
                     <span className="font-medium">Brand:</span> {item.brandName || "-"}

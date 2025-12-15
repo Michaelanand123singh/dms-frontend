@@ -35,7 +35,7 @@ class InvoiceService {
       partId: item.partId,
       partName: item.partName,
       partNumber: item.partNumber,
-      sku: item.sku,
+      hsnCode: item.hsnCode,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       totalPrice: item.totalPrice,

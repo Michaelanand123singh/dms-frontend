@@ -9,7 +9,7 @@ import { Package, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import type { Part } from "@/shared/types/inventory.types";
 import { PartsOrderEntryForm } from "./PartsOrderEntryForm";
-import { getInitialFormData, type PartsOrderEntryFormData } from "./form.schema";
+import { getInitialFormData, getInitialItemFormData, type PartsOrderEntryFormData, type PartsOrderItem } from "./form.schema";
 
 export default function PartsOrderEntryPage() {
   const [parts, setParts] = useState<Part[]>([]);
@@ -17,6 +17,7 @@ export default function PartsOrderEntryPage() {
   const [showOrderView, setShowOrderView] = useState(true);
   const [formData, setFormData] = useState<PartsOrderEntryFormData>(getInitialFormData());
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
+  const [currentItem, setCurrentItem] = useState<PartsOrderItem>(getInitialItemFormData());
 
   const fetchParts = async () => {
     try {
@@ -47,29 +48,62 @@ export default function PartsOrderEntryPage() {
   const handlePartSelect = (partId: string) => {
     const part = parts.find((p) => p.id === partId);
     setSelectedPart(part || null);
-    setFormData({ ...formData, partId });
+    if (part) {
+      setCurrentItem({
+        ...currentItem,
+        partId: part.id,
+        partName: part.partName,
+      });
+    } else {
+      setCurrentItem(getInitialItemFormData());
+    }
+  };
+
+  const handleAddPart = () => {
+    if (!currentItem.partId || !currentItem.partName || !currentItem.requiredQty || currentItem.requiredQty <= 0) {
+      alert("Please fill all required fields for the part");
+      return;
+    }
+
+    // Check if part already added
+    if (formData.items.find((item) => item.partId === currentItem.partId)) {
+      alert("This part is already added to the order");
+      return;
+    }
+
+    setFormData({
+      ...formData,
+      items: [...formData.items, { ...currentItem }],
+    });
+
+    // Reset current item
+    setCurrentItem(getInitialItemFormData());
+    setSelectedPart(null);
+  };
+
+  const handleRemovePart = (index: number) => {
+    setFormData({
+      ...formData,
+      items: formData.items.filter((_, i) => i !== index),
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.partId || !formData.requiredQty || !selectedPart) {
-      alert("Please fill all required fields");
+    if (formData.items.length === 0) {
+      alert("Please add at least one part to the order");
       return;
     }
 
     try {
       const order = await partsOrderService.create(
-        {
-          partId: formData.partId,
-          requiredQty: formData.requiredQty,
-          urgency: formData.urgency,
-          notes: formData.notes,
-        },
-        selectedPart.partName,
+        formData.items,
+        formData.orderNotes,
         "Inventory Manager"
       );
-      alert(`Purchase order ${order.orderNumber} created successfully!`);
+      alert(`Purchase order ${order.orderNumber} created successfully with ${formData.items.length} part(s)!`);
       setFormData(getInitialFormData());
+      setCurrentItem(getInitialItemFormData());
       setSelectedPart(null);
       // Refresh orders and show order view
       await fetchOrders();
@@ -113,10 +147,10 @@ export default function PartsOrderEntryPage() {
       <div className="pt-24 px-8 pb-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-indigo-600">Parts Order Entry</h1>
-          <p className="text-gray-500 mt-1">Create purchase orders for parts</p>
+          <p className="text-gray-500 mt-1">Create purchase orders for multiple parts</p>
         </div>
 
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>
               <h2 className="text-lg font-semibold">New Purchase Order</h2>
@@ -129,9 +163,17 @@ export default function PartsOrderEntryPage() {
                   availableParts={parts}
                   selectedPart={selectedPart}
                   onPartSelect={handlePartSelect}
+                  currentItem={currentItem}
+                  onCurrentItemChange={setCurrentItem}
+                  onAddPart={handleAddPart}
+                  onRemovePart={handleRemovePart}
                 />
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white mt-4">
-                  Create Purchase Order
+                <Button 
+                  type="submit" 
+                  disabled={formData.items.length === 0}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create Purchase Order {formData.items.length > 0 && `(${formData.items.length} part${formData.items.length !== 1 ? "s" : ""})`}
                 </Button>
               </form>
             </CardBody>
@@ -185,25 +227,43 @@ export default function PartsOrderEntryPage() {
                               <div className="flex items-center gap-2 mb-1">
                                 <Package className="text-indigo-600" size={20} />
                                 <h3 className="text-lg font-semibold text-gray-900">{order.orderNumber}</h3>
+                                <Badge variant="info">{order.items.length} part{order.items.length !== 1 ? "s" : ""}</Badge>
                               </div>
-                              <p className="text-sm text-gray-600">{order.partName}</p>
                             </div>
                             <div className="flex gap-2">
                               {getStatusBadge(order.status)}
-                              {getUrgencyBadge(order.urgency)}
                             </div>
                           </div>
                         </CardHeader>
                         <CardBody>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                            <div>
-                              <p className="text-gray-600 mb-1">Part ID</p>
-                              <p className="font-medium text-gray-900">{order.partId}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600 mb-1">Quantity</p>
-                              <p className="font-medium text-gray-900">{order.requiredQty}</p>
-                            </div>
+                          {/* Parts List */}
+                          <div className="space-y-3 mb-4">
+                            {order.items.map((item, index) => (
+                              <div key={index} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <p className="font-medium text-gray-900">{item.partName}</p>
+                                    <p className="text-xs text-gray-600">Part ID: {item.partId}</p>
+                                  </div>
+                                  {getUrgencyBadge(item.urgency)}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                                  <div>
+                                    <span className="text-gray-600">Quantity:</span>
+                                    <span className="ml-1 font-medium text-gray-900">{item.requiredQty}</span>
+                                  </div>
+                                  {item.notes && (
+                                    <div className="col-span-2 md:col-span-2">
+                                      <span className="text-gray-600">Notes:</span>
+                                      <span className="ml-1 text-gray-700">{item.notes}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4 pt-3 border-t border-gray-200">
                             <div>
                               <p className="text-gray-600 mb-1">Requested By</p>
                               <p className="font-medium text-gray-900">{order.requestedBy}</p>
@@ -219,11 +279,16 @@ export default function PartsOrderEntryPage() {
                                 })}
                               </p>
                             </div>
+                            <div>
+                              <p className="text-gray-600 mb-1">Total Parts</p>
+                              <p className="font-medium text-gray-900">{order.items.length}</p>
+                            </div>
                           </div>
-                          {order.notes && (
+
+                          {order.orderNotes && (
                             <div className="mt-3 pt-3 border-t border-gray-200">
-                              <p className="text-xs text-gray-600 mb-1">Notes:</p>
-                              <p className="text-sm text-gray-700">{order.notes}</p>
+                              <p className="text-xs text-gray-600 mb-1">Order Notes:</p>
+                              <p className="text-sm text-gray-700">{order.orderNotes}</p>
                             </div>
                           )}
                           {order.status === "approved" && order.approvedBy && (
@@ -249,4 +314,3 @@ export default function PartsOrderEntryPage() {
     </div>
   );
 }
-

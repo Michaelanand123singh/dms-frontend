@@ -30,8 +30,9 @@ export function mapFormDataToPartFormData(formData: PartsMasterFormData): PartFo
     ...(formData.minStockLevel !== undefined && { minStockLevel: formData.minStockLevel }),
     ...(formData.unit?.trim() && { unit: formData.unit.trim() }),
     // Extended fields - only include if they have data
-    ...(getValueIfNotEmpty(formData.sku) && { sku: getValueIfNotEmpty(formData.sku) }),
+    ...(getValueIfNotEmpty(formData.hsnCode) && { hsnCode: getValueIfNotEmpty(formData.hsnCode) }),
     ...(getValueIfNotEmpty(formData.partCode) && { partCode: getValueIfNotEmpty(formData.partCode) }),
+    ...(getValueIfNotEmpty(formData.labourCode) && { labourCode: getValueIfNotEmpty(formData.labourCode) }),
     ...(formData.status && { status: formData.status }),
     // Basic Part Info
     ...(getValueIfNotEmpty(formData.brandName) && { brandName: getValueIfNotEmpty(formData.brandName) }),
@@ -77,8 +78,9 @@ export function mapPartToFormData(part: Part): PartsMasterFormData {
     partId: part.partId,
     partName: part.partName,
     partNumber: part.partNumber,
-    sku: part.sku || "",
+    hsnCode: part.hsnCode || "",
     partCode: part.partCode || "",
+    labourCode: part.labourCode || "",
     category: part.category,
     quantity: String(part.stockQuantity || ""),
     price: String(part.price || ""),

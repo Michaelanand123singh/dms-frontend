@@ -166,9 +166,9 @@ export const serviceCenterUsers = [
 ];
 
 export const defaultInventory = [
-  { partName: "Engine Oil", sku: "EO-001", category: "Lubricants" },
-  { partName: "Brake Pads", sku: "BP-002", category: "Brakes" },
-  { partName: "Air Filter", sku: "AF-003", category: "Filters" },
+  { partName: "Engine Oil", hsnCode: "EO-001", category: "Lubricants" },
+  { partName: "Brake Pads", hsnCode: "BP-002", category: "Brakes" },
+  { partName: "Air Filter", hsnCode: "AF-003", category: "Filters" },
 ];
 
 /**

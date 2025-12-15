@@ -91,7 +91,7 @@ class CentralInventoryRepository {
       (stock) =>
         stock.partName.toLowerCase().includes(lowerQuery) ||
         stock.partNumber.toLowerCase().includes(lowerQuery) ||
-        stock.sku.toLowerCase().includes(lowerQuery) ||
+        stock.hsnCode.toLowerCase().includes(lowerQuery) ||
         stock.category.toLowerCase().includes(lowerQuery)
     );
   }
@@ -331,7 +331,7 @@ class CentralInventoryRepository {
         partId: item.partId,
         partName: stock.partName,
         partNumber: stock.partNumber,
-        sku: stock.sku,
+        hsnCode: stock.hsnCode,
         quantity: item.quantity,
         unitPrice: stock.unitPrice,
         totalPrice: stock.unitPrice * item.quantity,

@@ -149,7 +149,7 @@ export default function InvoiceDetailPage() {
                     <thead>
                       <tr className="border-b border-gray-200">
                         <th className="text-left py-3 px-4 font-semibold text-gray-700">Part Name</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-700">SKU</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">HSN Code</th>
                         <th className="text-right py-3 px-4 font-semibold text-gray-700">Quantity</th>
                         <th className="text-right py-3 px-4 font-semibold text-gray-700">Unit Price</th>
                         <th className="text-right py-3 px-4 font-semibold text-gray-700">Total</th>
@@ -159,7 +159,7 @@ export default function InvoiceDetailPage() {
                       {invoice.items.map((item) => (
                         <tr key={item.id} className="border-b border-gray-100">
                           <td className="py-3 px-4">{item.partName}</td>
-                          <td className="py-3 px-4 text-gray-600">{item.sku}</td>
+                          <td className="py-3 px-4 text-gray-600">{item.hsnCode}</td>
                           <td className="py-3 px-4 text-right">{item.quantity}</td>
                           <td className="py-3 px-4 text-right">₹{item.unitPrice.toLocaleString()}</td>
                           <td className="py-3 px-4 text-right font-medium">₹{item.totalPrice.toLocaleString()}</td>

@@ -65,7 +65,7 @@ class CentralPurchaseOrderCreateService {
             partId: item.partId,
             partName: "Unknown Part", // Will be populated from stock lookup
             partNumber: "",
-            sku: "",
+            hsnCode: "",
             partCode: "",
             requestedQty: item.quantity,
             unitPrice: 0, // Will be populated from stock lookup
@@ -142,7 +142,7 @@ class CentralPurchaseOrderCreateService {
           partId: item.partId,
           partName: stockItem?.partName || "Unknown Part",
           partNumber: stockItem?.partNumber || "",
-          sku: stockItem?.sku || "",
+          hsnCode: stockItem?.hsnCode || "",
           partCode: stockItem?.partCode,
           requestedQty: item.quantity,
           unitPrice: stockItem?.unitPrice || 0,

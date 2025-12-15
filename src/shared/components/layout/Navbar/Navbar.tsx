@@ -67,7 +67,7 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
 
   interface InventoryItem {
     partName: string;
-    sku?: string;
+    hsnCode?: string;
     category?: string;
   }
 
@@ -135,14 +135,14 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
       allInventory.forEach((item) => {
         if (
           item.partName.toLowerCase().includes(lowerQuery) ||
-          (item.sku && item.sku.toLowerCase().includes(lowerQuery)) ||
+          (item.hsnCode && item.hsnCode.toLowerCase().includes(lowerQuery)) ||
           (item.category && item.category.toLowerCase().includes(lowerQuery))
         ) {
           results.push({
             type: "Inventory",
-            id: item.sku || item.partName,
+            id: item.hsnCode || item.partName,
             title: item.partName,
-            subtitle: `${item.category || "N/A"} • SKU: ${item.sku || "N/A"}`,
+            subtitle: `${item.category || "N/A"} • HSN Code: ${item.hsnCode || "N/A"}`,
             icon: Package,
             href: "/inventory",
             color: "text-green-600",

@@ -13,7 +13,7 @@ import type {
 interface IssueItem {
   partId: string;
   partName: string;
-  sku: string;
+  hsnCode: string;
   fromStock: string;
   quantity: number;
   unitPrice: number;
@@ -76,7 +76,7 @@ export function PartsIssueForm({
         {
           partId: selectedPart.partId,
           partName: selectedPart.partName,
-          sku: selectedPart.sku,
+          hsnCode: selectedPart.hsnCode,
           fromStock: selectedPart.id,
           quantity,
           unitPrice: selectedPart.unitPrice,
@@ -141,7 +141,7 @@ export function PartsIssueForm({
   const filteredStock = availableStock.filter(
     (s) =>
       s.partName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.hsnCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.partNumber.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -229,7 +229,7 @@ export function PartsIssueForm({
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <p className="font-medium">{item.partName}</p>
-                      <p className="text-sm text-gray-500">{item.sku}</p>
+                      <p className="text-sm text-gray-500">{item.hsnCode}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-medium">{item.currentQty}</p>
@@ -276,7 +276,7 @@ export function PartsIssueForm({
                   <Package className="w-5 h-5 text-gray-400" />
                   <div className="flex-1">
                     <p className="font-medium">{item.partName}</p>
-                    <p className="text-sm text-gray-500">{item.sku}</p>
+                    <p className="text-sm text-gray-500">{item.hsnCode}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button

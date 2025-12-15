@@ -8,7 +8,7 @@ export type FilterType = "all" | "low_stock" | "out_of_stock";
 export interface InventoryItem {
   id: number;
   partName: string;
-  sku: string;
+  hsnCode: string; // HSN Code
   partCode?: string;
   category: string;
   currentQty: number;
@@ -42,8 +42,9 @@ export interface Part {
   createdAt?: string;
   updatedAt?: string;
   // Extended fields from form
-  sku?: string;
+  hsnCode?: string; // HSN Code
   partCode?: string;
+  labourCode?: string; // Labour Code
   status?: "In Stock" | "Low Stock" | "Out of Stock";
   // Basic Part Info
   brandName?: string;
@@ -88,8 +89,9 @@ export interface PartFormData {
   minStockLevel?: number;
   unit?: string;
   // Extended fields
-  sku?: string;
+  hsnCode?: string; // HSN Code
   partCode?: string;
+  labourCode?: string; // Labour Code
   status?: "In Stock" | "Low Stock" | "Out of Stock";
   // Basic Part Info
   brandName?: string;
