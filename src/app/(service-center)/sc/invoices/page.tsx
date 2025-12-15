@@ -20,9 +20,13 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import type { ServiceCenterInvoice, PaymentStatus, InvoiceStats, ServiceCenterInvoiceItem } from "@/shared/types";
+import type { ServiceCenterInvoice, PaymentStatus, InvoiceStats, ServiceCenterInvoiceItem, EnhancedServiceCenterInvoiceItem } from "@/shared/types";
 import { defaultInvoices } from "@/__mocks__/data/invoices.mock";
 import { filterByServiceCenter, getServiceCenterContext } from "@/shared/lib/serviceCenter";
+import { generateInvoiceNumber, calculateGST, convertNumberToWords, populateInvoiceFromJobCard, validateInvoiceData } from "@/shared/utils/invoice.utils";
+import { generateInvoiceHTML } from "@/shared/utils/invoicePDF.utils";
+import type { JobCard } from "@/shared/types/job-card.types";
+import InvoicePDF from "../../../../components/invoice/InvoicePDF";
 
 type FilterType = "all" | "paid" | "unpaid" | "overdue";
 
@@ -38,10 +42,16 @@ function InvoicesContent() {
     jobCardId: "",
     date: new Date().toISOString().split("T")[0],
     dueDate: "",
-    items: [{ name: "", qty: 1, price: "" }] as ServiceCenterInvoiceItem[],
+    items: [{ name: "", qty: 1, price: "", hsnSacCode: "", gstRate: 18 }] as Array<ServiceCenterInvoiceItem & { hsnSacCode?: string; gstRate?: number }>,
     paymentMethod: "" as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | "",
     gstRequirement: false,
     businessNameForInvoice: "",
+    customerGstNumber: "",
+    customerPanNumber: "",
+    customerAddress: "",
+    customerState: "",
+    placeOfSupply: "",
+    discount: 0,
   });
   const { userRole } = useRole();
   const isServiceAdvisor = userRole === "service_advisor";
@@ -97,7 +107,7 @@ function InvoicesContent() {
 
   const filteredInvoices = visibleInvoices.filter((invoice) => {
     const matchesSearch =
-      invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (invoice.invoiceNumber || invoice.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.vehicle.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -151,10 +161,128 @@ function InvoicesContent() {
     }
   };
 
+  const formatInvoiceWhatsAppMessage = (invoice: ServiceCenterInvoice): string => {
+    const customerName = invoice.customerName;
+    const vehicleInfo = invoice.vehicle;
+    const invoiceNumber = invoice.invoiceNumber || invoice.id;
+    const invoiceDate = new Date(invoice.date).toLocaleDateString("en-IN");
+    const dueDate = new Date(invoice.dueDate).toLocaleDateString("en-IN");
+    
+    // Format items summary
+    const itemsSummary = invoice.enhancedItems && invoice.enhancedItems.length > 0
+      ? invoice.enhancedItems.slice(0, 5).map((item, idx) => 
+          `${idx + 1}. ${item.name} (Qty: ${item.quantity}) - ₹${item.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+        ).join("\n")
+      : invoice.items.slice(0, 5).map((item, idx) => 
+          `${idx + 1}. ${item.name} (Qty: ${item.qty}) - ${item.price}`
+        ).join("\n");
+    
+    const remainingCount = invoice.enhancedItems 
+      ? Math.max(0, invoice.enhancedItems.length - 5)
+      : Math.max(0, invoice.items.length - 5);
+    
+    const grandTotal = invoice.grandTotal ?? (parseFloat(invoice.amount.replace("₹", "").replace(/,/g, "")) || 0);
+    const subtotal = invoice.subtotal ?? 0;
+    const totalTax = invoice.totalTax ?? 0;
+    
+    const serviceCenter = invoice.serviceCenterDetails;
+    
+    return `Hello ${customerName}! 👋
+
+📄 *Invoice ${invoiceNumber}*
+
+📅 Invoice Date: ${invoiceDate}
+⏰ Due Date: ${dueDate}
+🚗 Vehicle: ${vehicleInfo}
+
+📋 *Items Summary:*
+${itemsSummary}
+${remainingCount > 0 ? `... and ${remainingCount} more item${remainingCount > 1 ? "s" : ""}\n` : ""}
+
+💰 *Pricing:*
+Subtotal: ₹${subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDigits: 2 })}\n` : ""}${invoice.discount && invoice.discount > 0 ? `Discount: -₹${invoice.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}\n` : ""}*Grand Total: ₹${grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}*
+
+📄 A detailed invoice PDF has been generated. Please review it.
+
+💳 Please make payment before the due date.
+
+📞 Contact: ${serviceCenter?.phone || "N/A"}
+🏢 ${serviceCenter?.name || invoice.serviceCenterName || "Service Center"}`;
+  };
+
+  const handleSendInvoiceToCustomer = async (invoice: ServiceCenterInvoice) => {
+    try {
+      // Generate invoice HTML for PDF
+      const invoiceHTML = generateInvoiceHTML(invoice);
+      
+      // Print invoice (opens print dialog for PDF generation)
+      const printInvoice = () => {
+        try {
+          const printWindow = window.open("", "_blank");
+          if (!printWindow) {
+            alert("Please allow popups to generate PDF. The invoice details will be shown in the message.");
+            return false;
+          }
+
+          printWindow.document.write(invoiceHTML);
+          printWindow.document.close();
+
+          setTimeout(() => {
+            try {
+              printWindow.focus();
+              printWindow.print();
+              setTimeout(() => {
+                if (!printWindow.closed) {
+                  printWindow.close();
+                }
+              }, 2000);
+            } catch (printError) {
+              console.error("Print error:", printError);
+            }
+          }, 500);
+          return true;
+        } catch (error) {
+          console.error("Error opening print window:", error);
+          alert("Could not open print dialog. The invoice will still be sent via WhatsApp.");
+          return false;
+        }
+      };
+
+      // Generate PDF
+      printInvoice();
+
+      // Format WhatsApp message
+      const message = formatInvoiceWhatsAppMessage(invoice);
+      
+      // Get customer phone number (would need to fetch from customer data)
+      // For now, prompt user
+      const customerPhone = prompt("Enter customer WhatsApp number (with country code, e.g., 919876543210):");
+      if (!customerPhone) {
+        return;
+      }
+      
+      const cleanPhone = customerPhone.replace(/\D/g, "");
+      if (cleanPhone.length < 10) {
+        alert("Invalid phone number. Please enter a valid WhatsApp number.");
+        return;
+      }
+      
+      // Open WhatsApp
+      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, "_blank");
+      
+      alert("Invoice sent to customer via WhatsApp!");
+    } catch (error) {
+      console.error("Error sending invoice:", error);
+      alert("Failed to send invoice. Please try again.");
+    }
+  };
+
   const handleAddInvoiceItem = () => {
     setInvoiceForm({
       ...invoiceForm,
-      items: [...invoiceForm.items, { name: "", qty: 1, price: "" }],
+      items: [...invoiceForm.items, { name: "", qty: 1, price: "", hsnSacCode: "", gstRate: 18 }],
     });
   };
 
@@ -185,41 +313,133 @@ function InvoicesContent() {
       return;
     }
 
-    // Calculate total amount
-    const totalAmount = invoiceForm.items.reduce((sum, item) => {
-      const price = parseFloat(item.price.replace("₹", "").replace(",", "")) || 0;
-      return sum + price * item.qty;
-    }, 0);
-
-    // Generate invoice ID
-    const newId = `INV-2025-${String(invoices.length + 1).padStart(3, "0")}`;
-
-    // Create new invoice
+    // Get service center details
     const contextServiceCenterId = String(serviceCenterContext.serviceCenterId ?? "1");
     const contextServiceCenterName = serviceCenterContext.serviceCenterName ?? "Service Center";
+    
+    // Determine service center code and state (default values for now)
+    let serviceCenterCode = "SC001";
+    let serviceCenterState = "Delhi";
+    if (contextServiceCenterId === "2" || contextServiceCenterId === "sc-002") {
+      serviceCenterCode = "SC002";
+      serviceCenterState = "Maharashtra";
+    } else if (contextServiceCenterId === "3" || contextServiceCenterId === "sc-003") {
+      serviceCenterCode = "SC003";
+      serviceCenterState = "Karnataka";
+    }
 
+    // Generate invoice number
+    const currentYear = new Date().getFullYear();
+    const invoiceNumber = generateInvoiceNumber(serviceCenterCode, currentYear, invoices);
+
+    // Process items and calculate GST
+    const placeOfSupply = invoiceForm.placeOfSupply || invoiceForm.customerState || serviceCenterState;
+    const enhancedItems: EnhancedServiceCenterInvoiceItem[] = invoiceForm.items.map((item) => {
+      const unitPrice = parseFloat(item.price.replace("₹", "").replace(",", "")) || 0;
+      const quantity = item.qty || 1;
+      const taxableAmount = unitPrice * quantity;
+      const gstRate = item.gstRate || 18;
+      
+      const gst = calculateGST(taxableAmount, gstRate, placeOfSupply, serviceCenterState);
+      
+      return {
+        name: item.name,
+        hsnSacCode: item.hsnSacCode || "",
+        unitPrice: unitPrice,
+        quantity: quantity,
+        taxableAmount: taxableAmount,
+        gstRate: gstRate,
+        cgstAmount: gst.cgst,
+        sgstAmount: gst.sgst,
+        igstAmount: gst.igst,
+        totalAmount: taxableAmount + gst.cgst + gst.sgst + gst.igst,
+      };
+    });
+
+    // Calculate totals
+    const subtotal = enhancedItems.reduce((sum, item) => sum + item.taxableAmount, 0);
+    const totalCgst = enhancedItems.reduce((sum, item) => sum + item.cgstAmount, 0);
+    const totalSgst = enhancedItems.reduce((sum, item) => sum + item.sgstAmount, 0);
+    const totalIgst = enhancedItems.reduce((sum, item) => sum + item.igstAmount, 0);
+    const totalTax = totalCgst + totalSgst + totalIgst;
+    const discount = invoiceForm.discount || 0;
+    const roundOff = 0; // Can be calculated if needed
+    const grandTotal = subtotal + totalTax - discount + roundOff;
+
+    // Get service center details (mock data for now - should come from service center config)
+    const serviceCenterDetails = {
+      name: contextServiceCenterName,
+      address: "123 Service Center Address",
+      city: serviceCenterState === "Delhi" ? "New Delhi" : serviceCenterState === "Maharashtra" ? "Mumbai" : "Bangalore",
+      state: serviceCenterState,
+      pincode: "110001",
+      gstNumber: "29ABCDE1234F1Z5", // Mock GST - should come from service center config
+      panNumber: "ABCDE1234F", // Mock PAN - should come from service center config
+      phone: "+91-1234567890",
+      email: "info@servicecenter.com",
+    };
+
+    const customerDetails = {
+      name: invoiceForm.customerName,
+      address: invoiceForm.customerAddress || "",
+      state: invoiceForm.customerState || placeOfSupply,
+      phone: "",
+      email: "",
+      gstNumber: invoiceForm.customerGstNumber || undefined,
+      panNumber: invoiceForm.customerPanNumber || undefined,
+    };
+
+    // Create new invoice with enhanced structure
     const newInvoice: ServiceCenterInvoice = {
-      id: newId,
+      id: invoiceNumber,
+      invoiceNumber: invoiceNumber,
       jobCardId: invoiceForm.jobCardId || undefined,
       customerName: invoiceForm.customerName,
       vehicle: invoiceForm.vehicle,
       date: invoiceForm.date,
       dueDate: invoiceForm.dueDate,
-      amount: `₹${totalAmount.toLocaleString("en-IN")}`,
+      amount: `₹${grandTotal.toLocaleString("en-IN")}`,
       paidAmount: "₹0",
-      balance: `₹${totalAmount.toLocaleString("en-IN")}`,
+      balance: `₹${grandTotal.toLocaleString("en-IN")}`,
       status: "Unpaid" as PaymentStatus,
       paymentMethod: invoiceForm.paymentMethod || null,
       serviceCenterId: contextServiceCenterId,
       serviceCenterName: contextServiceCenterName,
-      items: invoiceForm.items,
+      items: invoiceForm.items.map(item => ({
+        name: item.name,
+        qty: item.qty,
+        price: item.price,
+      })),
+      // Enhanced fields
+      serviceCenterDetails,
+      customerDetails,
+      placeOfSupply,
+      subtotal,
+      totalTaxableAmount: subtotal,
+      totalCgst,
+      totalSgst,
+      totalIgst,
+      totalTax,
+      discount,
+      roundOff,
+      grandTotal,
+      amountInWords: convertNumberToWords(grandTotal),
+      enhancedItems,
+      createdBy: "System", // Should come from user info
     };
+
+    // Validate invoice
+    const validation = validateInvoiceData(newInvoice);
+    if (!validation.valid) {
+      alert(`Validation errors:\n${validation.errors.join("\n")}`);
+      return;
+    }
 
     // Add to invoices list
     setInvoices([...invoices, newInvoice]);
 
     // Store in localStorage
-    const storedInvoices = safeStorage.getItem<unknown[]>("invoices", []);
+    const storedInvoices = safeStorage.getItem<ServiceCenterInvoice[]>("invoices", []);
     storedInvoices.push(newInvoice);
     safeStorage.setItem("invoices", storedInvoices);
 
@@ -230,14 +450,20 @@ function InvoicesContent() {
       jobCardId: "",
       date: new Date().toISOString().split("T")[0],
       dueDate: "",
-      items: [{ name: "", qty: 1, price: "" }],
+      items: [{ name: "", qty: 1, price: "", hsnSacCode: "", gstRate: 18 }],
       paymentMethod: "",
       gstRequirement: false,
       businessNameForInvoice: "",
+      customerGstNumber: "",
+      customerPanNumber: "",
+      customerAddress: "",
+      customerState: "",
+      placeOfSupply: "",
+      discount: 0,
     });
     setShowGenerateModal(false);
 
-    alert(`Invoice generated successfully! Invoice ID: ${newId}`);
+    alert(`Invoice generated successfully! Invoice Number: ${invoiceNumber}`);
   };
 
   return (
@@ -258,10 +484,16 @@ function InvoicesContent() {
                 jobCardId: "",
                 date: new Date().toISOString().split("T")[0],
                 dueDate: "",
-                items: [{ name: "", qty: 1, price: "" }],
+                items: [{ name: "", qty: 1, price: "", hsnSacCode: "", gstRate: 18 }],
                 paymentMethod: "",
                 gstRequirement: false,
                 businessNameForInvoice: "",
+                customerGstNumber: "",
+                customerPanNumber: "",
+                customerAddress: "",
+                customerState: "",
+                placeOfSupply: "",
+                discount: 0,
               });
             }}
             className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
@@ -426,7 +658,7 @@ function InvoicesContent() {
                           key={invoice.id}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          <td className="px-4 py-3 font-semibold text-gray-800">{invoice.id}</td>
+                          <td className="px-4 py-3 font-semibold text-gray-800">{invoice.invoiceNumber || invoice.id}</td>
                           <td className="px-4 py-3">
                             <div className="font-medium text-gray-900">{invoice.customerName}</div>
                             <div className="text-xs text-gray-500">{invoice.jobCardId ? `Job Card: ${invoice.jobCardId}` : "—"}</div>
@@ -484,7 +716,7 @@ function InvoicesContent() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
-                      {invoice.id}
+                      {invoice.invoiceNumber || invoice.id}
                     </span>
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
@@ -582,128 +814,12 @@ function InvoicesContent() {
 
       {/* Invoice Details Modal */}
       {showDetails && selectedInvoice && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Invoice Details</h2>
-              <div className="flex gap-2">
-                <button className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200">
-                  <Printer size={20} />
-                </button>
-                <button className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200">
-                  <Download size={20} />
-                </button>
-                <button
-                  onClick={() => setShowDetails(false)}
-                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  <XCircle size={20} />
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              {/* Invoice Header */}
-              <div className="border-b border-gray-200 pb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <p className="text-sm text-gray-600">Invoice Number</p>
-                    <p className="text-xl font-bold text-gray-800">{selectedInvoice.id}</p>
-                  </div>
-                  <span
-                    className={`px-4 py-2 rounded-lg text-sm font-medium border ${getStatusColor(
-                      selectedInvoice.status
-                    )}`}
-                  >
-                    {selectedInvoice.status}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  Date: {selectedInvoice.date} • Due Date: {selectedInvoice.dueDate}
-                </p>
-              </div>
-
-              {/* Customer Info */}
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-2">Customer Information</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-700">{selectedInvoice.customerName}</p>
-                  <p className="text-sm text-gray-700">{selectedInvoice.vehicle}</p>
-                </div>
-              </div>
-
-              {/* Items */}
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-2">Items</h3>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">
-                          Item
-                        </th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700">
-                          Qty
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs font-semibold text-gray-700">
-                          Price
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {selectedInvoice.items.map((item, idx) => (
-                        <tr key={idx}>
-                          <td className="px-4 py-2 text-sm text-gray-800">{item.name}</td>
-                          <td className="px-4 py-2 text-sm text-center text-gray-700">
-                            {item.qty}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-right font-medium text-gray-800">
-                            {item.price}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Totals */}
-              <div className="border-t border-gray-200 pt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total Amount</span>
-                  <span className="text-blue-600">{selectedInvoice.amount}</span>
-                </div>
-                {selectedInvoice.status !== "Paid" && (
-                  <div className="flex justify-between text-sm text-red-600 mt-2">
-                    <span>Outstanding</span>
-                    <span>{selectedInvoice.balance}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t">
-                <button
-                  onClick={() => setShowDetails(false)}
-                  className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition"
-                >
-                  Close
-                </button>
-                {selectedInvoice.status !== "Paid" && (
-                  <button
-                    onClick={() => {
-                      handleRecordPayment(selectedInvoice.id);
-                      setShowDetails(false);
-                    }}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"
-                  >
-                    Record Payment
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <InvoicePDF
+          invoice={selectedInvoice}
+          onClose={() => setShowDetails(false)}
+          showActions={true}
+          onSendToCustomer={() => handleSendInvoiceToCustomer(selectedInvoice)}
+        />
       )}
 
       {/* Generate Invoice Modal */}
@@ -721,10 +837,16 @@ function InvoicesContent() {
                     jobCardId: "",
                     date: new Date().toISOString().split("T")[0],
                     dueDate: "",
-                    items: [{ name: "", qty: 1, price: "" }],
-                    paymentMethod: "",
+                    items: [{ name: "", qty: 1, price: "", hsnSacCode: "", gstRate: 18 }] as Array<ServiceCenterInvoiceItem & { hsnSacCode?: string; gstRate?: number }>,
+                    paymentMethod: "" as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | "",
                     gstRequirement: false,
                     businessNameForInvoice: "",
+                    customerGstNumber: "",
+                    customerPanNumber: "",
+                    customerAddress: "",
+                    customerState: "",
+                    placeOfSupply: "",
+                    discount: 0,
                   });
                 }}
                 className="text-gray-400 hover:text-gray-600 transition p-2 rounded-lg hover:bg-gray-100"
@@ -771,13 +893,132 @@ function InvoicesContent() {
                     <input
                       type="text"
                       value={invoiceForm.jobCardId}
-                      onChange={(e) => setInvoiceForm({ ...invoiceForm, jobCardId: e.target.value })}
+                      onChange={(e) => {
+                        const jobCardId = e.target.value;
+                        setInvoiceForm({ ...invoiceForm, jobCardId });
+                        // Auto-populate from job card if exists
+                        if (jobCardId) {
+                          const jobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+                          const jobCard = jobCards.find(jc => jc.id === jobCardId || jc.jobCardNumber === jobCardId);
+                          if (jobCard) {
+                            const serviceCenter: any = {
+                              id: jobCard.serviceCenterId,
+                              code: jobCard.serviceCenterCode || "SC001",
+                              name: jobCard.serviceCenterName || serviceCenterContext.serviceCenterName || "Service Center",
+                              state: "Delhi", // Default, should come from service center config
+                            };
+                            const populatedData = populateInvoiceFromJobCard(jobCard, serviceCenter);
+                            if (populatedData) {
+                              setInvoiceForm({
+                                ...invoiceForm,
+                                jobCardId,
+                                customerName: populatedData.customerName || invoiceForm.customerName,
+                                vehicle: populatedData.vehicle || invoiceForm.vehicle,
+                                customerAddress: populatedData.customerDetails?.address || invoiceForm.customerAddress,
+                                customerState: populatedData.customerDetails?.state || invoiceForm.customerState,
+                                placeOfSupply: populatedData.placeOfSupply || invoiceForm.placeOfSupply,
+                                items: populatedData.items || invoiceForm.items,
+                              });
+                            }
+                          }
+                        }
+                      }}
                       placeholder="JC-2025-001"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>
                 </div>
               </div>
+
+              {/* Customer GST Details */}
+              {invoiceForm.gstRequirement && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-4">Customer GST Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Customer GST Number
+                      </label>
+                      <input
+                        type="text"
+                        value={invoiceForm.customerGstNumber}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, customerGstNumber: e.target.value })}
+                        placeholder="29ABCDE1234F1Z5"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Customer PAN Number
+                      </label>
+                      <input
+                        type="text"
+                        value={invoiceForm.customerPanNumber}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, customerPanNumber: e.target.value })}
+                        placeholder="ABCDE1234F"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Customer Address
+                      </label>
+                      <input
+                        type="text"
+                        value={invoiceForm.customerAddress}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, customerAddress: e.target.value })}
+                        placeholder="Enter customer address"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Customer State
+                      </label>
+                      <input
+                        type="text"
+                        value={invoiceForm.customerState}
+                        onChange={(e) => {
+                          const state = e.target.value;
+                          setInvoiceForm({ 
+                            ...invoiceForm, 
+                            customerState: state,
+                            placeOfSupply: state || invoiceForm.placeOfSupply,
+                          });
+                        }}
+                        placeholder="Enter state"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Place of Supply <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={invoiceForm.placeOfSupply}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, placeOfSupply: e.target.value })}
+                        placeholder="Enter place of supply (State)"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Discount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={invoiceForm.discount}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, discount: parseFloat(e.target.value) || 0 })}
+                        placeholder="0"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Invoice Dates */}
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -878,7 +1119,7 @@ function InvoicesContent() {
                 <div className="space-y-3">
                   {invoiceForm.items.map((item, index) => (
                     <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 grid grid-cols-12 gap-3 items-end">
-                      <div className="col-span-5">
+                      <div className="col-span-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Item Name <span className="text-red-500">*</span>
                         </label>
@@ -891,9 +1132,25 @@ function InvoicesContent() {
                           required
                         />
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Quantity <span className="text-red-500">*</span>
+                          HSN/SAC
+                        </label>
+                        <input
+                          type="text"
+                          value={item.hsnSacCode || ""}
+                          onChange={(e) => {
+                            const updatedItems = [...invoiceForm.items];
+                            updatedItems[index] = { ...updatedItems[index], hsnSacCode: e.target.value };
+                            setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                          }}
+                          placeholder="HSN/SAC"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Qty <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="number"
@@ -904,7 +1161,7 @@ function InvoicesContent() {
                           required
                         />
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Price <span className="text-red-500">*</span>
                         </label>
@@ -915,6 +1172,23 @@ function InvoicesContent() {
                           placeholder="₹2,500"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
                           required
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          GST %
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={item.gstRate || 18}
+                          onChange={(e) => {
+                            const updatedItems = [...invoiceForm.items];
+                            updatedItems[index] = { ...updatedItems[index], gstRate: parseFloat(e.target.value) || 18 };
+                            setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
                         />
                       </div>
                       <div className="col-span-1">
@@ -943,10 +1217,16 @@ function InvoicesContent() {
                       jobCardId: "",
                       date: new Date().toISOString().split("T")[0],
                       dueDate: "",
-                      items: [{ name: "", qty: 1, price: "" }],
-                      paymentMethod: "",
+                      items: [{ name: "", qty: 1, price: "", hsnSacCode: "", gstRate: 18 }] as Array<ServiceCenterInvoiceItem & { hsnSacCode?: string; gstRate?: number }>,
+                      paymentMethod: "" as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | "",
                       gstRequirement: false,
                       businessNameForInvoice: "",
+                      customerGstNumber: "",
+                      customerPanNumber: "",
+                      customerAddress: "",
+                      customerState: "",
+                      placeOfSupply: "",
+                      discount: 0,
                     });
                   }}
                   className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition"

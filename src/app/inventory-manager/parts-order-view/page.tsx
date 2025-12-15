@@ -61,6 +61,14 @@ export default function PartsOrderViewPage() {
     }
   };
 
+  const getHighestUrgency = (order: PartsOrder): "low" | "medium" | "high" => {
+    if (order.items.length === 0) return "low";
+    const urgencies = order.items.map(item => item.urgency);
+    if (urgencies.includes("high")) return "high";
+    if (urgencies.includes("medium")) return "medium";
+    return "low";
+  };
+
   return (
     <div className="bg-[#f9f9fb] min-h-screen">
       <div className="pt-24 px-8 pb-10">
@@ -98,24 +106,48 @@ export default function PartsOrderViewPage() {
                         <Package className="text-indigo-600" size={20} />
                         <h3 className="text-lg font-semibold text-gray-900">{order.orderNumber}</h3>
                       </div>
-                      <p className="text-sm text-gray-600">{order.partName}</p>
+                      <p className="text-sm text-gray-600">
+                        {order.items.length} {order.items.length === 1 ? 'part' : 'parts'}
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       {getStatusBadge(order.status)}
-                      {getUrgencyBadge(order.urgency)}
+                      {getUrgencyBadge(getHighestUrgency(order))}
                     </div>
                   </div>
                 </CardHeader>
                 <CardBody>
+                  <div className="space-y-3 mb-4">
+                    {order.items.map((item, index) => (
+                      <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600 mb-1">Part Name</p>
+                            <p className="font-medium text-gray-900">{item.partName}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 mb-1">Part ID</p>
+                            <p className="font-medium text-gray-900">{item.partId}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 mb-1">Quantity</p>
+                            <p className="font-medium text-gray-900">{item.requiredQty}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 mb-1">Urgency</p>
+                            {getUrgencyBadge(item.urgency)}
+                          </div>
+                        </div>
+                        {item.notes && (
+                          <div className="mt-2 pt-2 border-t border-gray-300">
+                            <p className="text-xs text-gray-600 mb-1">Item Notes:</p>
+                            <p className="text-sm text-gray-700">{item.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                    <div>
-                      <p className="text-gray-600 mb-1">Part ID</p>
-                      <p className="font-medium text-gray-900">{order.partId}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">Quantity</p>
-                      <p className="font-medium text-gray-900">{order.requiredQty}</p>
-                    </div>
                     <div>
                       <p className="text-gray-600 mb-1">Requested By</p>
                       <p className="font-medium text-gray-900">{order.requestedBy}</p>
@@ -132,10 +164,10 @@ export default function PartsOrderViewPage() {
                       </p>
                     </div>
                   </div>
-                  {order.notes && (
+                  {order.orderNotes && (
                     <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-xs text-gray-600 mb-1">Notes:</p>
-                      <p className="text-sm text-gray-700">{order.notes}</p>
+                      <p className="text-xs text-gray-600 mb-1">Order Notes:</p>
+                      <p className="text-sm text-gray-700">{order.orderNotes}</p>
                     </div>
                   )}
                   {order.status === "approved" && order.approvedBy && (

@@ -317,7 +317,7 @@ export default function PurchaseOrderDetailPage() {
                           Part Name
                         </th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                          SKU
+                          HSN Code
                         </th>
                         <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">
                           Requested Qty
@@ -345,7 +345,7 @@ export default function PurchaseOrderDetailPage() {
                               <p className="text-sm text-gray-400">Code: {item.partCode}</p>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-sm text-gray-600">{item.sku}</td>
+                          <td className="py-3 px-4 text-sm text-gray-600">{item.hsnCode}</td>
                           <td className="py-3 px-4 text-right font-medium">{item.requestedQty}</td>
                           <td className="py-3 px-4 text-right">
                             {item.approvedQty !== undefined ? (

@@ -96,7 +96,7 @@ export function CentralStockUpdateForm({
         <div className="mb-4 p-4 bg-gray-50 rounded-lg">
           <p className="text-sm text-gray-500 mb-1">Selected Item</p>
           <p className="font-medium">{stock.partName}</p>
-          <p className="text-sm text-gray-500">SKU: {stock.sku}</p>
+          <p className="text-sm text-gray-500">HSN Code: {stock.hsnCode}</p>
           <p className="text-sm text-gray-500 mt-2">
             Current Quantity: <span className="font-medium">{stock.currentQty}</span>
           </p>

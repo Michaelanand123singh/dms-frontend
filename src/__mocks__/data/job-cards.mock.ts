@@ -16,7 +16,7 @@ export interface Engineer {
 export interface Part {
   id: string;
   name: string;
-  sku: string;
+  hsnCode: string;
   category: string;
   availableQty: number;
   unitPrice: string;
@@ -167,11 +167,11 @@ export const engineers: Engineer[] = [
 ];
 
 export const availableParts: Part[] = [
-  { id: "part-1", name: "Engine Oil 5W-30", sku: "EO-001", category: "Lubricants", availableQty: 45, unitPrice: "₹450" },
-  { id: "part-2", name: "Brake Pads - Front", sku: "BP-002", category: "Brakes", availableQty: 8, unitPrice: "₹1,200" },
-  { id: "part-3", name: "Air Filter", sku: "AF-003", category: "Filters", availableQty: 25, unitPrice: "₹350" },
-  { id: "part-4", name: "AC Gas R134a", sku: "AC-004", category: "AC Parts", availableQty: 12, unitPrice: "₹800" },
-  { id: "part-5", name: "Spark Plugs Set", sku: "SP-005", category: "Engine", availableQty: 25, unitPrice: "₹600" },
+  { id: "part-1", name: "Engine Oil 5W-30", hsnCode: "EO-001", category: "Lubricants", availableQty: 45, unitPrice: "₹450" },
+  { id: "part-2", name: "Brake Pads - Front", hsnCode: "BP-002", category: "Brakes", availableQty: 8, unitPrice: "₹1,200" },
+  { id: "part-3", name: "Air Filter", hsnCode: "AF-003", category: "Filters", availableQty: 25, unitPrice: "₹350" },
+  { id: "part-4", name: "AC Gas R134a", hsnCode: "AC-004", category: "AC Parts", availableQty: 12, unitPrice: "₹800" },
+  { id: "part-5", name: "Spark Plugs Set", hsnCode: "SP-005", category: "Engine", availableQty: 25, unitPrice: "₹600" },
 ];
 
 /**

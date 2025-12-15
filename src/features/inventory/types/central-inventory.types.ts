@@ -10,7 +10,7 @@ export interface CentralStock {
   partId: string;
   partName: string;
   partNumber: string;
-  sku: string;
+  hsnCode: string;
   partCode?: string;
   category: string;
   currentQty: number;
@@ -45,7 +45,7 @@ export interface PurchaseOrderItem {
   partId: string;
   partName: string;
   partNumber: string;
-  sku: string;
+  hsnCode: string;
   partCode?: string;
   requestedQty: number;
   approvedQty?: number;
@@ -100,7 +100,7 @@ export interface PartsIssue {
     partId: string;
     partName: string;
     partNumber: string;
-    sku: string;
+    hsnCode: string;
     quantity: number;
     unitPrice: number;
     totalPrice: number;

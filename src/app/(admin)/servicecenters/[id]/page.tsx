@@ -181,7 +181,7 @@ export default function ServiceCenterDetailPage() {
   
   const [newPartForm, setNewPartForm] = useState({
     partName: "",
-    sku: "",
+    hsnCode: "",
     category: "",
     quantity: "",
     price: "",
@@ -189,7 +189,7 @@ export default function ServiceCenterDetailPage() {
   
   const [inventoryForm, setInventoryForm] = useState({
     partName: "",
-    sku: "",
+    hsnCode: "",
     partCode: "",
     category: "",
     quantity: "",
@@ -1524,7 +1524,7 @@ export default function ServiceCenterDetailPage() {
                     setEditingInventoryItem(null);
                     setInventoryForm({
                       partName: "",
-                      sku: "",
+                      hsnCode: "",
                       partCode: "",
                       category: "",
                       quantity: "",
@@ -1574,7 +1574,7 @@ export default function ServiceCenterDetailPage() {
                           PART NAME
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          SKU
+                          HSN Code
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                           PART CODE
@@ -1604,7 +1604,7 @@ export default function ServiceCenterDetailPage() {
                             <div className="text-xs text-gray-500 md:hidden mt-1">{item.category}</div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                            {item.sku}
+                            {item.hsnCode}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                             {item.partCode || "-"}
@@ -1635,7 +1635,7 @@ export default function ServiceCenterDetailPage() {
                                 setEditingInventoryItem(item as any);
                                 setInventoryForm({
                                   partName: item.partName,
-                                  sku: item.sku,
+                                  hsnCode: item.hsnCode,
                                   partCode: (item as any).partCode || "",
                                   category: item.category,
                                   quantity: item.currentQty.toString(),
@@ -2707,7 +2707,7 @@ export default function ServiceCenterDetailPage() {
                 setShowAddPartPopup(false);
                 setNewPartForm({
                   partName: "",
-                  sku: "",
+                  hsnCode: "",
                   category: "",
                   quantity: "",
                   price: "",
@@ -2728,7 +2728,7 @@ export default function ServiceCenterDetailPage() {
                 setShowAddPartPopup(false);
                 setNewPartForm({
                   partName: "",
-                  sku: "",
+                  hsnCode: "",
                   category: "",
                   quantity: "",
                   price: "",
@@ -2814,7 +2814,7 @@ export default function ServiceCenterDetailPage() {
           setEditingInventoryItem(null);
           setInventoryForm({
             partName: "",
-            sku: "",
+            hsnCode: "",
             partCode: "",
             category: "",
             quantity: "",
@@ -2858,7 +2858,7 @@ export default function ServiceCenterDetailPage() {
                 ? {
                     ...item,
                     partName: inventoryForm.partName,
-                    sku: inventoryForm.sku,
+                    hsnCode: inventoryForm.hsnCode,
                     partCode: inventoryForm.partCode,
                     category: inventoryForm.category,
                     currentQty: parseInt(inventoryForm.quantity),
@@ -2876,7 +2876,7 @@ export default function ServiceCenterDetailPage() {
             const newPart: typeof inventory[0] = {
               id: inventory.length + 1,
               partName: inventoryForm.partName,
-              sku: inventoryForm.sku,
+              hsnCode: inventoryForm.hsnCode,
               selectedQuantity: 0,
               partCode: inventoryForm.partCode,
               category: inventoryForm.category,
@@ -2895,7 +2895,7 @@ export default function ServiceCenterDetailPage() {
           setEditingInventoryItem(null);
           setInventoryForm({
             partName: "",
-            sku: "",
+            hsnCode: "",
             partCode: "",
             category: "",
             quantity: "",

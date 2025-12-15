@@ -49,7 +49,7 @@ class AdminApprovalService {
         partId: item.partId,
         partName: stockItem.partName,
         partNumber: stockItem.partNumber,
-        sku: stockItem.sku,
+        hsnCode: stockItem.hsnCode,
         quantity: item.quantity,
         unitPrice: stockItem.unitPrice,
         totalPrice: stockItem.unitPrice * item.quantity,

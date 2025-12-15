@@ -5,7 +5,7 @@
 export interface OTCPart {
   id: number;
   name: string;
-  sku: string;
+  hsnCode: string;
   price: number;
   stock: number;
   category: string;

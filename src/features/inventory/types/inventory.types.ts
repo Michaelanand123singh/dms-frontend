@@ -8,7 +8,7 @@ export type FilterType = "all" | "low_stock" | "out_of_stock";
 export interface InventoryItem {
   id: number;
   partName: string;
-  sku: string;
+  hsnCode: string;
   partCode?: string;
   category: string;
   currentQty: number;

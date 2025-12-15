@@ -31,11 +31,11 @@ export function CentralStockTable({ data, loading = false, onRowClick }: Central
       ),
     },
     {
-      key: "sku",
-      header: "SKU / Part Number",
+      key: "hsnCode",
+      header: "HSN Code / Part Number",
       render: (item) => (
         <div>
-          <p className="text-sm">{item.sku}</p>
+          <p className="text-sm">{item.hsnCode}</p>
           <p className="text-xs text-gray-400">{item.partNumber}</p>
         </div>
       ),

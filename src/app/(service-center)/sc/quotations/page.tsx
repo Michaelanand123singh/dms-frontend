@@ -471,6 +471,356 @@ const persistQuotation = (quotation: Quotation) => {
   }
 };
 
+// Helper function to validate WhatsApp number
+const validateWhatsAppNumber = (phone: string): boolean => {
+  if (!phone || phone.trim() === "") return false;
+  const cleaned = phone.replace(/\D/g, "");
+  // Indian phone numbers should be 10 digits, with optional country code
+  return cleaned.length >= 10 && cleaned.length <= 13;
+};
+
+// Helper function to generate complete quotation HTML for PDF/Print
+const generateQuotationHTML = (
+  quotation: Quotation,
+  serviceCenter: any,
+  serviceAdvisor: any
+): string => {
+  const quotationDate = new Date(quotation.quotationDate).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+  const validUntilDate = quotation.validUntil
+    ? new Date(quotation.validUntil).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : "N/A";
+
+  const itemsHTML = quotation.items && quotation.items.length > 0
+    ? quotation.items
+        .map(
+          (item, index) => `
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.serialNumber || index + 1}</td>
+            <td style="border: 1px solid #ddd; padding: 8px;">${item.partName || "-"}</td>
+            <td style="border: 1px solid #ddd; padding: 8px;">${item.partNumber || "-"}</td>
+            <td style="border: 1px solid #ddd; padding: 8px;">${item.hsnSacCode || "-"}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.quantity || 0}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">₹${(item.rate || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.gstPercent || 0}%</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">₹${(item.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+          </tr>
+        `
+        )
+        .join("")
+    : '<tr><td colspan="8" style="border: 1px solid #ddd; padding: 8px; text-align: center;">No items added</td></tr>';
+
+  const insuranceHTML =
+    quotation.hasInsurance && (quotation.insurer || quotation.insuranceStartDate || quotation.insuranceEndDate)
+      ? `
+      <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border: 1px solid #bfdbfe; margin-bottom: 24px;">
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e40af;">Insurance Details</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 14px;">
+          ${quotation.insurer ? `<div><strong>Insurer:</strong> ${quotation.insurer.name}</div>` : ""}
+          ${quotation.insuranceStartDate ? `<div><strong>Start Date:</strong> ${new Date(quotation.insuranceStartDate).toLocaleDateString("en-IN")}</div>` : ""}
+          ${quotation.insuranceEndDate ? `<div><strong>End Date:</strong> ${new Date(quotation.insuranceEndDate).toLocaleDateString("en-IN")}</div>` : ""}
+        </div>
+      </div>
+    `
+      : "";
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>${quotation.documentType === "Proforma Invoice" ? "Proforma Invoice" : "Quotation"} ${quotation.quotationNumber}</title>
+        <meta charset="UTF-8">
+        <style>
+          @media print {
+            body { margin: 0; }
+            .no-print { display: none !important; }
+          }
+          body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            color: #1f2937;
+            line-height: 1.6;
+          }
+          .header {
+            border-bottom: 2px solid #374151;
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+          }
+          .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+          }
+          .company-info {
+            flex: 1;
+          }
+          .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #111827;
+          }
+          .document-info {
+            text-align: right;
+          }
+          .document-type {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 12px;
+          }
+          .details-section {
+            margin: 24px 0;
+          }
+          .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            font-size: 14px;
+          }
+          .detail-item {
+            margin-bottom: 8px;
+          }
+          .detail-label {
+            font-weight: 600;
+            color: #374151;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 24px 0;
+            font-size: 14px;
+          }
+          th {
+            background-color: #f3f4f6;
+            border: 1px solid #d1d5db;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+          }
+          td {
+            border: 1px solid #d1d5db;
+            padding: 10px 8px;
+          }
+          .pricing-summary {
+            max-width: 400px;
+            margin-left: auto;
+            margin-top: 24px;
+          }
+          .pricing-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+          }
+          .pricing-total {
+            border-top: 2px solid #374151;
+            padding-top: 12px;
+            margin-top: 12px;
+            font-size: 18px;
+            font-weight: bold;
+          }
+          .notes-section {
+            margin-top: 24px;
+            padding: 16px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="header-content">
+            <div class="company-info">
+              <div class="company-name">${serviceCenter.name || "Service Center"}</div>
+              <div style="font-size: 14px; color: #6b7280; margin-top: 8px;">
+                ${serviceCenter.address || ""}<br>
+                ${serviceCenter.city || ""}, ${serviceCenter.state || ""} - ${serviceCenter.pincode || ""}<br>
+                Phone: ${serviceCenter.phone || "N/A"}
+                ${serviceCenter.gstNumber ? `<br>GST: ${serviceCenter.gstNumber}` : ""}
+                ${serviceCenter.panNumber ? `<br>PAN: ${serviceCenter.panNumber}` : ""}
+              </div>
+            </div>
+            <div class="document-info">
+              <div class="document-type">${quotation.documentType === "Proforma Invoice" ? "PROFORMA INVOICE" : "QUOTATION"}</div>
+              <div style="font-size: 14px;">
+                <div><strong>Document No:</strong> ${quotation.quotationNumber}</div>
+                <div><strong>Date:</strong> ${quotationDate}</div>
+                <div><strong>Valid Till:</strong> ${validUntilDate}</div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 14px;">
+            <span><strong>Service Advisor:</strong> ${serviceAdvisor.name || "N/A"}</span>
+            <span style="margin-left: 24px;"><strong>Phone:</strong> ${serviceAdvisor.phone || "N/A"}</span>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3 class="section-title">Customer & Vehicle Details</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">Customer Name:</span>
+              <span> ${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Phone Number:</span>
+              <span> ${quotation.customer?.phone || "N/A"}</span>
+            </div>
+            ${quotation.vehicle ? `
+            <div class="detail-item">
+              <span class="detail-label">Vehicle Number:</span>
+              <span> ${quotation.vehicle.registration || "N/A"}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Brand and Model:</span>
+              <span> ${quotation.vehicle.make || ""} ${quotation.vehicle.model || ""}</span>
+            </div>
+            ` : ""}
+            ${quotation.vehicleLocation ? `
+            <div class="detail-item">
+              <span class="detail-label">Vehicle Location:</span>
+              <span> ${quotation.vehicleLocation === "with_customer" ? "Vehicle with Customer" : "Vehicle at Workshop"}</span>
+            </div>
+            ` : ""}
+          </div>
+        </div>
+
+        ${insuranceHTML}
+
+        <div class="details-section">
+          <h3 class="section-title">Parts & Services</h3>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: center;">S.No</th>
+                <th>Part Name</th>
+                <th>Part Number</th>
+                <th>HSN/SAC Code</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: right;">Rate (₹)</th>
+                <th style="text-align: center;">GST %</th>
+                <th style="text-align: right;">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pricing-summary">
+          <h3 class="section-title">Pricing Summary</h3>
+          <div class="pricing-row">
+            <span>Subtotal:</span>
+            <span>₹${quotation.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          </div>
+          ${quotation.discount > 0 ? `
+          <div class="pricing-row">
+            <span>Discount ${quotation.discountPercent > 0 ? `(${quotation.discountPercent.toFixed(1)}%)` : ""}:</span>
+            <span>-₹${quotation.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          </div>
+          ` : ""}
+          <div class="pricing-row" style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 8px;">
+            <span>Pre-GST Amount:</span>
+            <span>₹${quotation.preGstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          </div>
+          ${quotation.cgstAmount > 0 ? `
+          <div class="pricing-row">
+            <span>CGST (9%):</span>
+            <span>₹${quotation.cgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          </div>
+          ` : ""}
+          ${quotation.sgstAmount > 0 ? `
+          <div class="pricing-row">
+            <span>SGST (9%):</span>
+            <span>₹${quotation.sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          </div>
+          ` : ""}
+          ${quotation.igstAmount > 0 ? `
+          <div class="pricing-row">
+            <span>IGST (18%):</span>
+            <span>₹${quotation.igstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          </div>
+          ` : ""}
+          <div class="pricing-row pricing-total">
+            <span>Total Amount:</span>
+            <span>₹${quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+
+        ${quotation.notes || quotation.customNotes ? `
+        <div class="notes-section">
+          <h3 class="section-title" style="margin-bottom: 8px;">Notes</h3>
+          <div>${quotation.notes || quotation.customNotes || ""}</div>
+        </div>
+        ` : ""}
+      </body>
+    </html>
+  `;
+};
+
+// Helper function to format WhatsApp message
+const formatWhatsAppMessage = (quotation: Quotation, serviceCenter: any): string => {
+  const customerName = quotation.customer?.firstName || "Customer";
+  const vehicleInfo = quotation.vehicle
+    ? `${quotation.vehicle.make} ${quotation.vehicle.model} (${quotation.vehicle.registration})`
+    : "N/A";
+
+  // Show first 3 items, then count of remaining
+  const itemsCount = quotation.items?.length || 0;
+  const firstItems = quotation.items?.slice(0, 3) || [];
+  const remainingCount = itemsCount > 3 ? itemsCount - 3 : 0;
+
+  const itemsSummary = firstItems
+    .map((item, idx) => `${idx + 1}. ${item.partName} (Qty: ${item.quantity}) - ₹${item.amount.toLocaleString("en-IN")}`)
+    .join("\n");
+
+  const approvalLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=approve`;
+  const rejectionLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=reject`;
+
+  return `Hello ${customerName}! 👋
+
+📄 *${quotation.documentType === "Proforma Invoice" ? "Proforma Invoice" : "Quotation"} ${quotation.quotationNumber}*
+
+📅 Date: ${new Date(quotation.quotationDate).toLocaleDateString("en-IN")}
+${quotation.validUntil ? `⏰ Valid Till: ${new Date(quotation.validUntil).toLocaleDateString("en-IN")}\n` : ""}
+🚗 Vehicle: ${vehicleInfo}
+
+📋 *Items Summary:*
+${itemsSummary}
+${remainingCount > 0 ? `... and ${remainingCount} more item${remainingCount > 1 ? "s" : ""}\n` : ""}
+💰 *Pricing:*
+Subtotal: ₹${quotation.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+${quotation.discount > 0 ? `Discount: -₹${quotation.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}\n` : ""}*Total Amount: ₹${quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}*
+
+📄 A detailed PDF has been generated. Please review it.
+
+✅ *To Approve:* ${approvalLink}
+❌ *To Reject:* ${rejectionLink}
+
+Or reply with "APPROVE" or "REJECT"
+
+📞 Contact: ${serviceCenter.phone || "N/A"}
+🏢 ${serviceCenter.name || "Service Center"}`;
+};
+
 const sendQuotationToCustomerById = async (
   quotationId: string,
   options?: { manageLoading?: boolean }
@@ -501,67 +851,92 @@ const sendQuotationToCustomerById = async (
     setQuotations(updatedQuotations);
     safeStorage.setItem("quotations", updatedQuotations);
 
+    // Get service center and advisor details
+    const serviceCenterData: any = quotation.serviceCenter || {
+      name: "42 EV Tech & Services",
+      address: "123 Main Street, Industrial Area",
+      city: "Pune",
+      state: "Maharashtra",
+      pincode: "411001",
+      phone: "+91-20-12345678",
+      gstNumber: (quotation.serviceCenter as any)?.gstNumber || "",
+      panNumber: (quotation.serviceCenter as any)?.panNumber || "",
+    };
+
+    const serviceAdvisor = {
+      name: userInfo?.name || "Service Advisor",
+      phone: (userInfo as any)?.phone || "+91-9876543210",
+    };
+
+    // Validate WhatsApp number
     const rawWhatsapp =
       (quotation.customer as any)?.whatsappNumber || quotation.customer?.phone || "";
     const customerWhatsapp = rawWhatsapp.replace(/\D/g, "");
 
-    const printQuotation = () => {
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        alert("Please allow popups to generate PDF");
-        return;
+    if (!validateWhatsAppNumber(customerWhatsapp)) {
+      alert("Customer WhatsApp number is missing or invalid. Please update customer contact information.");
+      if (manageLoading) {
+        setLoading(false);
       }
+      return;
+    }
 
-      const quotationHTML = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Quotation ${quotation.quotationNumber}</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              .header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 20px; }
-              .quotation-number { font-size: 24px; font-weight: bold; }
-              .details { margin: 20px 0; }
-              .items { width: 100%; border-collapse: collapse; margin: 20px 0; }
-              .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              .total { text-align: right; font-weight: bold; font-size: 18px; margin-top: 20px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div class="quotation-number">Quotation ${quotation.quotationNumber}</div>
-              <div>Date: ${new Date(quotation.quotationDate).toLocaleDateString("en-IN")}</div>
-            </div>
-            <div class="details">
-              <p><strong>Customer:</strong> ${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}</p>
-              <p><strong>Total:</strong> ₹${quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
-            </div>
-            <div class="total">Total Amount in Words: ₹${quotation.totalAmount.toLocaleString("en-IN")}</div>
-          </body>
-        </html>
-      `;
+    // Generate quotation HTML
+    const quotationHTML = generateQuotationHTML(quotation, serviceCenterData, serviceAdvisor);
 
-      printWindow.document.write(quotationHTML);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
+    // Print quotation
+    const printQuotation = () => {
+      try {
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+          alert("Please allow popups to generate PDF. The quotation details will be shown in the message.");
+          return false;
+        }
+
+        printWindow.document.write(quotationHTML);
+        printWindow.document.close();
+
+        // Wait for content to load, then trigger print
+        setTimeout(() => {
+          try {
+            printWindow.focus();
+            printWindow.print();
+            // Close window after a delay
+            setTimeout(() => {
+              if (!printWindow.closed) {
+                printWindow.close();
+              }
+            }, 2000);
+          } catch (printError) {
+            console.error("Print error:", printError);
+            // Keep window open if print fails
+          }
+        }, 500);
+        return true;
+      } catch (error) {
+        console.error("Error opening print window:", error);
+        alert("Could not open print dialog. The quotation will still be sent via WhatsApp.");
+        return false;
+      }
     };
 
+    // Generate PDF
     printQuotation();
 
-    const approvalLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=approve`;
-    const rejectionLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=reject`;
+    // Format WhatsApp message
+    const message = formatWhatsAppMessage(quotation, serviceCenterData);
+    const whatsappUrl = `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(message)}`;
 
-    const message = encodeURIComponent(
-      `Hi ${quotation.customer?.firstName || ""},\n\nHere is your quotation ${quotation.quotationNumber} for ₹${quotation.totalAmount.toLocaleString("en-IN")}.\n\nApprove: ${approvalLink}\nReject: ${rejectionLink}`
-    );
-    const whatsappUrl = `https://wa.me/${customerWhatsapp}?text=${message}`;
-
+    // Open WhatsApp with delay to allow PDF generation
     setTimeout(() => {
-      window.open(whatsappUrl, "_blank");
-      alert("Quotation PDF generated and sent to customer via WhatsApp!\n\nCustomer can approve or reject via the links provided.");
-    }, 1000);
+      try {
+        window.open(whatsappUrl, "_blank");
+        alert("Quotation PDF generated and sent to customer via WhatsApp!\n\nCustomer can approve or reject via the links provided.");
+      } catch (error) {
+        console.error("Error opening WhatsApp:", error);
+        alert("Could not open WhatsApp. Please copy this link manually:\n\n" + whatsappUrl);
+      }
+    }, 1500);
   } catch (error) {
     console.error("Error sending quotation:", error);
     alert("Failed to send quotation via WhatsApp. Please try again.");
@@ -1047,102 +1422,92 @@ Please keep this slip safe for vehicle collection.`;
       // Create or update lead when quotation is sent to customer
       createOrUpdateLeadFromQuotation(quotation);
       
-      // Prefer customer's WhatsApp number; fall back to phone if not available
+      // Get service center and advisor details
+      const serviceCenterData: any = quotation.serviceCenter || {
+        name: "42 EV Tech & Services",
+        address: "123 Main Street, Industrial Area",
+        city: "Pune",
+        state: "Maharashtra",
+        pincode: "411001",
+        phone: "+91-20-12345678",
+        gstNumber: (quotation.serviceCenter as any)?.gstNumber || "",
+        panNumber: (quotation.serviceCenter as any)?.panNumber || "",
+      };
+
+      const serviceAdvisor = {
+        name: userInfo?.name || "Service Advisor",
+        phone: (userInfo as any)?.phone || "+91-9876543210",
+      };
+
+      // Validate WhatsApp number
       const rawWhatsapp =
         (quotation.customer as any)?.whatsappNumber ||
         quotation.customer?.phone ||
         "";
       const customerWhatsapp = rawWhatsapp.replace(/\D/g, "");
 
-      // Generate PDF by triggering print/download
-      // In a real implementation, you would use a PDF library like jsPDF or html2pdf
-      // For now, we'll use the browser's print functionality to generate PDF
+      if (!validateWhatsAppNumber(customerWhatsapp)) {
+        alert("Customer WhatsApp number is missing or invalid. Please update customer contact information.");
+        setLoading(false);
+        return;
+      }
+
+      // Generate quotation HTML
+      const quotationHTML = generateQuotationHTML(quotation, serviceCenterData, serviceAdvisor);
+
+      // Print quotation
       const printQuotation = () => {
-        // Create a temporary modal with the quotation content for printing
-        const printWindow = window.open("", "_blank");
-        if (!printWindow) {
-          alert("Please allow popups to generate PDF");
-          return;
+        try {
+          const printWindow = window.open("", "_blank");
+          if (!printWindow) {
+            alert("Please allow popups to generate PDF. The quotation details will be shown in the message.");
+            return false;
+          }
+
+          printWindow.document.write(quotationHTML);
+          printWindow.document.close();
+
+          // Wait for content to load, then trigger print
+          setTimeout(() => {
+            try {
+              printWindow.focus();
+              printWindow.print();
+              // Close window after a delay
+              setTimeout(() => {
+                if (!printWindow.closed) {
+                  printWindow.close();
+                }
+              }, 2000);
+            } catch (printError) {
+              console.error("Print error:", printError);
+              // Keep window open if print fails
+            }
+          }, 500);
+          return true;
+        } catch (error) {
+          console.error("Error opening print window:", error);
+          alert("Could not open print dialog. The quotation will still be sent via WhatsApp.");
+          return false;
         }
-        
-        // Get quotation HTML content (simplified version for PDF)
-        const quotationHTML = `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Quotation ${quotation.quotationNumber}</title>
-              <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                .header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 20px; }
-                .quotation-number { font-size: 24px; font-weight: bold; }
-                .details { margin: 20px 0; }
-                .items { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                .total { text-align: right; font-weight: bold; font-size: 18px; margin-top: 20px; }
-              </style>
-            </head>
-            <body>
-              <div class="header">
-                <div class="quotation-number">Quotation ${quotation.quotationNumber}</div>
-                <div>Date: ${new Date(quotation.quotationDate).toLocaleDateString("en-IN")}</div>
-              </div>
-              <div class="details">
-                <p><strong>Customer:</strong> ${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}</p>
-                <p><strong>Vehicle:</strong> ${quotation.vehicle ? `${quotation.vehicle.make} ${quotation.vehicle.model} (${quotation.vehicle.registration})` : "N/A"}</p>
-              </div>
-              <table class="items">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Quantity</th>
-                    <th>Rate</th>
-                    <th>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${quotation.items.map(item => `
-                    <tr>
-                      <td>${item.partName}</td>
-                      <td>${item.quantity}</td>
-                      <td>₹${item.rate.toLocaleString("en-IN")}</td>
-                      <td>₹${item.amount.toLocaleString("en-IN")}</td>
-                    </tr>
-                  `).join("")}
-                </tbody>
-              </table>
-              <div class="total">
-                <p>Total Amount: ₹${quotation.totalAmount.toLocaleString("en-IN")}</p>
-              </div>
-            </body>
-          </html>
-        `;
-        
-        printWindow.document.write(quotationHTML);
-        printWindow.document.close();
-        
-        // Wait for content to load, then trigger print
-        setTimeout(() => {
-          printWindow.print();
-          // After printing, close the window
-          setTimeout(() => printWindow.close(), 1000);
-        }, 500);
       };
-      
-      // Generate PDF first
+
+      // Generate PDF
       printQuotation();
-      
-      // Open WhatsApp with quotation details and approval/rejection links
-      const approvalLink = `${window.location.origin}/sc/quotations/approve/${quotation.id}`;
-      const rejectionLink = `${window.location.origin}/sc/quotations/reject/${quotation.id}`;
-      
-      const message = `Hello ${quotation.customer?.firstName || "Customer"}, your quotation ${quotation.quotationNumber} is ready.\n\n📄 A PDF copy has been generated. Please review it.\n\n✅ To Approve: Click here - ${approvalLink}\n❌ To Reject or Request Changes: Click here - ${rejectionLink}\n\nOr reply with "APPROVE" or "REJECT" in this chat.`;
+
+      // Format WhatsApp message
+      const message = formatWhatsAppMessage(quotation, serviceCenterData);
       const whatsappUrl = `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(message)}`;
-      
-      // Small delay to allow PDF generation
+
+      // Open WhatsApp with delay to allow PDF generation
       setTimeout(() => {
-        window.open(whatsappUrl, "_blank");
-        alert("Quotation PDF generated and sent to customer via WhatsApp!\n\nCustomer can approve or reject via the links provided.");
-      }, 1000);
+        try {
+          window.open(whatsappUrl, "_blank");
+          alert("Quotation PDF generated and sent to customer via WhatsApp!\n\nCustomer can approve or reject via the links provided.");
+        } catch (error) {
+          console.error("Error opening WhatsApp:", error);
+          alert("Could not open WhatsApp. Please copy this link manually:\n\n" + whatsappUrl);
+        }
+      }, 1500);
     } catch (error) {
       console.error("Error sending quotation:", error);
       alert("Failed to send quotation. Please try again.");

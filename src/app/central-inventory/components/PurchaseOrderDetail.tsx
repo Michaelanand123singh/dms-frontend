@@ -145,7 +145,7 @@ export function PurchaseOrderDetail({ order }: PurchaseOrderDetailProps) {
               <TableHeader>
                 <TableRow>
                   <TableCell>Part Name</TableCell>
-                  <TableCell>SKU</TableCell>
+                  <TableCell>HSN Code</TableCell>
                   <TableCell align="right">Requested Qty</TableCell>
                   <TableCell align="right">Approved Qty</TableCell>
                   <TableCell align="right">Issued Qty</TableCell>
@@ -163,7 +163,7 @@ export function PurchaseOrderDetail({ order }: PurchaseOrderDetailProps) {
                         <p className="text-xs text-gray-400">Code: {item.partCode}</p>
                       )}
                     </TableCell>
-                    <TableCell>{item.sku}</TableCell>
+                    <TableCell>{item.hsnCode}</TableCell>
                     <TableCell align="right" className="font-medium">
                       {item.requestedQty}
                     </TableCell>

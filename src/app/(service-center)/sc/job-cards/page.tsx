@@ -44,6 +44,8 @@ import {
   getServiceCenterContext,
   shouldFilterByServiceCenter,
 } from "@/shared/lib/serviceCenter";
+import { generateInvoiceNumber, populateInvoiceFromJobCard } from "@/shared/utils/invoice.utils";
+import type { ServiceCenterInvoice } from "@/shared/types/invoice.types";
 
 import JobCardFormModal from "../components/job-cards/JobCardFormModal";
 import type { JobCard as JobCardType } from "@/shared/types";
@@ -684,44 +686,107 @@ export default function JobCards() {
       return;
     }
     
-    // Update job card with invoice information
-    const invoiceNumber = `INV-${selectedJob.jobCardNumber || selectedJob.id}-${Date.now()}`;
-    const updatedJobCards = jobCards.map((job) =>
-      job.id === selectedJob.id
-        ? {
-            ...job,
-            status: "Invoiced" as JobCardStatus,
-            invoiceNumber,
-            invoiceCreatedAt: new Date().toLocaleString(),
-            invoiceSentToAdvisor: false,
-          }
-        : job
-    );
-    setJobCards(updatedJobCards);
-    safeStorage.setItem("jobCards", updatedJobCards);
-    
-    // Update lead status to converted when service is invoiced (completed)
-    if (selectedJob.id) {
-      const existingLeads = safeStorage.getItem<any[]>("leads", []);
-      const leadIndex = existingLeads.findIndex((l) => l.jobCardId === selectedJob.id);
+    try {
+      // Get service center context
+      const serviceCenterContext = getServiceCenterContext();
+      const serviceCenterId = String(serviceCenterContext.serviceCenterId ?? "1");
+      const serviceCenterCode = SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
       
-      if (leadIndex !== -1) {
-        const lead = existingLeads[leadIndex];
-        const updatedNotes = lead.notes 
-          ? `${lead.notes}\nService completed and invoiced on ${new Date().toLocaleString()}. Invoice: ${invoiceNumber}`
-          : `Service completed and invoiced on ${new Date().toLocaleString()}. Invoice: ${invoiceNumber}`;
-        
-        existingLeads[leadIndex] = {
-          ...lead,
-          status: "converted" as const,
-          notes: updatedNotes,
-          updatedAt: new Date().toISOString(),
-        };
-        safeStorage.setItem("leads", existingLeads);
+      // Determine service center state
+      let serviceCenterState = "Delhi";
+      if (serviceCenterId === "2" || serviceCenterId === "sc-002") {
+        serviceCenterState = "Maharashtra";
+      } else if (serviceCenterId === "3" || serviceCenterId === "sc-003") {
+        serviceCenterState = "Karnataka";
       }
+      
+      // Create service center object for invoice generation
+      const serviceCenter = {
+        id: serviceCenterId,
+        code: serviceCenterCode,
+        name: serviceCenterContext.serviceCenterName || selectedJob.serviceCenterName || "Service Center",
+        state: serviceCenterState,
+        address: "123 Service Center Address", // Should come from service center config
+        city: serviceCenterState === "Delhi" ? "New Delhi" : serviceCenterState === "Maharashtra" ? "Mumbai" : "Bangalore",
+        pincode: "110001",
+        gstNumber: "29ABCDE1234F1Z5", // Should come from service center config
+        panNumber: "ABCDE1234F", // Should come from service center config
+      };
+      
+      // Populate invoice from job card
+      const invoiceData = populateInvoiceFromJobCard(selectedJob, serviceCenter);
+      
+      // Get existing invoices to generate proper invoice number
+      const existingInvoices = safeStorage.getItem<ServiceCenterInvoice[]>("invoices", []);
+      const currentYear = new Date().getFullYear();
+      const invoiceNumber = generateInvoiceNumber(serviceCenterCode, currentYear, existingInvoices);
+      
+      // Create complete invoice
+      const newInvoice: ServiceCenterInvoice = {
+        ...invoiceData,
+        id: invoiceNumber,
+        invoiceNumber: invoiceNumber,
+        customerName: invoiceData.customerName || "",
+        vehicle: invoiceData.vehicle || "",
+        date: invoiceData.date || new Date().toISOString().split("T")[0],
+        dueDate: invoiceData.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        amount: invoiceData.amount || invoiceData.grandTotal?.toString() || "0",
+        paidAmount: invoiceData.paidAmount || "0",
+        balance: invoiceData.balance || invoiceData.amount || invoiceData.grandTotal?.toString() || "0",
+        items: invoiceData.items || [],
+        jobCardId: selectedJob.id,
+        status: "Unpaid",
+        createdBy: userInfo?.name || "System",
+      };
+      
+      // Save invoice
+      existingInvoices.push(newInvoice);
+      safeStorage.setItem("invoices", existingInvoices);
+      
+      // Update job card with invoice information
+      const updatedJobCards = jobCards.map((job) =>
+        job.id === selectedJob.id
+          ? {
+              ...job,
+              status: "Invoiced" as JobCardStatus,
+              invoiceNumber,
+              invoiceCreatedAt: new Date().toLocaleString(),
+              invoiceSentToAdvisor: false,
+            }
+          : job
+      );
+      setJobCards(updatedJobCards);
+      safeStorage.setItem("jobCards", updatedJobCards);
+      
+      // Update lead status to converted when service is invoiced (completed)
+      if (selectedJob.id) {
+        const existingLeads = safeStorage.getItem<any[]>("leads", []);
+        const leadIndex = existingLeads.findIndex((l) => l.jobCardId === selectedJob.id);
+        
+        if (leadIndex !== -1) {
+          const lead = existingLeads[leadIndex];
+          const updatedNotes = lead.notes 
+            ? `${lead.notes}\nService completed and invoiced on ${new Date().toLocaleString()}. Invoice: ${invoiceNumber}`
+            : `Service completed and invoiced on ${new Date().toLocaleString()}. Invoice: ${invoiceNumber}`;
+          
+          existingLeads[leadIndex] = {
+            ...lead,
+            status: "converted" as const,
+            notes: updatedNotes,
+            updatedAt: new Date().toISOString(),
+          };
+          safeStorage.setItem("leads", existingLeads);
+        }
+      }
+      
+      // Navigate to invoices page with the new invoice
+      router.push(`/sc/invoices?invoiceId=${invoiceNumber}`);
+      
+      alert(`Invoice ${invoiceNumber} created successfully! Redirecting to invoice page...`);
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      alert("Failed to create invoice. Please try again.");
     }
-    
-    alert(`Invoice ${invoiceNumber} created and sent to service advisor.`);
   };
 
   // Service Advisor: Send invoice to customer

@@ -57,7 +57,7 @@ export interface InvoiceItem {
   partId: string;
   partName: string;
   partNumber: string;
-  sku: string;
+  hsnCode: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;

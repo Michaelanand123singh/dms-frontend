@@ -120,7 +120,7 @@ export default function StockUpdatePage() {
   const filteredStock = stock.filter(
     (s) =>
       s.partName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.hsnCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.partNumber.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -181,7 +181,7 @@ export default function StockUpdatePage() {
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <p className="font-medium">{item.partName}</p>
-                          <p className="text-sm text-gray-500">{item.sku}</p>
+                          <p className="text-sm text-gray-500">{item.hsnCode}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-medium">{item.currentQty}</p>
@@ -206,7 +206,7 @@ export default function StockUpdatePage() {
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <p className="text-sm text-gray-500 mb-1">Selected Item</p>
                     <p className="font-medium">{selectedStock.partName}</p>
-                    <p className="text-sm text-gray-500">SKU: {selectedStock.sku}</p>
+                    <p className="text-sm text-gray-500">HSN Code: {selectedStock.hsnCode}</p>
                     <p className="text-sm text-gray-500 mt-2">
                       Current Quantity: <span className="font-medium">{selectedStock.currentQty}</span>
                     </p>

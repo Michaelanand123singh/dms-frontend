@@ -7,15 +7,20 @@ import type { PartsOrderFormData } from "@/shared/types/inventory.types";
 
 export type PartsOrderStatus = "pending" | "approved" | "rejected" | "received";
 
-export interface PartsOrder {
-  id: string;
-  orderNumber: string;
+export interface PartsOrderItem {
   partId: string;
   partName: string;
   requiredQty: number;
   urgency: "low" | "medium" | "high";
-  status: PartsOrderStatus;
   notes?: string;
+}
+
+export interface PartsOrder {
+  id: string;
+  orderNumber: string;
+  items: PartsOrderItem[];
+  status: PartsOrderStatus;
+  orderNotes?: string;
   requestedBy: string;
   requestedAt: string;
   approvedBy?: string;
@@ -43,7 +48,25 @@ class PartsOrderService {
   }
 
   async getAll(): Promise<PartsOrder[]> {
-    return safeStorage.getItem<PartsOrder[]>(STORAGE_KEY, []);
+    const orders = safeStorage.getItem<any[]>(STORAGE_KEY, []);
+    // Migrate old format to new format for backward compatibility
+    return orders.map((order) => {
+      // If order has old format (single part fields), convert to new format
+      if (order.partId && !order.items) {
+        return {
+          ...order,
+          items: [{
+            partId: order.partId,
+            partName: order.partName || "",
+            requiredQty: order.requiredQty || 0,
+            urgency: order.urgency || "medium",
+            notes: order.notes,
+          }],
+          orderNotes: order.notes,
+        } as PartsOrder;
+      }
+      return order as PartsOrder;
+    });
   }
 
   async getById(id: string): Promise<PartsOrder | null> {
@@ -52,19 +75,20 @@ class PartsOrderService {
   }
 
   async create(
-    formData: PartsOrderFormData,
-    partName: string,
+    items: PartsOrderItem[],
+    orderNotes?: string,
     requestedBy: string = "Inventory Manager"
   ): Promise<PartsOrder> {
+    if (!items || items.length === 0) {
+      throw new Error("At least one part is required to create an order");
+    }
+
     const order: PartsOrder = {
       id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       orderNumber: this.generateOrderNumber(),
-      partId: formData.partId,
-      partName,
-      requiredQty: formData.requiredQty,
-      urgency: formData.urgency,
+      items,
       status: "pending",
-      notes: formData.notes,
+      orderNotes,
       requestedBy,
       requestedAt: new Date().toISOString(),
     };
@@ -73,6 +97,25 @@ class PartsOrderService {
     safeStorage.setItem(STORAGE_KEY, [order, ...orders]);
 
     return order;
+  }
+
+  // Legacy method for backward compatibility (single part)
+  async createSingle(
+    formData: PartsOrderFormData,
+    partName: string,
+    requestedBy: string = "Inventory Manager"
+  ): Promise<PartsOrder> {
+    return this.create(
+      [{
+        partId: formData.partId,
+        partName,
+        requiredQty: formData.requiredQty,
+        urgency: formData.urgency,
+        notes: formData.notes,
+      }],
+      undefined,
+      requestedBy
+    );
   }
 
   async updateStatus(
@@ -89,7 +132,7 @@ class PartsOrderService {
 
     const update: Partial<PartsOrder> = {
       status,
-      notes: notes || orders[index].notes,
+      orderNotes: notes || orders[index].orderNotes,
     };
 
     if (status === "approved") {
