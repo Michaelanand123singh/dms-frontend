@@ -21,7 +21,7 @@ import { defaultServiceCenterInventory } from "@/__mocks__/data/inventory.mock";
 interface RequestItem {
   partId: number;
   partName: string;
-  sku: string;
+  hsnCode: string;
   partCode?: string;
   quantity: number;
   urgency: "Normal" | "Urgent";
@@ -37,7 +37,7 @@ export default function SCInventory() {
   const [currentRequest, setCurrentRequest] = useState<{
     partId: number;
     partName: string;
-    sku: string;
+    hsnCode: string;
     partCode?: string;
     quantity: number;
     urgency: "Normal" | "Urgent";
@@ -58,7 +58,7 @@ export default function SCInventory() {
   const filteredInventory = inventory.filter((item) => {
     const matchesSearch =
       item.partName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.hsnCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.partCode && item.partCode.toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -99,7 +99,7 @@ export default function SCInventory() {
     // Prepare CSV data
     const headers = [
       "Part Name",
-      "SKU",
+      "HSN Code",
       "Part Code",
       "Category",
       "Current Quantity",
@@ -116,7 +116,7 @@ export default function SCInventory() {
       ...filteredInventory.map((item) =>
         [
           `"${item.partName}"`,
-          `"${item.sku}"`,
+          `"${item.hsnCode}"`,
           `"${item.partCode || ""}"`,
           `"${item.category}"`,
           item.currentQty,
@@ -152,7 +152,7 @@ export default function SCInventory() {
     const newItem: RequestItem = {
       partId: selectedPart.id,
       partName: selectedPart.partName,
-      sku: selectedPart.sku,
+      hsnCode: selectedPart.hsnCode,
       partCode: selectedPart.partCode,
       quantity: currentRequest?.quantity || selectedPart.minStock * 2 - selectedPart.currentQty,
       urgency: currentRequest?.urgency || "Normal",
@@ -302,7 +302,7 @@ export default function SCInventory() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="Search by part name, SKU, or category..."
+                placeholder="Search by part name, HSN Code, or category..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -340,7 +340,7 @@ export default function SCInventory() {
                     Part Name
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    SKU
+                    HSN Code
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Part Code
@@ -385,7 +385,7 @@ export default function SCInventory() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 font-mono">{item.sku}</span>
+                        <span className="text-sm text-gray-900 font-mono">{item.hsnCode}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-700">{item.partCode || "-"}</span>
@@ -505,7 +505,7 @@ export default function SCInventory() {
                           setCurrentRequest({
                             partId: part.id,
                             partName: part.partName,
-                            sku: part.sku,
+                            hsnCode: part.hsnCode,
                             partCode: part.partCode,
                             quantity: part.minStock * 2 - part.currentQty > 0 ? part.minStock * 2 - part.currentQty : part.minStock,
                             urgency: "Normal",
@@ -518,7 +518,7 @@ export default function SCInventory() {
                       <option value="">-- Select a part --</option>
                       {inventory.map((part) => (
                         <option key={part.id} value={part.id}>
-                          {part.partName} ({part.sku}) - Stock: {part.currentQty}
+                          {part.partName} (HSN: {part.hsnCode}) - Stock: {part.currentQty}
                         </option>
                       ))}
                     </select>
@@ -529,7 +529,7 @@ export default function SCInventory() {
                       <div className="bg-white p-4 rounded-lg border border-gray-200">
                         <p className="text-sm text-gray-600 mb-1">Part Name</p>
                         <p className="font-semibold text-gray-800">{selectedPart.partName}</p>
-                        <p className="text-xs text-gray-500 mt-1">SKU: {selectedPart.sku}</p>
+                        <p className="text-xs text-gray-500 mt-1">HSN Code: {selectedPart.hsnCode}</p>
                         {selectedPart.partCode && (
                           <p className="text-xs text-gray-500 mt-1">Part Code: {selectedPart.partCode}</p>
                         )}
@@ -614,7 +614,7 @@ export default function SCInventory() {
                       <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-semibold text-gray-800">{item.partName}</p>
-                          <p className="text-sm text-gray-600">SKU: {item.sku}</p>
+                          <p className="text-sm text-gray-600">HSN Code: {item.hsnCode}</p>
                           <div className="flex gap-4 mt-2 text-sm">
                             <span className="text-gray-600">Qty: <strong>{item.quantity}</strong></span>
                             <span className={`px-2 py-1 rounded ${item.urgency === "Urgent" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>

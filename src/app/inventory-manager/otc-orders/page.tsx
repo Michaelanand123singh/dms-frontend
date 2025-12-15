@@ -31,18 +31,18 @@ export default function OTCOrders() {
 
   // Mock parts inventory for OTC
   const availableParts: OTCPart[] = [
-    { id: 1, name: "Engine Oil 5W-30", sku: "EO-001", price: 450, stock: 45, category: "Lubricants" },
-    { id: 2, name: "Brake Pads - Front", sku: "BP-002", price: 1200, stock: 8, category: "Brakes" },
-    { id: 3, name: "Air Filter", sku: "AF-003", price: 350, stock: 0, category: "Filters" },
-    { id: 4, name: "AC Gas R134a", sku: "AC-004", price: 800, stock: 12, category: "AC Parts" },
-    { id: 5, name: "Spark Plugs Set", sku: "SP-005", price: 600, stock: 25, category: "Engine" },
-    { id: 6, name: "Windshield Wiper", sku: "WW-006", price: 250, stock: 30, category: "Accessories" },
+    { id: 1, name: "Engine Oil 5W-30", hsnCode: "EO-001", price: 450, stock: 45, category: "Lubricants" },
+    { id: 2, name: "Brake Pads - Front", hsnCode: "BP-002", price: 1200, stock: 8, category: "Brakes" },
+    { id: 3, name: "Air Filter", hsnCode: "AF-003", price: 350, stock: 0, category: "Filters" },
+    { id: 4, name: "AC Gas R134a", hsnCode: "AC-004", price: 800, stock: 12, category: "AC Parts" },
+    { id: 5, name: "Spark Plugs Set", hsnCode: "SP-005", price: 600, stock: 25, category: "Engine" },
+    { id: 6, name: "Windshield Wiper", hsnCode: "WW-006", price: 250, stock: 30, category: "Accessories" },
   ];
 
   const filteredParts = availableParts.filter(
     (part) =>
       part.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      part.sku.toLowerCase().includes(searchQuery.toLowerCase())
+      part.hsnCode.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const addToCart = (part: OTCPart): void => {
@@ -152,7 +152,7 @@ export default function OTCOrders() {
                           <div>
                             <p className="font-semibold text-gray-800">{part.name}</p>
                             <p className="text-xs text-gray-500">
-                              SKU: {part.sku} • {part.category}
+                              HSN Code: {part.hsnCode} • {part.category}
                             </p>
                           </div>
                         </div>
@@ -219,7 +219,7 @@ export default function OTCOrders() {
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-800">{item.name}</p>
-                          <p className="text-xs text-gray-500">SKU: {item.sku}</p>
+                          <p className="text-xs text-gray-500">HSN Code: {item.hsnCode}</p>
                         </div>
                         <button
                           onClick={() => removeFromCart(item.id)}

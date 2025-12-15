@@ -7,8 +7,9 @@ export interface PartsMasterFormData {
   partId: string;
   partName: string;
   partNumber: string;
-  sku: string;
+  hsnCode: string; // HSN Code
   partCode: string;
+  labourCode: string; // Labour Code
   category: string;
   quantity: string;
   price: string;
@@ -117,8 +118,8 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     required: false,
   },
   {
-    name: "sku",
-    label: "SKU",
+    name: "hsnCode",
+    label: "HSN Code",
     type: "text",
     section: "basic",
     required: false,
@@ -129,6 +130,13 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     type: "text",
     section: "basic",
     placeholder: "Enter part code",
+  },
+  {
+    name: "labourCode",
+    label: "Labour Code",
+    type: "text",
+    section: "basic",
+    placeholder: "Enter labour code",
   },
   {
     name: "category",
@@ -383,8 +391,9 @@ export function getInitialFormData(): PartsMasterFormData {
     partId: "",
     partName: "",
     partNumber: "",
-    sku: "",
+    hsnCode: "",
     partCode: "",
+    labourCode: "",
     category: "",
     quantity: "",
     price: "",

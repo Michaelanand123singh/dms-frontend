@@ -42,8 +42,9 @@ function mapPartFormDataToPart(data: PartFormData, id: string): Part {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     // Include all extended fields from data (only if they have values)
-    ...(data.sku && { sku: data.sku }),
+    ...(data.hsnCode && { hsnCode: data.hsnCode }),
     ...(data.partCode && { partCode: data.partCode }),
+    ...(data.labourCode && { labourCode: data.labourCode }),
     ...(data.status && { status: data.status }),
     ...(data.description && { description: data.description }),
     ...(data.brandName && { brandName: data.brandName }),

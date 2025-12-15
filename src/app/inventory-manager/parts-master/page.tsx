@@ -189,8 +189,9 @@ export default function PartsMasterPage() {
           minStockLevel: parseInt(getValue(["Min Stock", "MinStock", "min_stock", "Min Stock Level", "min_stock_level"]) || "0") || 0,
           unit: String(getValue(["Unit", "unit", "UOM"]) || "piece"),
           // Extended fields
-          sku: String(getValue(["SKU", "sku"]) || ""),
+          hsnCode: String(getValue(["HSN Code", "HSN", "SKU", "sku", "hsnCode"]) || ""),
           partCode: String(getValue(["Part Code", "PartCode", "part_code"]) || ""),
+          labourCode: String(getValue(["Labour Code", "LabourCode", "labour_code", "Labor Code", "LaborCode"]) || ""),
           status: (getValue(["Status", "status"]) || "In Stock") as "In Stock" | "Low Stock" | "Out of Stock",
           // Basic Part Info
           brandName: String(getValue(["Brand Name", "BrandName", "brand_name", "Brand"]) || ""),
