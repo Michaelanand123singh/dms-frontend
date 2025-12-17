@@ -164,7 +164,7 @@ export default function PartsMasterPage() {
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData: any[] = XLSX.utils.sheet_to_json(firstSheet);
 
-      // Map Excel columns to PartFormData
+      // Map Excel columns to PartFormData (new parameters from image)
       const partsData: PartFormData[] = jsonData.map((row: any) => {
         // Try to match common column names (case-insensitive)
         const getValue = (keys: string[]) => {
@@ -179,46 +179,48 @@ export default function PartsMasterPage() {
           return "";
         };
 
+        // Calculate price from totalPrice or use purchasePrice
+        const totalPrice = parseFloat(getValue(["TOTAL PRICE", "Total Price", "total_price", "TotalPrice"]) || "0");
+        const purchasePrice = parseFloat(getValue(["PURCHASE PRICE", "Purchase Price", "purchase_price", "PurchasePrice"]) || "0");
+        const price = totalPrice > 0 ? totalPrice : (purchasePrice > 0 ? purchasePrice : 0);
+
         return {
           partId: String(getValue(["Part ID", "PartID", "part_id", "PartId"]) || ""),
           partName: String(getValue(["Part Name", "PartName", "part_name", "Name"]) || ""),
           partNumber: String(getValue(["Part Number", "PartNumber", "part_number", "Number"]) || ""),
           category: String(getValue(["Category", "category", "Category Name"]) || ""),
-          price: parseFloat(getValue(["Price", "price", "Unit Price", "unit_price"]) || "0") || 0,
+          price: price,
           description: String(getValue(["Description", "description", "Desc"]) || ""),
           minStockLevel: parseInt(getValue(["Min Stock", "MinStock", "min_stock", "Min Stock Level", "min_stock_level"]) || "0") || 0,
           unit: String(getValue(["Unit", "unit", "UOM"]) || "piece"),
-          // Extended fields
-          hsnCode: String(getValue(["HSN Code", "HSN", "SKU", "sku", "hsnCode"]) || ""),
-          partCode: String(getValue(["Part Code", "PartCode", "part_code"]) || ""),
-          labourCode: String(getValue(["Labour Code", "LabourCode", "labour_code", "Labor Code", "LaborCode"]) || ""),
-          status: (getValue(["Status", "status"]) || "In Stock") as "In Stock" | "Low Stock" | "Out of Stock",
+          // New fields from image
+          oemPartNumber: String(getValue(["OEM PART NUMBER", "OEM Part Number", "oem_part_number", "OemPartNumber"]) || ""),
+          originType: String(getValue(["ORIGIN TYPE", "Origin Type", "origin_type", "OriginType"]) || "NEW"),
+          purchasePrice: String(getValue(["PURCHASE PRICE", "Purchase Price", "purchase_price", "PurchasePrice"]) || ""),
           // Basic Part Info
           brandName: String(getValue(["Brand Name", "BrandName", "brand_name", "Brand"]) || ""),
           variant: String(getValue(["Variant", "variation"]) || ""),
-          partType: (getValue(["Part Type", "PartType", "part_type"]) || "NEW") as "NEW" | "OLD",
-          color: String(getValue(["Color", "colour"]) || "NA"),
-          // Purchase (Incoming)
-          preGstAmountToUs: String(getValue(["Pre GST Amount To Us", "PreGstAmountToUs", "pre_gst_amount"]) || ""),
+          partType: String(getValue(["Part Type", "PartType", "part_type"]) || ""),
+          color: String(getValue(["Color", "colour"]) || ""),
+          // GST and Pricing
+          gstAmount: String(getValue(["GST Amount", "GstAmount", "gst_amount"]) || ""),
           gstRateInput: String(getValue(["GST Rate Input", "GstRateInput", "gst_rate_input"]) || ""),
-          gstInputAmount: "",
-          postGstAmountToUs: "",
-          // Sale (Outgoing)
-          salePricePreGst: String(getValue(["Sale Price Pre GST", "SalePricePreGst", "sale_price_pre_gst"]) || ""),
+          pricePreGst: String(getValue(["Price Pre GST", "PricePreGst", "price_pre_gst"]) || ""),
           gstRateOutput: String(getValue(["GST Rate Output", "GstRateOutput", "gst_rate_output"]) || ""),
-          gstOutputAmount: "",
-          postGstSaleAmount: "",
-          // Labour Association
-          associatedLabourName: String(getValue(["Associated Labour Name", "AssociatedLabourName", "labour_name"]) || ""),
-          associatedLabourCode: String(getValue(["Associated Labour Code", "AssociatedLabourCode", "labour_code"]) || ""),
-          workTime: String(getValue(["Work Time", "WorkTime", "work_time", "Hours"]) || ""),
+          // Labour Information
+          estimatedLabour: String(getValue(["Estimated Labour", "EstimatedLabour", "estimated_labour"]) || ""),
+          estimatedLabourWorkTime: String(getValue(["Estimated Labour Work Time", "EstimatedLabourWorkTime", "estimated_labour_work_time", "Work Time"]) || ""),
           labourRate: String(getValue(["Labour Rate", "LabourRate", "labour_rate"]) || ""),
           labourGstRate: String(getValue(["Labour GST Rate", "LabourGstRate", "labour_gst_rate"]) || ""),
-          labourGstAmount: "",
-          labourPostGstAmount: "",
+          labourPrice: String(getValue(["LABOUR PRICE", "Labour Price", "labour_price", "LabourPrice"]) || ""),
+          // Calculated Totals
+          gstInput: String(getValue(["GST INPUT", "GST Input", "gst_input", "GstInput"]) || ""),
+          totalPrice: String(getValue(["TOTAL PRICE", "Total Price", "total_price", "TotalPrice"]) || ""),
+          totalGst: String(getValue(["TOTAL GST", "Total GST", "total_gst", "TotalGst"]) || ""),
           // High Value Part
-          highValuePart: getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "true" || getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "yes" || false,
-          partSerialNumber: String(getValue(["Part Serial Number", "PartSerialNumber", "serial_number"]) || ""),
+          highValuePart: getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "true" || 
+                        getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "yes" || 
+                        false,
         } as PartFormData;
       });
 
@@ -255,54 +257,32 @@ export default function PartsMasterPage() {
   const downloadTemplate = () => {
     const templateData = [
       {
-        "Part ID": "PART-001",
-        "Part Name": "Brake Pad Set",
-        "Part Number": "BP-001",
-        "Category": "Brakes",
-        "Price": 1500,
-        "Description": "Front brake pad set",
-        "Min Stock": 10,
-        "Unit": "piece",
-        "Brand Name": "Example Brand",
-        "Variant": "Variant A",
-        "Part Type": "NEW",
-        "Color": "NA",
-        "Pre GST Amount To Us": "1000",
+        "OEM PART NUMBER": "W_000000000272_00",
+        "Part Name": "COCKPIT TOP SHELL ANTHRACITE",
+        "Part Number": "003",
+        "ORIGIN TYPE": "OLD/NEW",
+        "Category": "BODY PANE",
+        "PURCHASE PRICE": 950,
+        "Description": "HEADLIGH",
+        "Min Stock": 2,
+        "Unit": "1",
+        "Brand Name": "LA ELECTRI",
+        "Variant": "S1 PRO, S1",
+        "Part Type": "PANEL",
+        "Color": "ANTHRACIT",
+        "GST Amount": "",
         "GST Rate Input": "18",
-        "Sale Price Pre GST": "1200",
+        "Price Pre GST": "1652",
         "GST Rate Output": "18",
-        "Associated Labour Name": "Labour 1",
-        "Associated Labour Code": "LAB001",
-        "Work Time": "2",
-        "Labour Rate": "500",
+        "Estimated Labour": "COCKPIT FIT000000000",
+        "Estimated Labour Work Time": "0.3M",
+        "Labour Rate": "180",
         "Labour GST Rate": "18",
-        "High Value Part": "false",
-        "Part Serial Number": "",
-      },
-      {
-        "Part ID": "PART-002",
-        "Part Name": "Engine Oil 5W-30",
-        "Part Number": "EO-001",
-        "Category": "Lubricants",
-        "Price": 800,
-        "Description": "Synthetic engine oil",
-        "Min Stock": 20,
-        "Unit": "liter",
-        "Brand Name": "Example Brand",
-        "Variant": "Variant B",
-        "Part Type": "NEW",
-        "Color": "NA",
-        "Pre GST Amount To Us": "800",
-        "GST Rate Input": "18",
-        "Sale Price Pre GST": "1000",
-        "GST Rate Output": "18",
-        "Associated Labour Name": "",
-        "Associated Labour Code": "",
-        "Work Time": "",
-        "Labour Rate": "",
-        "Labour GST Rate": "",
-        "High Value Part": "false",
-        "Part Serial Number": "",
+        "LABOUR PRICE": "",
+        "GST INPUT": "",
+        "TOTAL PRICE": "",
+        "TOTAL GST": "",
+        "High Value Part": "NO",
       },
     ];
 
@@ -654,17 +634,17 @@ export default function PartsMasterPage() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-semibold text-blue-900 mb-2">Excel File Format</h4>
               <p className="text-sm text-blue-800 mb-2">
-                Your Excel file should have the following columns:
+                Your Excel file should have the following columns (matching the image format):
               </p>
               <ul className="text-xs text-blue-700 list-disc list-inside space-y-1">
-                <li><strong>Required:</strong> Part ID, Part Name, Part Number, Category</li>
-                <li><strong>Basic Info (optional):</strong> Price (default: 0), Description, Min Stock (default: 0), Unit (default: "piece")</li>
-                <li><strong>Basic Part Info (optional):</strong> Brand Name, Variant, Part Type (NEW/OLD), Color (default: "NA")</li>
-                <li><strong>Purchase (Incoming) - optional:</strong> Pre GST Amount To Us, GST Rate Input</li>
-                <li><strong>Sale (Outgoing) - optional:</strong> Sale Price Pre GST, GST Rate Output</li>
-                <li><strong>Labour Association - optional:</strong> Associated Labour Name, Associated Labour Code, Work Time (Hours), Labour Rate, Labour GST Rate</li>
-                <li><strong>High Value Part - optional:</strong> High Value Part (true/false/yes/no), Part Serial Number (required if High Value Part is true)</li>
-                <li><strong>Note:</strong> GST amounts are auto-calculated from base amounts and rates</li>
+                <li><strong>Required:</strong> Part Name</li>
+                <li><strong>Basic Info (optional):</strong> OEM PART NUMBER, Part Number, ORIGIN TYPE (OLD/NEW), Category, PURCHASE PRICE, Description, Min Stock, Unit</li>
+                <li><strong>Basic Part Info (optional):</strong> Brand Name, Variant, Part Type (e.g., PANEL), Color</li>
+                <li><strong>GST and Pricing (optional):</strong> GST Amount (auto-calculated), GST Rate Input (%), Price Pre GST, GST Rate Output (%)</li>
+                <li><strong>Labour Information (optional):</strong> Estimated Labour, Estimated Labour Work Time (e.g., 0.3M), Labour Rate, Labour GST Rate (%)</li>
+                <li><strong>Calculated Totals (auto-calculated):</strong> LABOUR PRICE, GST INPUT, TOTAL PRICE, TOTAL GST</li>
+                <li><strong>High Value Part (optional):</strong> High Value Part (YES/NO/true/false)</li>
+                <li><strong>Note:</strong> GST amounts, Labour Price, and Totals are auto-calculated from base amounts and rates</li>
               </ul>
             </div>
 
