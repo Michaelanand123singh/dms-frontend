@@ -532,11 +532,11 @@ function AppointmentsContent() {
       dropPincode: appointment.dropPincode,
       preferredCommunicationMode: appointment.preferredCommunicationMode,
       pickupDropRequired: appointment.pickupDropRequired,
-      arrivalMode: (appointment as any).arrivalMode || appointment.arrivalMode,
-      checkInNotes: (appointment as any).checkInNotes,
-      checkInSlipNumber: (appointment as any).checkInSlipNumber,
-      checkInDate: (appointment as any).checkInDate,
-      checkInTime: (appointment as any).checkInTime,
+      arrivalMode: appointment.arrivalMode,
+      checkInNotes: appointment.checkInNotes,
+      checkInSlipNumber: appointment.checkInSlipNumber,
+      checkInDate: appointment.checkInDate,
+      checkInTime: appointment.checkInTime,
       // Structured PART 1 data
       part1,
       // PART 2 will be populated when parts are added

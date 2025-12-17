@@ -38,6 +38,11 @@ export interface AppointmentRecord {
   dropCity?: string;
   dropPincode?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
+  arrivalMode?: "vehicle_present" | "vehicle_absent" | "check_in_only";
+  checkInNotes?: string;
+  checkInSlipNumber?: string;
+  checkInDate?: string;
+  checkInTime?: string;
   createdByRole?: "call_center" | "service_advisor" | "service_manager"; // Track who created the appointment
 }
 

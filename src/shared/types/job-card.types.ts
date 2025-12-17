@@ -195,6 +195,7 @@ export interface JobCard {
   dropCity?: string;
   dropPincode?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
+  pickupDropRequired?: boolean;
   checkInNotes?: string;
   checkInSlipNumber?: string;
   checkInDate?: string;
