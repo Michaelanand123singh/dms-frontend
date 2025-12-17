@@ -35,50 +35,51 @@ export function PartsMasterForm({
   submitButtonText,
   submitButtonClass = "w-full bg-purple-600 text-white py-2 rounded-lg font-medium hover:bg-purple-700 transition text-sm sm:text-base mt-4",
 }: PartsMasterFormProps) {
-  // Calculate GST amounts when base amounts or rates change
+  // Calculate GST amounts and totals when base amounts or rates change
   useEffect(() => {
     // Calculate Purchase GST
-    const preGst = parseFloat(formData.preGstAmountToUs) || 0;
+    const purchasePrice = parseFloat(formData.purchasePrice) || 0;
     const gstRateInput = parseFloat(formData.gstRateInput) || 0;
-    const gstInputAmount = (preGst * gstRateInput) / 100;
-    const postGstAmountToUs = preGst + gstInputAmount;
+    const gstAmount = (purchasePrice * gstRateInput) / 100;
+    const gstInput = gstAmount; // GST Input is the GST on purchase
 
-    // Calculate Sale GST
-    const salePreGst = parseFloat(formData.salePricePreGst) || 0;
+    // Calculate Sale GST Output
+    const pricePreGst = parseFloat(formData.pricePreGst) || 0;
     const gstRateOutput = parseFloat(formData.gstRateOutput) || 0;
-    const gstOutputAmount = (salePreGst * gstRateOutput) / 100;
-    const postGstSaleAmount = salePreGst + gstOutputAmount;
+    const gstOutputAmount = (pricePreGst * gstRateOutput) / 100;
 
-    // Calculate Labour GST
+    // Calculate Labour GST and Price
     const labourRate = parseFloat(formData.labourRate) || 0;
     const labourGstRate = parseFloat(formData.labourGstRate) || 0;
     const labourGstAmount = (labourRate * labourGstRate) / 100;
-    const labourPostGstAmount = labourRate + labourGstAmount;
+    const labourPrice = labourRate + labourGstAmount;
+
+    // Calculate Totals
+    const totalPrice = pricePreGst + labourPrice;
+    const totalGst = gstInput + gstOutputAmount + labourGstAmount;
 
     // Only update if values have changed to avoid infinite loops
     if (
-      formData.gstInputAmount !== gstInputAmount.toFixed(2) ||
-      formData.postGstAmountToUs !== postGstAmountToUs.toFixed(2) ||
-      formData.gstOutputAmount !== gstOutputAmount.toFixed(2) ||
-      formData.postGstSaleAmount !== postGstSaleAmount.toFixed(2) ||
-      formData.labourGstAmount !== labourGstAmount.toFixed(2) ||
-      formData.labourPostGstAmount !== labourPostGstAmount.toFixed(2)
+      formData.gstAmount !== gstAmount.toFixed(2) ||
+      formData.gstInput !== gstInput.toFixed(2) ||
+      formData.labourPrice !== labourPrice.toFixed(2) ||
+      formData.totalPrice !== totalPrice.toFixed(2) ||
+      formData.totalGst !== totalGst.toFixed(2)
     ) {
       onFormChange({
         ...formData,
-        gstInputAmount: gstInputAmount.toFixed(2),
-        postGstAmountToUs: postGstAmountToUs.toFixed(2),
-        gstOutputAmount: gstOutputAmount.toFixed(2),
-        postGstSaleAmount: postGstSaleAmount.toFixed(2),
-        labourGstAmount: labourGstAmount.toFixed(2),
-        labourPostGstAmount: labourPostGstAmount.toFixed(2),
+        gstAmount: gstAmount.toFixed(2),
+        gstInput: gstInput.toFixed(2),
+        labourPrice: labourPrice.toFixed(2),
+        totalPrice: totalPrice.toFixed(2),
+        totalGst: totalGst.toFixed(2),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    formData.preGstAmountToUs,
+    formData.purchasePrice,
     formData.gstRateInput,
-    formData.salePricePreGst,
+    formData.pricePreGst,
     formData.gstRateOutput,
     formData.labourRate,
     formData.labourGstRate,
@@ -126,11 +127,6 @@ export function PartsMasterForm({
       return false;
     }
 
-    // Skip partId if not provided
-    if (field.name === "partId" && !formData.partId) {
-      return false;
-    }
-
     // Skip partNumber if not provided
     if (field.name === "partNumber" && formData.partNumber === undefined) {
       return false;
@@ -138,7 +134,7 @@ export function PartsMasterForm({
 
     // Skip optional fields that are undefined
     if (
-      (field.name === "minStockLevel" || field.name === "unit" || field.name === "description") &&
+      (field.name === "minStock" || field.name === "unit" || field.name === "description") &&
       formData[field.name] === undefined
     ) {
       return false;

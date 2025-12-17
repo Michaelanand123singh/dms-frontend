@@ -27,6 +27,7 @@ export interface StockIndicator {
 
 /**
  * Part Master - Complete part information
+ * Updated with new parameters from image
  */
 export interface Part {
   id: string;
@@ -41,43 +42,41 @@ export interface Part {
   unit: string;
   createdAt?: string;
   updatedAt?: string;
-  // Extended fields from form
-  hsnCode?: string; // HSN Code
-  partCode?: string;
-  labourCode?: string; // Labour Code
-  status?: "In Stock" | "Low Stock" | "Out of Stock";
+  // New fields from image
+  oemPartNumber?: string;
+  originType?: string; // OLD/NEW
+  purchasePrice?: string;
   // Basic Part Info
   brandName?: string;
   variant?: string;
-  partType?: "NEW" | "OLD";
+  partType?: string; // PANEL, etc.
   color?: string;
-  // Purchase (Incoming)
-  preGstAmountToUs?: string;
+  // GST and Pricing
+  gstAmount?: string;
   gstRateInput?: string;
-  gstInputAmount?: string;
-  postGstAmountToUs?: string;
-  // Sale (Outgoing)
-  salePricePreGst?: string;
+  pricePreGst?: string;
   gstRateOutput?: string;
-  gstOutputAmount?: string;
-  postGstSaleAmount?: string;
-  // Labour Association
-  associatedLabourName?: string;
-  associatedLabourCode?: string;
-  workTime?: string;
+  // Labour Information
+  estimatedLabour?: string;
+  estimatedLabourWorkTime?: string; // Format like "0.3M"
   labourRate?: string;
   labourGstRate?: string;
-  labourGstAmount?: string;
-  labourPostGstAmount?: string;
+  labourPrice?: string;
+  // Calculated Totals
+  gstInput?: string;
+  totalPrice?: string;
+  totalGst?: string;
   // High Value Part
   highValuePart?: boolean;
-  partSerialNumber?: string;
   // Optional
   centerId?: string;
+  // Legacy fields for backward compatibility (deprecated)
+  status?: "In Stock" | "Low Stock" | "Out of Stock";
 }
 
 /**
  * Part Form Data for create/update
+ * Updated with new parameters from image
  */
 export interface PartFormData {
   partId?: string;
@@ -88,37 +87,32 @@ export interface PartFormData {
   description?: string;
   minStockLevel?: number;
   unit?: string;
-  // Extended fields
-  hsnCode?: string; // HSN Code
-  partCode?: string;
-  labourCode?: string; // Labour Code
-  status?: "In Stock" | "Low Stock" | "Out of Stock";
+  // New fields from image
+  oemPartNumber?: string;
+  originType?: string; // OLD/NEW
+  purchasePrice?: string;
   // Basic Part Info
   brandName?: string;
   variant?: string;
-  partType?: "NEW" | "OLD";
+  partType?: string; // PANEL, etc.
   color?: string;
-  // Purchase (Incoming)
-  preGstAmountToUs?: string;
+  // GST and Pricing
+  gstAmount?: string;
   gstRateInput?: string;
-  gstInputAmount?: string;
-  postGstAmountToUs?: string;
-  // Sale (Outgoing)
-  salePricePreGst?: string;
+  pricePreGst?: string;
   gstRateOutput?: string;
-  gstOutputAmount?: string;
-  postGstSaleAmount?: string;
-  // Labour Association
-  associatedLabourName?: string;
-  associatedLabourCode?: string;
-  workTime?: string;
+  // Labour Information
+  estimatedLabour?: string;
+  estimatedLabourWorkTime?: string; // Format like "0.3M"
   labourRate?: string;
   labourGstRate?: string;
-  labourGstAmount?: string;
-  labourPostGstAmount?: string;
+  labourPrice?: string;
+  // Calculated Totals
+  gstInput?: string;
+  totalPrice?: string;
+  totalGst?: string;
   // High Value Part
   highValuePart?: boolean;
-  partSerialNumber?: string;
   // Optional
   centerId?: string;
 }

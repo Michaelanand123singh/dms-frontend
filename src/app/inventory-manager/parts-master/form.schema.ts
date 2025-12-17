@@ -1,49 +1,43 @@
 /**
  * Parts Master Form Schema
  * Defines form structure, field definitions, and validation
+ * Updated with new parameters from image
  */
 
 export interface PartsMasterFormData {
-  partId: string;
+  // Basic Information
+  oemPartNumber: string;
   partName: string;
   partNumber: string;
-  hsnCode: string; // HSN Code
-  partCode: string;
-  labourCode: string; // Labour Code
+  originType: string; // OLD/NEW
   category: string;
-  quantity: string;
-  price: string;
-  status: "In Stock" | "Low Stock" | "Out of Stock";
+  purchasePrice: string;
   description: string;
-  minStockLevel: number;
+  minStock: number;
   unit: string;
   // Basic Part Info
   brandName: string;
   variant: string;
-  partType: "NEW" | "OLD";
+  partType: string; // PANEL, etc.
   color: string;
-  // Purchase (Incoming)
-  preGstAmountToUs: string;
-  gstRateInput: string;
-  gstInputAmount: string;
-  postGstAmountToUs: string;
-  // Sale (Outgoing)
-  salePricePreGst: string;
-  gstRateOutput: string;
-  gstOutputAmount: string;
-  postGstSaleAmount: string;
-  // Labour Association
-  associatedLabourName: string;
-  associatedLabourCode: string;
-  workTime: string;
+  // GST and Pricing
+  gstAmount: string; // Auto-calculated from purchase price and GST rate input
+  gstRateInput: string; // Percentage (e.g., 18%)
+  pricePreGst: string; // Sale price pre GST
+  gstRateOutput: string; // Percentage (e.g., 18%)
+  // Labour Information
+  estimatedLabour: string;
+  estimatedLabourWorkTime: string; // Format like "0.3M"
   labourRate: string;
-  labourGstRate: string;
-  labourGstAmount: string;
-  labourPostGstAmount: string;
+  labourGstRate: string; // Percentage
+  labourPrice: string; // Auto-calculated
+  // Calculated Totals
+  gstInput: string; // Auto-calculated
+  totalPrice: string; // Auto-calculated
+  totalGst: string; // Auto-calculated
   // High Value Part
   highValuePart: boolean;
-  partSerialNumber: string;
-  // Optional fields
+  // Optional
   centerId?: string;
 }
 
@@ -59,9 +53,9 @@ export type FieldSection =
   | "basic"
   | "serviceCenter"
   | "basicPartInfo"
-  | "purchase"
-  | "sale"
+  | "gstPricing"
   | "labour"
+  | "totals"
   | "highValue";
 
 export interface FormFieldDefinition {
@@ -97,8 +91,8 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
   
   // Basic Information Section
   {
-    name: "partId",
-    label: "Part ID",
+    name: "oemPartNumber",
+    label: "OEM PART NUMBER",
     type: "text",
     section: "basic",
     required: false,
@@ -108,7 +102,7 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     label: "Part Name",
     type: "text",
     section: "basic",
-    required: true, // Only partName is required
+    required: true,
   },
   {
     name: "partNumber",
@@ -118,50 +112,41 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     required: false,
   },
   {
-    name: "hsnCode",
-    label: "HSN Code",
-    type: "text",
+    name: "originType",
+    label: "ORIGIN TYPE",
+    type: "select",
     section: "basic",
     required: false,
-  },
-  {
-    name: "partCode",
-    label: "Part Code",
-    type: "text",
-    section: "basic",
-    placeholder: "Enter part code",
-  },
-  {
-    name: "labourCode",
-    label: "Labour Code",
-    type: "text",
-    section: "basic",
-    placeholder: "Enter labour code",
+    options: [
+      { value: "OLD", label: "OLD" },
+      { value: "NEW", label: "NEW" },
+    ],
   },
   {
     name: "category",
     label: "Category",
     type: "text",
     section: "basic",
+    required: false,
   },
   {
-    name: "quantity",
-    label: "Quantity",
+    name: "purchasePrice",
+    label: "PURCHASE PRICE",
     type: "number",
     section: "basic",
-    gridCols: 2,
+    step: "0.01",
+    required: false,
   },
   {
-    name: "price",
-    label: "Price",
-    type: "text",
+    name: "description",
+    label: "Description",
+    type: "textarea",
     section: "basic",
-    placeholder: "₹450",
-    gridCols: 2,
+    required: false,
   },
   {
-    name: "minStockLevel",
-    label: "Min Stock Level",
+    name: "minStock",
+    label: "Min Stock",
     type: "number",
     section: "basic",
     required: false,
@@ -172,23 +157,7 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     type: "text",
     section: "basic",
     required: false,
-  },
-  {
-    name: "description",
-    label: "Description",
-    type: "textarea",
-    section: "basic",
-  },
-  {
-    name: "status",
-    label: "Status",
-    type: "select",
-    section: "basic",
-    options: [
-      { value: "In Stock", label: "In Stock" },
-      { value: "Low Stock", label: "Low Stock" },
-      { value: "Out of Stock", label: "Out of Stock" },
-    ],
+    placeholder: "piece",
   },
 
   // Basic Part Info Section
@@ -197,119 +166,84 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     label: "Brand Name",
     type: "text",
     section: "basicPartInfo",
+    required: false,
   },
   {
     name: "variant",
     label: "Variant",
     type: "text",
     section: "basicPartInfo",
+    required: false,
   },
   {
     name: "partType",
     label: "Part Type",
-    type: "select",
+    type: "text",
     section: "basicPartInfo",
-    options: [
-      { value: "NEW", label: "NEW" },
-      { value: "OLD", label: "OLD" },
-    ],
-    gridCols: 2,
+    required: false,
+    placeholder: "PANEL",
   },
   {
     name: "color",
     label: "Color",
     type: "text",
     section: "basicPartInfo",
-    placeholder: "NA",
-    gridCols: 2,
+    required: false,
+    placeholder: "ANTHRACITE",
   },
 
-  // Purchase (Incoming) Section
+  // GST and Pricing Section
   {
-    name: "preGstAmountToUs",
-    label: "Pre GST Amount To Us",
-    type: "number",
-    section: "purchase",
-    step: "0.01",
+    name: "gstAmount",
+    label: "GST Amount",
+    type: "readonly",
+    section: "gstPricing",
+    autoCalculated: true,
+    helperText: "Auto-calculated from Purchase Price and GST Rate Input",
   },
   {
     name: "gstRateInput",
-    label: "GST Rate (Input)",
+    label: "GST Rate Input",
     type: "number",
-    section: "purchase",
+    section: "gstPricing",
     step: "0.01",
+    placeholder: "18",
+    helperText: "Enter as percentage (e.g., 18 for 18%)",
   },
   {
-    name: "gstInputAmount",
-    label: "GST Input Amount (auto-calculated)",
-    type: "readonly",
-    section: "purchase",
-    autoCalculated: true,
-    helperText: "Auto-calculated from Pre GST Amount and GST Rate",
-  },
-  {
-    name: "postGstAmountToUs",
-    label: "Post GST Amount To Us (auto-calculated)",
-    type: "readonly",
-    section: "purchase",
-    autoCalculated: true,
-    helperText: "Auto-calculated from Pre GST Amount and GST Input Amount",
-  },
-
-  // Sale (Outgoing) Section
-  {
-    name: "salePricePreGst",
-    label: "Sale Price (Pre GST)",
+    name: "pricePreGst",
+    label: "Price Pre GST",
     type: "number",
-    section: "sale",
+    section: "gstPricing",
     step: "0.01",
+    required: false,
   },
   {
     name: "gstRateOutput",
-    label: "GST Rate",
+    label: "GST Rate Output",
     type: "number",
-    section: "sale",
+    section: "gstPricing",
     step: "0.01",
-  },
-  {
-    name: "gstOutputAmount",
-    label: "GST Output Amount (auto-calculated)",
-    type: "readonly",
-    section: "sale",
-    autoCalculated: true,
-    helperText: "Auto-calculated from Sale Price and GST Rate",
-  },
-  {
-    name: "postGstSaleAmount",
-    label: "Post GST Sale Amount (auto-calculated)",
-    type: "readonly",
-    section: "sale",
-    autoCalculated: true,
-    helperText: "Auto-calculated from Sale Price and GST Output Amount",
+    placeholder: "18",
+    helperText: "Enter as percentage (e.g., 18 for 18%)",
   },
 
   // Labour Association Section
   {
-    name: "associatedLabourName",
-    label: "Associated Labour Name",
+    name: "estimatedLabour",
+    label: "Estimated Labour",
     type: "text",
     section: "labour",
-    gridCols: 2,
+    required: false,
   },
   {
-    name: "associatedLabourCode",
-    label: "Associated Labour Code",
+    name: "estimatedLabourWorkTime",
+    label: "Estimated Labour Work Time",
     type: "text",
     section: "labour",
-    gridCols: 2,
-  },
-  {
-    name: "workTime",
-    label: "Work Time (in Hours)",
-    type: "number",
-    section: "labour",
-    step: "0.01",
-    gridCols: 2,
+    required: false,
+    placeholder: "0.3M",
+    helperText: "Format: e.g., 0.3M for 0.3 minutes",
   },
   {
     name: "labourRate",
@@ -317,7 +251,7 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     type: "number",
     section: "labour",
     step: "0.01",
-    gridCols: 2,
+    required: false,
   },
   {
     name: "labourGstRate",
@@ -325,22 +259,42 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     type: "number",
     section: "labour",
     step: "0.01",
+    placeholder: "18",
+    helperText: "Enter as percentage (e.g., 18 for 18%)",
   },
   {
-    name: "labourGstAmount",
-    label: "Labour GST Amount (auto-calculated)",
+    name: "labourPrice",
+    label: "LABOUR PRICE",
     type: "readonly",
     section: "labour",
     autoCalculated: true,
     helperText: "Auto-calculated from Labour Rate and Labour GST Rate",
   },
+
+  // Totals Section (Auto-calculated)
   {
-    name: "labourPostGstAmount",
-    label: "Labour Post GST Amount (auto-calculated)",
+    name: "gstInput",
+    label: "GST INPUT",
     type: "readonly",
-    section: "labour",
+    section: "totals",
     autoCalculated: true,
-    helperText: "Auto-calculated from Labour Rate and Labour GST Amount",
+    helperText: "Auto-calculated GST on purchase",
+  },
+  {
+    name: "totalPrice",
+    label: "TOTAL PRICE",
+    type: "readonly",
+    section: "totals",
+    autoCalculated: true,
+    helperText: "Auto-calculated: Price Pre GST + Labour Price",
+  },
+  {
+    name: "totalGst",
+    label: "TOTAL GST",
+    type: "readonly",
+    section: "totals",
+    autoCalculated: true,
+    helperText: "Auto-calculated: GST Input + GST Output + Labour GST",
   },
 
   // High Value Part Section
@@ -350,26 +304,15 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     type: "checkbox",
     section: "highValue",
   },
-  {
-    name: "partSerialNumber",
-    label: "Part Serial Number",
-    type: "text",
-    section: "highValue",
-    required: false,
-    conditional: {
-      field: "highValuePart",
-      value: true,
-    },
-  },
 ];
 
 export const SECTION_LABELS: Record<FieldSection, string> = {
   basic: "Basic Information",
   serviceCenter: "Service Center",
   basicPartInfo: "Basic Part Info",
-  purchase: "Purchase (Incoming – To Us)",
-  sale: "Sale (Outgoing)",
+  gstPricing: "GST and Pricing",
   labour: "Labour Association",
+  totals: "Totals",
   highValue: "High Value Part",
 };
 
@@ -377,9 +320,9 @@ export const SECTION_ORDER: FieldSection[] = [
   "serviceCenter",
   "basic",
   "basicPartInfo",
-  "purchase",
-  "sale",
+  "gstPricing",
   "labour",
+  "totals",
   "highValue",
 ];
 
@@ -388,45 +331,37 @@ export const SECTION_ORDER: FieldSection[] = [
  */
 export function getInitialFormData(): PartsMasterFormData {
   return {
-    partId: "",
+    oemPartNumber: "",
     partName: "",
     partNumber: "",
-    hsnCode: "",
-    partCode: "",
-    labourCode: "",
+    originType: "NEW",
     category: "",
-    quantity: "",
-    price: "",
-    status: "In Stock",
+    purchasePrice: "",
     description: "",
-    minStockLevel: 0,
+    minStock: 0,
     unit: "piece",
     // Basic Part Info
     brandName: "",
     variant: "",
-    partType: "NEW",
-    color: "NA",
-    // Purchase (Incoming)
-    preGstAmountToUs: "",
+    partType: "",
+    color: "",
+    // GST and Pricing
+    gstAmount: "",
     gstRateInput: "",
-    gstInputAmount: "",
-    postGstAmountToUs: "",
-    // Sale (Outgoing)
-    salePricePreGst: "",
+    pricePreGst: "",
     gstRateOutput: "",
-    gstOutputAmount: "",
-    postGstSaleAmount: "",
-    // Labour Association
-    associatedLabourName: "",
-    associatedLabourCode: "",
-    workTime: "",
+    // Labour
+    estimatedLabour: "",
+    estimatedLabourWorkTime: "",
     labourRate: "",
     labourGstRate: "",
-    labourGstAmount: "",
-    labourPostGstAmount: "",
+    labourPrice: "",
+    // Totals
+    gstInput: "",
+    totalPrice: "",
+    totalGst: "",
     // High Value Part
     highValuePart: false,
-    partSerialNumber: "",
   };
 }
 
@@ -462,4 +397,3 @@ export function getFieldsGroupedBySection(
 
   return grouped as Record<FieldSection, FormFieldDefinition[]>;
 }
-

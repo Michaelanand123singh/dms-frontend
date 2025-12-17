@@ -1,6 +1,7 @@
 /**
  * Form Utility Functions
  * Helper functions for form data transformation
+ * Updated with new parameters from image
  */
 
 import type { Part, PartFormData } from "@/shared/types/inventory.types";
@@ -22,44 +23,40 @@ export function mapFormDataToPartFormData(formData: PartsMasterFormData): PartFo
     // partName is required
     partName: formData.partName?.trim() || "",
     // Optional basic fields - only include if they have data
-    ...(formData.partId?.trim() && { partId: formData.partId.trim() }),
     ...(formData.partNumber?.trim() && { partNumber: formData.partNumber.trim() }),
     ...(formData.category?.trim() && { category: formData.category.trim() }),
-    ...(formData.price && { price: typeof formData.price === 'string' ? parseFloat(formData.price) || 0 : (formData.price || 0) }),
+    // Calculate price from totalPrice if available, otherwise use purchasePrice
+    ...(formData.totalPrice && { price: parseFloat(formData.totalPrice) || 0 }),
+    ...((!formData.totalPrice && formData.purchasePrice) && { price: parseFloat(formData.purchasePrice) || 0 }),
     ...(getValueIfNotEmpty(formData.description) && { description: getValueIfNotEmpty(formData.description) }),
-    ...(formData.minStockLevel !== undefined && { minStockLevel: formData.minStockLevel }),
+    ...(formData.minStock !== undefined && formData.minStock !== null && { minStockLevel: formData.minStock }),
     ...(formData.unit?.trim() && { unit: formData.unit.trim() }),
-    // Extended fields - only include if they have data
-    ...(getValueIfNotEmpty(formData.hsnCode) && { hsnCode: getValueIfNotEmpty(formData.hsnCode) }),
-    ...(getValueIfNotEmpty(formData.partCode) && { partCode: getValueIfNotEmpty(formData.partCode) }),
-    ...(getValueIfNotEmpty(formData.labourCode) && { labourCode: getValueIfNotEmpty(formData.labourCode) }),
-    ...(formData.status && { status: formData.status }),
+    // New fields from image
+    ...(getValueIfNotEmpty(formData.oemPartNumber) && { oemPartNumber: getValueIfNotEmpty(formData.oemPartNumber) }),
+    ...(getValueIfNotEmpty(formData.originType) && { originType: getValueIfNotEmpty(formData.originType) }),
+    ...(getValueIfNotEmpty(formData.purchasePrice) && { purchasePrice: getValueIfNotEmpty(formData.purchasePrice) }),
     // Basic Part Info
     ...(getValueIfNotEmpty(formData.brandName) && { brandName: getValueIfNotEmpty(formData.brandName) }),
     ...(getValueIfNotEmpty(formData.variant) && { variant: getValueIfNotEmpty(formData.variant) }),
-    ...(formData.partType && { partType: formData.partType }),
+    ...(getValueIfNotEmpty(formData.partType) && { partType: getValueIfNotEmpty(formData.partType) }),
     ...(getValueIfNotEmpty(formData.color) && { color: getValueIfNotEmpty(formData.color) }),
-    // Purchase (Incoming)
-    ...(getValueIfNotEmpty(formData.preGstAmountToUs) && { preGstAmountToUs: getValueIfNotEmpty(formData.preGstAmountToUs) }),
+    // GST and Pricing
+    ...(getValueIfNotEmpty(formData.gstAmount) && { gstAmount: getValueIfNotEmpty(formData.gstAmount) }),
     ...(getValueIfNotEmpty(formData.gstRateInput) && { gstRateInput: getValueIfNotEmpty(formData.gstRateInput) }),
-    ...(getValueIfNotEmpty(formData.gstInputAmount) && { gstInputAmount: getValueIfNotEmpty(formData.gstInputAmount) }),
-    ...(getValueIfNotEmpty(formData.postGstAmountToUs) && { postGstAmountToUs: getValueIfNotEmpty(formData.postGstAmountToUs) }),
-    // Sale (Outgoing)
-    ...(getValueIfNotEmpty(formData.salePricePreGst) && { salePricePreGst: getValueIfNotEmpty(formData.salePricePreGst) }),
+    ...(getValueIfNotEmpty(formData.pricePreGst) && { pricePreGst: getValueIfNotEmpty(formData.pricePreGst) }),
     ...(getValueIfNotEmpty(formData.gstRateOutput) && { gstRateOutput: getValueIfNotEmpty(formData.gstRateOutput) }),
-    ...(getValueIfNotEmpty(formData.gstOutputAmount) && { gstOutputAmount: getValueIfNotEmpty(formData.gstOutputAmount) }),
-    ...(getValueIfNotEmpty(formData.postGstSaleAmount) && { postGstSaleAmount: getValueIfNotEmpty(formData.postGstSaleAmount) }),
-    // Labour Association
-    ...(getValueIfNotEmpty(formData.associatedLabourName) && { associatedLabourName: getValueIfNotEmpty(formData.associatedLabourName) }),
-    ...(getValueIfNotEmpty(formData.associatedLabourCode) && { associatedLabourCode: getValueIfNotEmpty(formData.associatedLabourCode) }),
-    ...(getValueIfNotEmpty(formData.workTime) && { workTime: getValueIfNotEmpty(formData.workTime) }),
+    // Labour Information
+    ...(getValueIfNotEmpty(formData.estimatedLabour) && { estimatedLabour: getValueIfNotEmpty(formData.estimatedLabour) }),
+    ...(getValueIfNotEmpty(formData.estimatedLabourWorkTime) && { estimatedLabourWorkTime: getValueIfNotEmpty(formData.estimatedLabourWorkTime) }),
     ...(getValueIfNotEmpty(formData.labourRate) && { labourRate: getValueIfNotEmpty(formData.labourRate) }),
     ...(getValueIfNotEmpty(formData.labourGstRate) && { labourGstRate: getValueIfNotEmpty(formData.labourGstRate) }),
-    ...(getValueIfNotEmpty(formData.labourGstAmount) && { labourGstAmount: getValueIfNotEmpty(formData.labourGstAmount) }),
-    ...(getValueIfNotEmpty(formData.labourPostGstAmount) && { labourPostGstAmount: getValueIfNotEmpty(formData.labourPostGstAmount) }),
+    ...(getValueIfNotEmpty(formData.labourPrice) && { labourPrice: getValueIfNotEmpty(formData.labourPrice) }),
+    // Calculated Totals
+    ...(getValueIfNotEmpty(formData.gstInput) && { gstInput: getValueIfNotEmpty(formData.gstInput) }),
+    ...(getValueIfNotEmpty(formData.totalPrice) && { totalPrice: getValueIfNotEmpty(formData.totalPrice) }),
+    ...(getValueIfNotEmpty(formData.totalGst) && { totalGst: getValueIfNotEmpty(formData.totalGst) }),
     // High Value Part
     ...(formData.highValuePart !== undefined && { highValuePart: formData.highValuePart }),
-    ...(getValueIfNotEmpty(formData.partSerialNumber) && { partSerialNumber: getValueIfNotEmpty(formData.partSerialNumber) }),
     // Optional
     ...(getValueIfNotEmpty(formData.centerId) && { centerId: getValueIfNotEmpty(formData.centerId) }),
   };
@@ -75,47 +72,39 @@ export function mapPartToFormData(part: Part): PartsMasterFormData {
   
   return {
     ...initialData,
-    partId: part.partId,
     partName: part.partName,
     partNumber: part.partNumber,
-    hsnCode: part.hsnCode || "",
-    partCode: part.partCode || "",
-    labourCode: part.labourCode || "",
     category: part.category,
-    quantity: String(part.stockQuantity || ""),
-    price: String(part.price || ""),
-    status: part.status || "In Stock",
     description: part.description || "",
-    minStockLevel: part.minStockLevel,
+    minStock: part.minStockLevel || 0,
     unit: part.unit,
+    // New fields from image
+    oemPartNumber: part.oemPartNumber || "",
+    originType: part.originType || "NEW",
+    purchasePrice: part.purchasePrice || "",
     // Basic Part Info
     brandName: part.brandName || "",
     variant: part.variant || "",
-    partType: part.partType || "NEW",
-    color: part.color || "NA",
-    // Purchase (Incoming)
-    preGstAmountToUs: part.preGstAmountToUs || "",
+    partType: part.partType || "",
+    color: part.color || "",
+    // GST and Pricing
+    gstAmount: part.gstAmount || "",
     gstRateInput: part.gstRateInput || "",
-    gstInputAmount: part.gstInputAmount || "",
-    postGstAmountToUs: part.postGstAmountToUs || "",
-    // Sale (Outgoing)
-    salePricePreGst: part.salePricePreGst || "",
+    pricePreGst: part.pricePreGst || "",
     gstRateOutput: part.gstRateOutput || "",
-    gstOutputAmount: part.gstOutputAmount || "",
-    postGstSaleAmount: part.postGstSaleAmount || "",
-    // Labour Association
-    associatedLabourName: part.associatedLabourName || "",
-    associatedLabourCode: part.associatedLabourCode || "",
-    workTime: part.workTime || "",
+    // Labour Information
+    estimatedLabour: part.estimatedLabour || "",
+    estimatedLabourWorkTime: part.estimatedLabourWorkTime || "",
     labourRate: part.labourRate || "",
     labourGstRate: part.labourGstRate || "",
-    labourGstAmount: part.labourGstAmount || "",
-    labourPostGstAmount: part.labourPostGstAmount || "",
+    labourPrice: part.labourPrice || "",
+    // Calculated Totals
+    gstInput: part.gstInput || "",
+    totalPrice: part.totalPrice || "",
+    totalGst: part.totalGst || "",
     // High Value Part
     highValuePart: part.highValuePart || false,
-    partSerialNumber: part.partSerialNumber || "",
     // Optional
     centerId: part.centerId,
   };
 }
-

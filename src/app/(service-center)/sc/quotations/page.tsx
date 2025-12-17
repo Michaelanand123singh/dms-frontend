@@ -539,19 +539,92 @@ const generateQuotationHTML = (
         <meta charset="UTF-8">
         <style>
           @media print {
-            body { margin: 0; }
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+            }
+            body {
+              padding: 10px 15px !important;
+              font-size: 12px !important;
+            }
             .no-print { display: none !important; }
+            @page {
+              margin: 0.8cm !important;
+              size: A4;
+            }
+            @page :first {
+              margin: 0.8cm !important;
+            }
+            .header {
+              padding-bottom: 10px !important;
+              margin-bottom: 12px !important;
+            }
+            .company-name {
+              font-size: 18px !important;
+            }
+            .document-type {
+              font-size: 20px !important;
+            }
+            .header-content {
+              margin-bottom: 8px !important;
+            }
+            .details-section {
+              margin: 12px 0 !important;
+            }
+            table {
+              font-size: 11px !important;
+              margin: 12px 0 !important;
+            }
+            th, td {
+              padding: 6px 4px !important;
+            }
+            .section-title {
+              font-size: 14px !important;
+              margin-bottom: 8px !important;
+              padding-bottom: 4px !important;
+            }
+            .details-grid {
+              gap: 8px !important;
+              font-size: 11px !important;
+            }
+            .pricing-summary {
+              margin-top: 12px !important;
+            }
+            .pricing-summary-table {
+              font-size: 12px !important;
+              margin-top: 8px !important;
+            }
+            .pricing-summary-table td {
+              padding: 6px 8px !important;
+              font-size: 12px !important;
+            }
+            .pricing-total-row td {
+              font-size: 14px !important;
+              padding-top: 8px !important;
+            }
+            .notes-section {
+              margin-top: 12px !important;
+              padding: 10px !important;
+              font-size: 11px !important;
+            }
           }
           body {
             font-family: Arial, sans-serif;
             padding: 20px;
             color: #1f2937;
-            line-height: 1.6;
+            line-height: 1.5;
+            font-size: 14px;
           }
           .header {
             border-bottom: 2px solid #374151;
-            padding-bottom: 20px;
-            margin-bottom: 24px;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
           }
           .header-content {
             display: flex;
@@ -577,23 +650,23 @@ const generateQuotationHTML = (
             margin-bottom: 12px;
           }
           .details-section {
-            margin: 24px 0;
+            margin: 16px 0;
           }
           .section-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
             border-bottom: 1px solid #e5e7eb;
           }
           .details-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            font-size: 14px;
+            gap: 12px;
+            font-size: 13px;
           }
           .detail-item {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
           }
           .detail-label {
             font-weight: 600;
@@ -602,31 +675,72 @@ const generateQuotationHTML = (
           table {
             width: 100%;
             border-collapse: collapse;
-            margin: 24px 0;
-            font-size: 14px;
+            margin: 16px 0;
+            font-size: 13px;
           }
           th {
             background-color: #f3f4f6;
             border: 1px solid #d1d5db;
-            padding: 12px 8px;
+            padding: 8px 6px;
             text-align: left;
             font-weight: 600;
             color: #374151;
+            font-size: 12px;
           }
           td {
             border: 1px solid #d1d5db;
-            padding: 10px 8px;
+            padding: 8px 6px;
+            font-size: 12px;
           }
           .pricing-summary {
-            max-width: 400px;
+            width: 100%;
             margin-left: auto;
             margin-top: 24px;
+            margin-right: 0;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .pricing-summary-table {
+            width: 100%;
+            max-width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            table-layout: fixed;
+          }
+          .pricing-summary-table td {
+            padding: 8px 10px;
+            border: none;
+            font-size: 13px;
+            vertical-align: middle;
+            white-space: nowrap;
+            overflow: visible;
+          }
+          .pricing-summary-table td:first-child {
+            text-align: left;
+            color: #374151;
+            font-weight: 500;
+            width: 65%;
+            padding-right: 15px;
+          }
+          .pricing-summary-table td:last-child {
+            text-align: right;
+            color: #111827;
+            font-weight: 500;
+            width: 35%;
+            white-space: nowrap;
+            padding-left: 15px;
           }
           .pricing-row {
             display: flex;
             justify-content: space-between;
             padding: 8px 0;
             font-size: 14px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            white-space: nowrap;
+          }
+          .pricing-row span {
+            white-space: nowrap;
           }
           .pricing-total {
             border-top: 2px solid #374151;
@@ -634,13 +748,60 @@ const generateQuotationHTML = (
             margin-top: 12px;
             font-size: 18px;
             font-weight: bold;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .pricing-total-row td {
+            border-top: 2px solid #374151;
+            padding-top: 10px;
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
           }
           .notes-section {
-            margin-top: 24px;
-            padding: 16px;
+            margin-top: 16px;
+            padding: 12px;
             background-color: #f9fafb;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13px;
+          }
+          @media print {
+            .pricing-summary {
+              max-width: 100% !important;
+              width: 100% !important;
+              margin-left: auto !important;
+              margin-right: 0 !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+            .pricing-summary-table {
+              width: 100% !important;
+              max-width: 100% !important;
+              table-layout: fixed !important;
+            }
+            .pricing-summary-table td {
+              white-space: nowrap !important;
+              overflow: visible !important;
+              padding: 10px 12px !important;
+            }
+            .pricing-summary-table td:first-child {
+              width: 65% !important;
+              text-align: left !important;
+              padding-right: 20px !important;
+            }
+            .pricing-summary-table td:last-child {
+              width: 35% !important;
+              text-align: right !important;
+              padding-left: 20px !important;
+            }
+            .pricing-row {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              white-space: nowrap !important;
+            }
+            .pricing-row span {
+              white-space: nowrap !important;
+            }
           }
         </style>
       </head>
@@ -727,42 +888,46 @@ const generateQuotationHTML = (
 
         <div class="pricing-summary">
           <h3 class="section-title">Pricing Summary</h3>
-          <div class="pricing-row">
-            <span>Subtotal:</span>
-            <span>₹${quotation.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-          </div>
-          ${quotation.discount > 0 ? `
-          <div class="pricing-row">
-            <span>Discount ${quotation.discountPercent > 0 ? `(${quotation.discountPercent.toFixed(1)}%)` : ""}:</span>
-            <span>-₹${quotation.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-          </div>
-          ` : ""}
-          <div class="pricing-row" style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 8px;">
-            <span>Pre-GST Amount:</span>
-            <span>₹${quotation.preGstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-          </div>
-          ${quotation.cgstAmount > 0 ? `
-          <div class="pricing-row">
-            <span>CGST (9%):</span>
-            <span>₹${quotation.cgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-          </div>
-          ` : ""}
-          ${quotation.sgstAmount > 0 ? `
-          <div class="pricing-row">
-            <span>SGST (9%):</span>
-            <span>₹${quotation.sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-          </div>
-          ` : ""}
-          ${quotation.igstAmount > 0 ? `
-          <div class="pricing-row">
-            <span>IGST (18%):</span>
-            <span>₹${quotation.igstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-          </div>
-          ` : ""}
-          <div class="pricing-row pricing-total">
-            <span>Total Amount:</span>
-            <span>₹${quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-          </div>
+          <table class="pricing-summary-table" style="width: 100%; table-layout: fixed;">
+            <tbody>
+              <tr>
+                <td style="width: 65%; text-align: left; padding-right: 15px; padding: 8px 10px;">Subtotal:</td>
+                <td style="width: 35%; text-align: right; padding-left: 15px; padding: 8px 10px; white-space: nowrap;">₹${quotation.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+              </tr>
+              ${quotation.discount > 0 ? `
+              <tr>
+                <td style="width: 65%; text-align: left; padding-right: 15px; padding: 8px 10px;">Discount ${quotation.discountPercent > 0 ? `(${quotation.discountPercent.toFixed(1)}%)` : ""}:</td>
+                <td style="width: 35%; text-align: right; padding-left: 15px; padding: 8px 10px; white-space: nowrap;">-₹${quotation.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+              </tr>
+              ` : ""}
+              <tr style="border-top: 1px solid #e5e7eb;">
+                <td style="width: 65%; text-align: left; padding-right: 15px; padding: 8px 10px; padding-top: 10px;">Pre-GST Amount:</td>
+                <td style="width: 35%; text-align: right; padding-left: 15px; padding: 8px 10px; padding-top: 10px; white-space: nowrap;">₹${quotation.preGstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+              </tr>
+              ${quotation.cgstAmount > 0 ? `
+              <tr>
+                <td style="width: 65%; text-align: left; padding-right: 15px; padding: 8px 10px;">CGST (9%):</td>
+                <td style="width: 35%; text-align: right; padding-left: 15px; padding: 8px 10px; white-space: nowrap;">₹${quotation.cgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+              </tr>
+              ` : ""}
+              ${quotation.sgstAmount > 0 ? `
+              <tr>
+                <td style="width: 65%; text-align: left; padding-right: 15px; padding: 8px 10px;">SGST (9%):</td>
+                <td style="width: 35%; text-align: right; padding-left: 15px; padding: 8px 10px; white-space: nowrap;">₹${quotation.sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+              </tr>
+              ` : ""}
+              ${quotation.igstAmount > 0 ? `
+              <tr>
+                <td style="width: 65%; text-align: left; padding-right: 15px; padding: 8px 10px;">IGST (18%):</td>
+                <td style="width: 35%; text-align: right; padding-left: 15px; padding: 8px 10px; white-space: nowrap;">₹${quotation.igstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+              </tr>
+              ` : ""}
+              <tr class="pricing-total-row">
+                <td style="width: 65%; text-align: left; padding-right: 15px; border-top: 2px solid #374151; padding-top: 10px; font-size: 16px; font-weight: bold;">Total Amount:</td>
+                <td style="width: 35%; text-align: right; padding-left: 15px; border-top: 2px solid #374151; padding-top: 10px; font-size: 16px; font-weight: bold; white-space: nowrap;">₹${quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         ${quotation.notes || quotation.customNotes ? `
@@ -2941,12 +3106,121 @@ function ViewQuotationModal({
         {/* Proforma Invoice Template */}
         <div className="p-8 bg-white">
           <style dangerouslySetInnerHTML={{__html: `
+            .pricing-summary-table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .pricing-summary-table td {
+              padding: 8px 12px;
+              white-space: nowrap;
+            }
+            .pricing-summary-table td:first-child {
+              text-align: left;
+            }
+            .pricing-summary-table td:last-child {
+              text-align: right;
+            }
             @media print {
+              * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+              }
               .no-print {
                 display: none !important;
               }
               body {
                 background: white !important;
+                margin: 0 !important;
+                padding: 10px 15px !important;
+                font-size: 12px !important;
+              }
+              @page {
+                margin: 0.8cm !important;
+                size: A4;
+              }
+              @page :first {
+                margin: 0.8cm !important;
+              }
+              .border-b-2 {
+                padding-bottom: 10px !important;
+                margin-bottom: 12px !important;
+              }
+              .mb-6 {
+                margin-bottom: 12px !important;
+              }
+              h3 {
+                font-size: 14px !important;
+                margin-bottom: 8px !important;
+              }
+              .text-xl {
+                font-size: 16px !important;
+              }
+              table {
+                font-size: 11px !important;
+                margin: 12px 0 !important;
+              }
+              th, td {
+                padding: 6px 4px !important;
+                font-size: 11px !important;
+              }
+              .text-lg {
+                font-size: 14px !important;
+              }
+              .text-sm {
+                font-size: 11px !important;
+              }
+              .grid {
+                gap: 8px !important;
+              }
+              .space-y-1 {
+                gap: 4px !important;
+              }
+              .pricing-summary-container {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                margin-bottom: 12px !important;
+              }
+              .pricing-summary-table {
+                width: 100% !important;
+                max-width: 100% !important;
+                table-layout: fixed !important;
+                font-size: 12px !important;
+              }
+              .pricing-summary-table td {
+                white-space: nowrap !important;
+                overflow: visible !important;
+                padding: 6px 8px !important;
+                font-size: 12px !important;
+              }
+              .pricing-summary-table td:first-child {
+                width: 65% !important;
+                text-align: left !important;
+                padding-right: 15px !important;
+              }
+              .pricing-summary-table td:last-child {
+                width: 35% !important;
+                text-align: right !important;
+                padding-left: 15px !important;
+              }
+              .pricing-summary-row {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              .border-t-2 {
+                padding-top: 8px !important;
+              }
+              .text-lg.font-bold {
+                font-size: 14px !important;
               }
             }
           `}} />
@@ -3188,63 +3462,67 @@ function ViewQuotationModal({
           </div>
 
           {/* Pricing Summary */}
-          <div className="mb-6">
+          <div className="mb-6 pricing-summary-container">
             <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-2">
               Pricing Summary
             </h3>
-            <div className="max-w-md ml-auto">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-700">Subtotal:</span>
-                  <span className="text-gray-900 font-medium">
-                    ₹{quotation.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700">
-                    Discount {quotation.discountPercent > 0 ? `(${quotation.discountPercent.toFixed(1)}%)` : ""}:
-                  </span>
-                  <span className="text-gray-900 font-medium">
-                    -₹{quotation.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex justify-between border-t border-gray-200 pt-2">
-                  <span className="text-gray-700">Pre-GST Amount:</span>
-                  <span className="text-gray-900 font-medium">
-                    ₹{quotation.preGstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                {quotation.cgstAmount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-700">CGST (9%):</span>
-                    <span className="text-gray-900 font-medium">
-                      ₹{quotation.cgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {quotation.sgstAmount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-700">SGST (9%):</span>
-                    <span className="text-gray-900 font-medium">
-                      ₹{quotation.sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {quotation.igstAmount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-700">IGST (18%):</span>
-                    <span className="text-gray-900 font-medium">
-                      ₹{quotation.igstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between border-t-2 border-gray-400 pt-2 mt-2">
-                  <span className="text-lg font-bold text-gray-900">Total Amount:</span>
-                  <span className="text-lg font-bold text-blue-600">
-                    ₹{quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
+            <div className="w-full">
+              <table className="w-full pricing-summary-table border-collapse" style={{ tableLayout: 'fixed' }}>
+                <tbody>
+                  <tr className="pricing-summary-row">
+                    <td className="text-gray-700 text-sm py-2 pr-4" style={{ width: '65%' }}>Subtotal:</td>
+                    <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ width: '35%', whiteSpace: 'nowrap' }}>
+                      ₹{quotation.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                  {quotation.discount > 0 && (
+                    <tr className="pricing-summary-row">
+                      <td className="text-gray-700 text-sm py-2 pr-4">
+                        Discount {quotation.discountPercent > 0 ? `(${quotation.discountPercent.toFixed(1)}%)` : ""}:
+                      </td>
+                      <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ whiteSpace: 'nowrap' }}>
+                        -₹{quotation.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="pricing-summary-row border-t border-gray-200">
+                    <td className="text-gray-700 text-sm py-2 pr-4 pt-3">Pre-GST Amount:</td>
+                    <td className="text-gray-900 font-medium text-sm py-2 pt-3 text-right" style={{ whiteSpace: 'nowrap' }}>
+                      ₹{quotation.preGstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                  {quotation.cgstAmount > 0 && (
+                    <tr className="pricing-summary-row">
+                      <td className="text-gray-700 text-sm py-2 pr-4">CGST (9%):</td>
+                      <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ whiteSpace: 'nowrap' }}>
+                        ₹{quotation.cgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  )}
+                  {quotation.sgstAmount > 0 && (
+                    <tr className="pricing-summary-row">
+                      <td className="text-gray-700 text-sm py-2 pr-4">SGST (9%):</td>
+                      <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ whiteSpace: 'nowrap' }}>
+                        ₹{quotation.sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  )}
+                  {quotation.igstAmount > 0 && (
+                    <tr className="pricing-summary-row">
+                      <td className="text-gray-700 text-sm py-2 pr-4">IGST (18%):</td>
+                      <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ whiteSpace: 'nowrap' }}>
+                        ₹{quotation.igstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="pricing-summary-row border-t-2 border-gray-400">
+                    <td className="text-lg font-bold text-gray-900 py-2 pt-3">Total Amount:</td>
+                    <td className="text-lg font-bold text-blue-600 py-2 pt-3 text-right" style={{ whiteSpace: 'nowrap' }}>
+                      ₹{quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 

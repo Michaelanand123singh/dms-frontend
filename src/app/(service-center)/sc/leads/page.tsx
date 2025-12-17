@@ -461,7 +461,7 @@ export default function Leads() {
 
       {/* Create/Edit Lead Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">
@@ -599,46 +599,270 @@ export default function Leads() {
       )}
 
       {/* View Lead Modal */}
-      {showViewModal && selectedLead && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Lead Details</h2>
-              <button onClick={() => { setShowViewModal(false); setSelectedLead(null); }} className="text-gray-400 hover:text-gray-600">
-                <XCircle size={24} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Customer Name</label>
-                  <div className="text-lg font-semibold">{selectedLead.customerName}</div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Phone</label>
-                  <div className="text-lg">{selectedLead.phone}</div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Email</label>
-                  <div className="text-lg">{selectedLead.email || "N/A"}</div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Status</label>
-                  <div className="text-lg">{selectedLead.status}</div>
-                </div>
-              </div>
-              <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => { setShowViewModal(false); setSelectedLead(null); }}
-                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+      {showViewModal && selectedLead && (() => {
+        // Try to fetch customer details if customerId exists
+        const customers = safeStorage.getItem<any[]>("customers", []);
+        const mockCustomers = safeStorage.getItem<any[]>("mockCustomers", []);
+        const allCustomers = [...customers, ...mockCustomers];
+        const customer = selectedLead.customerId 
+          ? allCustomers.find((c: any) => c.id?.toString() === selectedLead.customerId?.toString())
+          : null;
+
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-[101]">
+                <h2 className="text-2xl font-bold text-gray-900">Lead & Customer Details</h2>
+                <button 
+                  onClick={() => { setShowViewModal(false); setSelectedLead(null); }} 
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  Close
+                  <XCircle size={24} />
                 </button>
               </div>
-        </div>
-      </div>
-        </div>
-      )}
+              <div className="p-6 space-y-6">
+                {/* Customer Information Section */}
+                <div className="bg-gray-50 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <User size={20} />
+                    Customer Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 block mb-1">Customer Name</label>
+                      <div className="text-base font-semibold text-gray-900">{selectedLead.customerName}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 block mb-1">Phone Number</label>
+                      <div className="text-base text-gray-900 flex items-center gap-2">
+                        <Phone size={16} className="text-gray-400" />
+                        {selectedLead.phone}
+                      </div>
+                    </div>
+                    {selectedLead.email && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 block mb-1">Email Address</label>
+                        <div className="text-base text-gray-900 flex items-center gap-2">
+                          <Mail size={16} className="text-gray-400" />
+                          {selectedLead.email}
+                        </div>
+                      </div>
+                    )}
+                    {customer && (
+                      <>
+                        {customer.address && (
+                          <div className="md:col-span-2">
+                            <label className="text-sm font-medium text-gray-500 block mb-1">Address</label>
+                            <div className="text-base text-gray-900">{customer.address}</div>
+                            {customer.cityState && (
+                              <div className="text-sm text-gray-600 mt-1">{customer.cityState}</div>
+                            )}
+                            {customer.pincode && (
+                              <div className="text-sm text-gray-600">{customer.pincode}</div>
+                            )}
+                          </div>
+                        )}
+                        {customer.customerNumber && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-500 block mb-1">Customer Number</label>
+                            <div className="text-base text-gray-900">{customer.customerNumber}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vehicle Information Section */}
+                {(selectedLead.vehicleMake || selectedLead.vehicleModel || customer?.vehicles) && (
+                  <div className="bg-gray-50 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Car size={20} />
+                      Vehicle Information
+                    </h3>
+                    {customer?.vehicles && customer.vehicles.length > 0 ? (
+                      <div className="space-y-3">
+                        {customer.vehicles.map((vehicle: any, index: number) => (
+                          <div key={vehicle.id || index} className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {vehicle.registration && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500 block mb-1">Registration Number</label>
+                                  <div className="text-base font-semibold text-gray-900">{vehicle.registration}</div>
+                                </div>
+                              )}
+                              {(vehicle.make || vehicle.model) && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500 block mb-1">Make & Model</label>
+                                  <div className="text-base text-gray-900">
+                                    {vehicle.make} {vehicle.model}
+                                  </div>
+                                </div>
+                              )}
+                              {vehicle.year && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500 block mb-1">Year</label>
+                                  <div className="text-base text-gray-900">{vehicle.year}</div>
+                                </div>
+                              )}
+                              {vehicle.vin && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500 block mb-1">VIN</label>
+                                  <div className="text-base text-gray-900 font-mono text-sm">{vehicle.vin}</div>
+                                </div>
+                              )}
+                              {vehicle.color && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500 block mb-1">Color</label>
+                                  <div className="text-base text-gray-900">{vehicle.color}</div>
+                                </div>
+                              )}
+                              {vehicle.fuelType && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500 block mb-1">Fuel Type</label>
+                                  <div className="text-base text-gray-900">{vehicle.fuelType}</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (selectedLead.vehicleMake || selectedLead.vehicleModel) ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedLead.vehicleMake && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-500 block mb-1">Vehicle Make</label>
+                            <div className="text-base text-gray-900">{selectedLead.vehicleMake}</div>
+                          </div>
+                        )}
+                        {selectedLead.vehicleModel && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-500 block mb-1">Vehicle Model</label>
+                            <div className="text-base text-gray-900">{selectedLead.vehicleModel}</div>
+                          </div>
+                        )}
+                        {selectedLead.vehicleDetails && (
+                          <div className="md:col-span-2">
+                            <label className="text-sm font-medium text-gray-500 block mb-1">Vehicle Details</label>
+                            <div className="text-base text-gray-900">{selectedLead.vehicleDetails}</div>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
+                {/* Lead Information Section */}
+                <div className="bg-gray-50 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <FileText size={20} />
+                    Lead Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 block mb-1">Status</label>
+                      <div>
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(selectedLead.status)}`}>
+                          {selectedLead.status === "job_card_in_progress" 
+                            ? "Job Card In Progress"
+                            : selectedLead.status.charAt(0).toUpperCase() + selectedLead.status.slice(1).replace(/_/g, " ")}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 block mb-1">Inquiry Type</label>
+                      <div className="text-base text-gray-900">{selectedLead.inquiryType}</div>
+                    </div>
+                    {selectedLead.serviceType && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 block mb-1">Service Type</label>
+                        <div className="text-base text-gray-900">{selectedLead.serviceType}</div>
+                      </div>
+                    )}
+                    {selectedLead.source && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 block mb-1">Source</label>
+                        <div className="text-base text-gray-900 capitalize">{selectedLead.source.replace(/_/g, " ")}</div>
+                      </div>
+                    )}
+                    {selectedLead.followUpDate && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 block mb-1 flex items-center gap-2">
+                          <Calendar size={16} />
+                          Follow Up Date
+                        </label>
+                        <div className="text-base text-gray-900">
+                          {new Date(selectedLead.followUpDate).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {selectedLead.convertedTo && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 block mb-1">Converted To</label>
+                        <div className="text-base text-gray-900 capitalize">{selectedLead.convertedTo.replace(/_/g, " ")}</div>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 block mb-1 flex items-center gap-2">
+                        <Clock size={16} />
+                        Created At
+                      </label>
+                      <div className="text-base text-gray-900">
+                        {new Date(selectedLead.createdAt).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 block mb-1 flex items-center gap-2">
+                        <Clock size={16} />
+                        Last Updated
+                      </label>
+                      <div className="text-base text-gray-900">
+                        {new Date(selectedLead.updatedAt).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes Section */}
+                {selectedLead.notes && (
+                  <div className="bg-gray-50 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Notes</h3>
+                    <div className="text-base text-gray-700 whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200">
+                      {selectedLead.notes}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => { setShowViewModal(false); setSelectedLead(null); }}
+                    className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

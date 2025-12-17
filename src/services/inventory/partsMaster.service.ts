@@ -29,45 +29,51 @@ function mapPartFormDataToPart(data: PartFormData, id: string): Part {
   const partNumber = data.partNumber?.trim() || "";
   const category = data.category?.trim() || "";
   
+  // Calculate price from totalPrice if available, otherwise use purchasePrice or default
+  const calculatedPrice = data.totalPrice 
+    ? parseFloat(data.totalPrice) 
+    : (data.price || (data.purchasePrice ? parseFloat(data.purchasePrice) : 0));
+
   const part: Part = {
     id,
     partId, // Always set (auto-generated if not provided)
     partName: data.partName.trim(),
     partNumber, // Always set (empty string if not provided)
     category, // Always set (empty string if not provided)
-    price: data.price || 0,
+    price: calculatedPrice,
     stockQuantity: 0,
     minStockLevel: data.minStockLevel || 0,
     unit: data.unit || "piece",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    // Include all extended fields from data (only if they have values)
-    ...(data.hsnCode && { hsnCode: data.hsnCode }),
-    ...(data.partCode && { partCode: data.partCode }),
-    ...(data.labourCode && { labourCode: data.labourCode }),
-    ...(data.status && { status: data.status }),
+    // New fields from image
+    ...(data.oemPartNumber && { oemPartNumber: data.oemPartNumber }),
+    ...(data.originType && { originType: data.originType }),
+    ...(data.purchasePrice && { purchasePrice: data.purchasePrice }),
     ...(data.description && { description: data.description }),
+    // Basic Part Info
     ...(data.brandName && { brandName: data.brandName }),
     ...(data.variant && { variant: data.variant }),
     ...(data.partType && { partType: data.partType }),
     ...(data.color && { color: data.color }),
-    ...(data.preGstAmountToUs && { preGstAmountToUs: data.preGstAmountToUs }),
+    // GST and Pricing
+    ...(data.gstAmount && { gstAmount: data.gstAmount }),
     ...(data.gstRateInput && { gstRateInput: data.gstRateInput }),
-    ...(data.gstInputAmount && { gstInputAmount: data.gstInputAmount }),
-    ...(data.postGstAmountToUs && { postGstAmountToUs: data.postGstAmountToUs }),
-    ...(data.salePricePreGst && { salePricePreGst: data.salePricePreGst }),
+    ...(data.pricePreGst && { pricePreGst: data.pricePreGst }),
     ...(data.gstRateOutput && { gstRateOutput: data.gstRateOutput }),
-    ...(data.gstOutputAmount && { gstOutputAmount: data.gstOutputAmount }),
-    ...(data.postGstSaleAmount && { postGstSaleAmount: data.postGstSaleAmount }),
-    ...(data.associatedLabourName && { associatedLabourName: data.associatedLabourName }),
-    ...(data.associatedLabourCode && { associatedLabourCode: data.associatedLabourCode }),
-    ...(data.workTime && { workTime: data.workTime }),
+    // Labour Information
+    ...(data.estimatedLabour && { estimatedLabour: data.estimatedLabour }),
+    ...(data.estimatedLabourWorkTime && { estimatedLabourWorkTime: data.estimatedLabourWorkTime }),
     ...(data.labourRate && { labourRate: data.labourRate }),
     ...(data.labourGstRate && { labourGstRate: data.labourGstRate }),
-    ...(data.labourGstAmount && { labourGstAmount: data.labourGstAmount }),
-    ...(data.labourPostGstAmount && { labourPostGstAmount: data.labourPostGstAmount }),
+    ...(data.labourPrice && { labourPrice: data.labourPrice }),
+    // Calculated Totals
+    ...(data.gstInput && { gstInput: data.gstInput }),
+    ...(data.totalPrice && { totalPrice: data.totalPrice }),
+    ...(data.totalGst && { totalGst: data.totalGst }),
+    // High Value Part
     ...(data.highValuePart !== undefined && { highValuePart: data.highValuePart }),
-    ...(data.partSerialNumber && { partSerialNumber: data.partSerialNumber }),
+    // Optional
     ...(data.centerId && { centerId: data.centerId }),
   };
   

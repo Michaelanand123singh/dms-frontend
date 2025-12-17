@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { defaultServiceCenters, vehiclesData, serviceRequestsData, partRequestsData, serviceCenterInventoryData, jobsData, serviceHistoryData, getServiceHistoryByVehicleId } from "@/__mocks__/data";
+import { defaultServiceCenters, vehiclesData, serviceRequestsData, partRequestsData, jobsData, serviceHistoryData, getServiceHistoryByVehicleId } from "@/__mocks__/data";
+import { getServiceCenterInventoryData, initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import {
   BarChart3,
   Search,
@@ -139,7 +140,7 @@ export default function ServiceCenterDetailPage() {
   });
   
   const [partRequests, setPartRequests] = useState(partRequestsData);
-  const [inventory, setInventory] = useState(serviceCenterInventoryData);
+  const [inventory, setInventory] = useState(getServiceCenterInventoryData());
   const [jobs, setJobs] = useState(jobsData);
   const [invoices, setInvoices] = useState(invoicesData);
   
@@ -160,7 +161,7 @@ export default function ServiceCenterDetailPage() {
     discount: "0",
     customerName: "",
     customerPhone: "",
-    items: serviceCenterInventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
+    items: getServiceCenterInventoryData().map((item) => ({ ...item, selectedQuantity: 0 })),
     paymentMethod: "Cash",
   });
   
@@ -226,7 +227,7 @@ export default function ServiceCenterDetailPage() {
   const [otcOrderForm, setOtcOrderForm] = useState({
     customerName: "",
     customerPhone: "",
-    items: serviceCenterInventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
+    items: getServiceCenterInventoryData().map((item) => ({ ...item, selectedQuantity: 0 })),
     paymentMethod: "Cash",
   });
 
@@ -1882,7 +1883,7 @@ export default function ServiceCenterDetailPage() {
                       discount: "0",
                       customerName: "",
                       customerPhone: "",
-                      items: serviceCenterInventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
+                      items: getServiceCenterInventoryData().map((item) => ({ ...item, selectedQuantity: 0 })),
                       paymentMethod: "Cash",
                     });
                   }}
@@ -2251,7 +2252,7 @@ export default function ServiceCenterDetailPage() {
                     setOtcOrderForm({
                       customerName: "",
                       customerPhone: "",
-                      items: serviceCenterInventoryData.map((item) => ({ ...item, selectedQuantity: 0 })),
+                      items: getServiceCenterInventoryData().map((item) => ({ ...item, selectedQuantity: 0 })),
                       paymentMethod: "Cash",
                     });
                   }}
