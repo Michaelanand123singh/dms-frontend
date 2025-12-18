@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Building, Package } from "lucide-react";
+import { ArrowLeft, Building } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { useToast } from "@/contexts/ToastContext";
 import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
@@ -60,7 +60,9 @@ export default function StockIssuePage() {
   const handleSubmit = async (formData: PartsIssueFormData) => {
     setIsSubmitting(true);
     try {
-      const userInfo = JSON.parse(localStorage.getItem("userInfo") || '{"name": "Central Inventory Manager"}');
+      const userInfo = typeof window !== "undefined" 
+        ? JSON.parse(localStorage.getItem("userInfo") || '{"name": "Central Inventory Manager"}')
+        : { name: "Central Inventory Manager" };
       // Create parts issue request (pending admin approval)
       const request = await adminApprovalService.createPartsIssueRequest(
         formData,

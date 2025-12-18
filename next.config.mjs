@@ -18,6 +18,9 @@ const nextConfig = {
   // Production source maps (optional - disable for smaller bundle)
   productionBrowserSourceMaps: false,
   
+  // Set outputFileTracingRoot to avoid workspace root warning
+  outputFileTracingRoot: process.cwd(),
+  
   // Experimental features for better performance
   // Note: optimizeCss requires 'critters' package - disabled to avoid build errors
   // experimental: {
