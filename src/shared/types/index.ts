@@ -1,5 +1,6 @@
 // Common types
 export * from './common.types';
+export * from './identity.types';
 
 // Auth types
 export * from './auth.types';

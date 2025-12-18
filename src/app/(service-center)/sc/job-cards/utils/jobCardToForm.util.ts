@@ -4,7 +4,7 @@
  */
 
 import type { JobCard } from "@/shared/types/job-card.types";
-import type { CreateJobCardForm } from "../../components/job-cards/JobCardFormModal";
+import type { CreateJobCardForm } from "@/features/job-cards/types/job-card.types";
 
 interface DocumentationFiles {
   files: File[];
@@ -109,7 +109,7 @@ export function jobCardToFormInitialValues(jobCard: JobCard): Partial<CreateJobC
     ),
     selectedParts: jobCard.parts || [],
     part2Items: jobCard.part2 || [],
-    
+
     // PART 1 fields with comprehensive fallbacks
     fullName: getValue("", jobCard.part1?.fullName, jobCard.customerName),
     // mobilePrimary: Try part1 first, then check if we can extract from other sources
@@ -146,23 +146,23 @@ export function jobCardToFormInitialValues(jobCard: JobCard): Partial<CreateJobC
     mcuSerialNumber: getValue("", jobCard.part1?.mcuSerialNumber),
     vcuSerialNumber: getValue("", jobCard.part1?.vcuSerialNumber),
     otherPartSerialNumber: getValue("", jobCard.part1?.otherPartSerialNumber),
-    
+
     // Additional Customer Contact Fields - direct from JobCard
     whatsappNumber: jobCard.customerWhatsappNumber || "",
     alternateMobile: jobCard.customerAlternateMobile || "",
     email: jobCard.customerEmail || "",
-    
+
     // Additional Vehicle Details - direct from JobCard
     vehicleYear: jobCard.vehicleYear,
     motorNumber: jobCard.motorNumber || "",
     chargerSerialNumber: jobCard.chargerSerialNumber || "",
     dateOfPurchase: jobCard.dateOfPurchase || "",
     vehicleColor: jobCard.vehicleColor || "",
-    
+
     // Additional Service Details - direct from JobCard
     previousServiceHistory: jobCard.previousServiceHistory || "",
     odometerReading: jobCard.odometerReading || "",
-    
+
     // Operational Fields - Use nullish coalescing for boolean to handle false values correctly
     pickupDropRequired: jobCard.pickupDropRequired ?? false,
     pickupAddress: jobCard.pickupAddress || "",
@@ -174,14 +174,14 @@ export function jobCardToFormInitialValues(jobCard: JobCard): Partial<CreateJobC
     dropCity: jobCard.dropCity || "",
     dropPincode: jobCard.dropPincode || "",
     preferredCommunicationMode: jobCard.preferredCommunicationMode,
-    
+
     // Check-in Fields - direct from JobCard
     arrivalMode: jobCard.arrivalMode,
     checkInNotes: jobCard.checkInNotes || "",
     checkInSlipNumber: jobCard.checkInSlipNumber || "",
     checkInDate: jobCard.checkInDate || "",
     checkInTime: jobCard.checkInTime || "",
-    
+
     // PART 2A fields from jobCard.part2A
     videoEvidence: convertPart2AFieldToDocFiles(jobCard.part2A?.videoEvidence),
     vinImage: convertPart2AFieldToDocFiles(jobCard.part2A?.vinImage),
@@ -205,7 +205,7 @@ export function jobCardToFormInitialValues(jobCard: JobCard): Partial<CreateJobC
     if (!formValues.email) missingFields.push("email");
     if (!formValues.vehicleRegistration) missingFields.push("vehicleRegistration");
     if (!formValues.vehicleYear) missingFields.push("vehicleYear");
-    
+
     if (missingFields.length > 0) {
       console.warn(`[JobCardToForm] Missing fields in JobCard ${jobCard.id || jobCard.jobCardNumber}:`, missingFields);
     }

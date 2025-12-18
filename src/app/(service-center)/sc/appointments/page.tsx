@@ -27,7 +27,9 @@ import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
 import { populateJobCardPart1, createEmptyJobCardPart1 } from "@/shared/utils/jobCardData.util";
+import { generateJobCardNumber } from "@/shared/utils/job-card.utils";
 import { customerService } from "@/features/customers/services/customer.service";
+import { jobCardService } from "@/features/job-cards/services/jobCard.service";
 import { AppointmentFormModal } from "../components/appointment/AppointmentFormModal";
 import type { AppointmentForm as AppointmentFormType } from "../components/appointment/types";
 import { getInitialAppointmentForm, formatTime } from "../components/appointment/utils";
@@ -49,24 +51,7 @@ const deriveServiceCenterCode = (serviceCenterName?: string | null): string => {
   return serviceCenterName.replace(/\s+/g, "").substring(0, 5).toUpperCase();
 };
 
-const generateJobCardNumber = (serviceCenterCode: string, existing: JobCard[]): string => {
-  const now = new Date();
-  const year = now.getFullYear().toString();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
 
-  const sequences = existing
-    .map((card) => {
-      const parts = card.jobCardNumber?.split("-");
-      if (parts && parts[0] === serviceCenterCode && parts[1] === year && parts[2] === month && parts[3]) {
-        return Number(parts[3]);
-      }
-      return 0;
-    })
-    .filter((seq) => !isNaN(seq));
-
-  const nextSequence = sequences.length > 0 ? Math.max(...sequences) + 1 : 1;
-  return `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
-};
 
 
 
@@ -272,7 +257,7 @@ function AppointmentsContent() {
   // Update customer/vehicle for appointment form when search completes
   useEffect(() => {
     if (!selectedAppointment || !showAppointmentFormModal) return;
-    
+
     const customer = customerSearchResults.find(
       (c) => c.phone === selectedAppointment.phone
     ) || null;
@@ -282,7 +267,7 @@ function AppointmentsContent() {
         const vehicleString = formatVehicleString(v);
         return vehicleString === selectedAppointment.vehicle;
       }) || customer.vehicles?.[0] || null;
-      
+
       setSelectedAppointmentCustomer(customer);
       setSelectedAppointmentVehicle(vehicle);
     } else {
@@ -342,7 +327,7 @@ function AppointmentsContent() {
       const updatedAppointments = appointments.filter((apt) => apt.id !== id);
       setAppointments(updatedAppointments);
       safeStorage.setItem("appointments", updatedAppointments);
-      
+
       // Close any open modals
       closeDetailModal();
       // Close appointment form modal if open
@@ -352,7 +337,7 @@ function AppointmentsContent() {
       setSelectedAppointmentVehicle(null);
       setAppointmentFormData(getInitialAppointmentForm());
       clearAppointmentCustomerSearch();
-      
+
       showToast(
         appointmentToDelete
           ? `Appointment for ${appointmentToDelete.customerName} deleted successfully!`
@@ -439,19 +424,7 @@ function AppointmentsContent() {
 
     // Get next sequence number
     const existingJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-    const lastJobCard = existingJobCards
-      .filter((jc) => jc.jobCardNumber?.startsWith(`${serviceCenterCode}-${year}-${month}`))
-      .sort((a, b) => {
-        const aSeq = parseInt(a.jobCardNumber?.split("-")[3] || "0");
-        const bSeq = parseInt(b.jobCardNumber?.split("-")[3] || "0");
-        return bSeq - aSeq;
-      })[0];
-
-    const nextSequence = lastJobCard
-      ? parseInt(lastJobCard.jobCardNumber?.split("-")[3] || "0") + 1
-      : 1;
-
-    const jobCardNumber = `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
+    const jobCardNumber = generateJobCardNumber(serviceCenterId, existingJobCards);
 
     // Extract vehicle details from appointment vehicle string (format: "Make Model (Year)")
     const vehicleParts = appointment.vehicle.match(/^(.+?)\s+(.+?)\s+\((\d+)\)$/);
@@ -509,7 +482,7 @@ function AppointmentsContent() {
     part1.customerType = (appointment.customerType || part1.customerType) as "B2C" | "B2B" | "";
     part1.customerFeedback = appointment.customerComplaintIssue || part1.customerFeedback;
     part1.estimatedDeliveryDate = appointment.estimatedDeliveryDate || part1.estimatedDeliveryDate;
-    
+
     // Build full customer address with city/state/pincode
     const fullAddress = [
       appointment.address,
@@ -517,30 +490,30 @@ function AppointmentsContent() {
       appointment.pincode
     ].filter(Boolean).join(", ");
     part1.customerAddress = fullAddress || part1.customerAddress;
-    
+
     // Append previous service history to customer feedback if available
     if (appointment.previousServiceHistory) {
       const existingFeedback = part1.customerFeedback || "";
       const serviceHistory = `Previous Service History: ${appointment.previousServiceHistory}`;
-      part1.customerFeedback = existingFeedback 
+      part1.customerFeedback = existingFeedback
         ? `${existingFeedback}\n\n${serviceHistory}`
         : serviceHistory;
     }
-    
+
     // Vehicle fields from appointment
     part1.vehicleBrand = appointment.vehicleBrand || vehicleMake || part1.vehicleBrand;
     part1.vehicleModel = appointment.vehicleModel || vehicleModel || part1.vehicleModel;
     part1.registrationNumber = appointment.registrationNumber || part1.registrationNumber;
     part1.vinChassisNumber = appointment.vinChassisNumber || part1.vinChassisNumber;
     part1.variantBatteryCapacity = appointment.variantBatteryCapacity || part1.variantBatteryCapacity;
-    
+
     // Warranty and insurance fields from appointment
     part1.warrantyStatus = appointment.warrantyStatus || part1.warrantyStatus;
     part1.technicianObservation = appointment.technicianObservation || part1.technicianObservation;
     part1.insuranceStartDate = appointment.insuranceStartDate || part1.insuranceStartDate;
     part1.insuranceEndDate = appointment.insuranceEndDate || part1.insuranceEndDate;
     part1.insuranceCompanyName = appointment.insuranceCompanyName || part1.insuranceCompanyName;
-    
+
     // Serial numbers from appointment
     part1.batterySerialNumber = appointment.batterySerialNumber || part1.batterySerialNumber;
     part1.mcuSerialNumber = appointment.mcuSerialNumber || part1.mcuSerialNumber;
@@ -677,9 +650,8 @@ function AppointmentsContent() {
       console.groupEnd();
     }
 
-    // Save job card
-    const updatedJobCards = [...existingJobCards, newJobCard];
-    safeStorage.setItem("jobCards", updatedJobCards);
+    // Save job card using service (auto-normalizes)
+    await jobCardService.create(newJobCard);
     setCurrentJobCardId(newJobCard.id);
 
     return newJobCard;
@@ -776,17 +748,17 @@ function AppointmentsContent() {
       return;
     }
 
-      // Ensure job card exists
-      if (!currentJobCardId) {
-        showToast("Please wait for job card to be created first.", "error");
-        return;
-      }
+    // Ensure job card exists
+    if (!currentJobCardId) {
+      showToast("Please wait for job card to be created first.", "error");
+      return;
+    }
 
-      // Generate check-in slip data
-      const slipData = generateCheckInSlipData();
-      if (slipData) {
-        setCheckInSlipData(slipData);
-        setShowCheckInSlipModal(true);
+    // Generate check-in slip data
+    const slipData = generateCheckInSlipData();
+    if (slipData) {
+      setCheckInSlipData(slipData);
+      setShowCheckInSlipModal(true);
       showToast("Check-in slip generated successfully.", "success");
     }
   }, [selectedAppointment, currentJobCardId, generateCheckInSlipData, showToast]);
@@ -954,8 +926,8 @@ function AppointmentsContent() {
     } else {
       // Create new appointment
       const newAppointment: AppointmentRecord = {
-        id: existingAppointments.length > 0 
-          ? Math.max(...existingAppointments.map((a: any) => a.id)) + 1 
+        id: existingAppointments.length > 0
+          ? Math.max(...existingAppointments.map((a: any) => a.id)) + 1
           : 1,
         ...appointmentData,
       };
@@ -1034,7 +1006,7 @@ function AppointmentsContent() {
       const { migrateAllJobCards } = require("../job-cards/utils/migrateJobCards.util");
       const jobCards: JobCard[] = migrateAllJobCards();
       const jobCard = jobCards.find((card: JobCard) => card.sourceAppointmentId === appointmentId);
-      
+
       if (jobCard) {
         router.push(`/sc/job-cards/${jobCard.id}`);
       } else {

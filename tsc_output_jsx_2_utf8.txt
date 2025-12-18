@@ -1,0 +1,51 @@
+﻿src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(6,57): error TS2307: Cannot find module '@/shared/types' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(7,32): error TS2307: Cannot find module '@/__mocks__/data/job-cards.mock' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(8,41): error TS2307: Cannot find module '@/shared/lib/serviceCenter' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(9,45): error TS2307: Cannot find module '@/shared/lib/localStorage' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(10,47): error TS2307: Cannot find module '@/shared/utils/jobCardPartsRequest.util' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(11,116): error TS2307: Cannot find module '@/shared/utils/jobCardData.util' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(12,33): error TS2307: Cannot find module '@/features/customers/services/customer.service' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(13,54): error TS2307: Cannot find module '@/shared/types/job-card.types' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(14,43): error TS2307: Cannot find module '@/shared/types' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(15,32): error TS2307: Cannot find module '@/shared/types/quotation.types' or its corresponding type declarations.
+src/app/(service-center)/sc/components/job-cards/JobCardFormModal.tsx(16,78): error TS2307: Cannot find module '@/components/check-in-slip/CheckInSlip' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/components/AssignEngineerModal.tsx(1,8): error TS1259: Module '"D:/DMS/dms-frontend/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+src/app/(service-center)/sc/job-cards/components/AssignEngineerModal.tsx(3,26): error TS2307: Cannot find module '@/__mocks__/data/job-cards.mock' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/components/JobCardKanban.tsx(1,8): error TS1259: Module '"D:/DMS/dms-frontend/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+src/app/(service-center)/sc/job-cards/components/JobCardKanban.tsx(3,64): error TS2307: Cannot find module '@/shared/types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/components/JobCardList.tsx(1,8): error TS1259: Module '"D:/DMS/dms-frontend/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+src/app/(service-center)/sc/job-cards/components/JobCardList.tsx(3,40): error TS2307: Cannot find module '@/shared/types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/components/PartsRequestModal.tsx(1,8): error TS1259: Module '"D:/DMS/dms-frontend/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+src/app/(service-center)/sc/job-cards/components/PartsRequestModal.tsx(3,25): error TS2307: Cannot find module '@/shared/types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/components/PartsRequestModal.tsx(4,34): error TS2307: Cannot find module '@/shared/types/job-card.types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/components/PartsRequestModal.tsx(5,36): error TS2307: Cannot find module '@/features/inventory/services/partsMaster.service' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/components/StatusUpdateModal.tsx(1,8): error TS1259: Module '"D:/DMS/dms-frontend/node_modules/@types/react/index"' can only be default-imported using the 'esModuleInterop' flag
+src/app/(service-center)/sc/job-cards/components/StatusUpdateModal.tsx(3,31): error TS2307: Cannot find module '@/shared/types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(2,45): error TS2307: Cannot find module '@/shared/lib/localStorage' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(14,44): error TS2307: Cannot find module '@/features/inventory/services/jobCardPartsRequest.service' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(15,39): error TS2307: Cannot find module '@/shared/types/job-card.types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(16,38): error TS2307: Cannot find module '@/shared/constants/service-types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(21,8): error TS2307: Cannot find module '@/shared/lib/serviceCenter' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(22,67): error TS2307: Cannot find module '@/shared/utils/invoice.utils' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(23,25): error TS2307: Cannot find module '@/shared/hooks' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(24,86): error TS2307: Cannot find module '@/shared/types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(30,8): error TS2307: Cannot find module '@/__mocks__/data/job-cards.mock' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(31,43): error TS2307: Cannot find module '@/shared/types/invoice.types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(39,45): error TS2307: Cannot find module '@/shared/types' or its corresponding type declarations.
+src/app/(service-center)/sc/job-cards/page.tsx(1334,32): error TS2304: Cannot find name 'Car'.
+src/app/(service-center)/sc/job-cards/page.tsx(1346,34): error TS2304: Cannot find name 'Wrench'.
+src/app/(service-center)/sc/job-cards/page.tsx(1354,34): error TS2304: Cannot find name 'Clock'.
+src/app/(service-center)/sc/job-cards/page.tsx(1366,36): error TS2304: Cannot find name 'User'.
+src/app/(service-center)/sc/job-cards/page.tsx(1379,34): error TS2304: Cannot find name 'FileText'.
+src/app/(service-center)/sc/job-cards/page.tsx(1426,26): error TS2304: Cannot find name 'User'.
+src/app/(service-center)/sc/job-cards/page.tsx(1430,26): error TS2304: Cannot find name 'Car'.
+src/app/(service-center)/sc/job-cards/page.tsx(1435,26): error TS2304: Cannot find name 'Wrench'.
+src/app/(service-center)/sc/job-cards/page.tsx(1439,26): error TS2304: Cannot find name 'Calendar'.
+src/app/(service-center)/sc/job-cards/page.tsx(1469,26): error TS2304: Cannot find name 'Eye'.
+src/app/(service-center)/sc/job-cards/page.tsx(1498,30): error TS2304: Cannot find name 'FileText'.
+src/app/(service-center)/sc/job-cards/page.tsx(1508,28): error TS2304: Cannot find name 'Edit'.
+src/app/(service-center)/sc/job-cards/page.tsx(1520,28): error TS2304: Cannot find name 'Edit'.
+src/app/(service-center)/sc/job-cards/page.tsx(1572,14): error TS2304: Cannot find name 'FileText'.
+src/app/(service-center)/sc/job-cards/page.tsx(1653,30): error TS2304: Cannot find name 'Package'.
+src/app/(service-center)/sc/job-cards/page.tsx(1682,24): error TS2304: Cannot find name 'User'.
+

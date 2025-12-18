@@ -188,3 +188,88 @@ export interface KanbanColumn {
   status: JobCardStatus;
 }
 
+export interface DocumentationFiles {
+  files: File[];
+  urls: string[];
+}
+
+export type CreateJobCardForm = {
+  // Basic fields
+  vehicleId: string;
+  customerId: string;
+  customerName: string;
+  vehicleRegistration: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  description: string;
+  selectedParts: string[];
+
+  // PART 2 items
+  part2Items: JobCardPart2Item[];
+
+  // PART 1 fields
+  fullName: string;
+  mobilePrimary: string;
+  customerType: "B2C" | "B2B" | "";
+  vehicleBrand: string;
+  vinChassisNumber: string;
+  variantBatteryCapacity: string;
+  warrantyStatus: string;
+  estimatedDeliveryDate: string;
+  customerAddress: string;
+  customerFeedback: string;
+  technicianObservation: string;
+  insuranceStartDate: string;
+  insuranceEndDate: string;
+  insuranceCompanyName: string;
+  batterySerialNumber: string;
+  mcuSerialNumber: string;
+  vcuSerialNumber: string;
+  otherPartSerialNumber: string;
+
+  // Additional Customer Contact Fields
+  whatsappNumber?: string;
+  alternateMobile?: string;
+  email?: string;
+
+  // Additional Vehicle Details
+  vehicleYear?: number;
+  motorNumber?: string;
+  chargerSerialNumber?: string;
+  dateOfPurchase?: string;
+  vehicleColor?: string;
+
+  // Additional Service Details
+  previousServiceHistory?: string;
+  odometerReading?: string;
+
+  // Operational Fields
+  pickupDropRequired?: boolean;
+  pickupAddress?: string;
+  pickupState?: string;
+  pickupCity?: string;
+  pickupPincode?: string;
+  dropAddress?: string;
+  dropState?: string;
+  dropCity?: string;
+  dropPincode?: string;
+  preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
+
+  // Check-in Fields
+  arrivalMode?: "vehicle_present" | "vehicle_absent" | "check_in_only";
+  checkInNotes?: string;
+  checkInSlipNumber?: string;
+  checkInDate?: string;
+  checkInTime?: string;
+
+  // PART 2A fields (Warranty/Insurance Case Details)
+  videoEvidence: DocumentationFiles;
+  vinImage: DocumentationFiles;
+  odoImage: DocumentationFiles;
+  damageImages: DocumentationFiles;
+  issueDescription: string;
+  numberOfObservations: string;
+  symptom: string;
+  defectPart: string;
+};
+

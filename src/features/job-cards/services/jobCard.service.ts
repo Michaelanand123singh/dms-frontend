@@ -5,8 +5,10 @@
 import { apiClient, mockApiClient, ApiError } from "@/core/api";
 import { API_ENDPOINTS } from "@/config/api.config";
 import { API_CONFIG } from "@/config/api.config";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import type { JobCard } from "@/shared/types/job-card.types";
 import type { ApiRequestConfig } from "@/core/api";
+import { normalizeJobCard } from "@/shared/utils/normalization.utils";
 
 class JobCardService {
   private useMock: boolean;
@@ -77,6 +79,26 @@ class JobCardService {
         createdAt: new Date().toISOString(),
       };
     });
+  }
+
+  async getAll(): Promise<JobCard[]> {
+    return safeStorage.getItem<JobCard[]>("jobCards", []);
+  }
+
+  async create(jobCard: JobCard): Promise<JobCard> {
+    const existing = await this.getAll();
+    const normalized = normalizeJobCard(jobCard) as JobCard;
+    const updated = [...existing, normalized];
+    safeStorage.setItem("jobCards", updated);
+    return jobCard;
+  }
+
+  async update(jobCardId: string, jobCard: JobCard): Promise<JobCard> {
+    const existing = await this.getAll();
+    const normalized = normalizeJobCard(jobCard) as JobCard;
+    const updated = existing.map(jc => jc.id === jobCardId ? normalized : jc);
+    safeStorage.setItem("jobCards", updated);
+    return jobCard;
   }
 
   async createFromQuotation(quotationId: string, engineerId?: string): Promise<JobCard> {

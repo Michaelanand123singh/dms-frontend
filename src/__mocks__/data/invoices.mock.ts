@@ -2,7 +2,7 @@
  * Mock data for Invoices
  */
 
-import type { Invoice } from "@/shared/types";
+import type { Invoice, ServiceCenterInvoice } from "@/shared/types";
 import { mockCustomers } from "./customers.mock";
 
 /**
@@ -140,7 +140,7 @@ const rajeshVehicle = rajesh.vehicles[0];
 const priyaVehicle = priya.vehicles[0];
 const amitVehicle = amit.vehicles[0];
 
-export const defaultInvoices: Invoice[] = [
+export const defaultInvoices: ServiceCenterInvoice[] = [
   {
     id: "INV-2025-001",
     jobCardId: "JC-2025-001",
@@ -247,15 +247,7 @@ export const defaultInvoices: Invoice[] = [
   },
 ];
 
-export interface ServiceCenterInvoice {
-  id: string;
-  customerName: string;
-  amount: string;
-  date: string;
-  dueDate: string;
-  status: string;
-  jobCardId?: string;
-}
+// Local ServiceCenterInvoice interface removed to use the shared one from "@/shared/types"
 
 export const serviceCenterInvoicesData: ServiceCenterInvoice[] = [
   {
@@ -264,7 +256,11 @@ export const serviceCenterInvoicesData: ServiceCenterInvoice[] = [
     amount: "₹5,500",
     date: "2024-11-10",
     dueDate: "2024-11-17",
-    status: "Pending",
+    status: "Unpaid",
+    vehicle: "Unknown Vehicle",
+    paidAmount: "₹0",
+    balance: "₹5,500",
+    items: [],
     jobCardId: "JC001",
   },
 ];

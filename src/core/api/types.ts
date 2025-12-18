@@ -37,6 +37,9 @@ export interface ApiRequestConfig {
     url?: string; // For mock client compatibility
     method?: HttpMethod; // For mock client compatibility
     body?: unknown; // For mock client compatibility
+    retries?: number;
+    cache?: boolean;
+    ttl?: number;
 }
 
 /**

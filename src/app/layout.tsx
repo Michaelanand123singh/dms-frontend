@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Sidebar, SCSidebar, InventoryManagerSidebar, CentralInventorySidebar, Navbar } from "@/components/layout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useRole } from "@/shared/hooks";
@@ -14,6 +15,14 @@ interface RootLayoutProps {
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000,
+        retry: 1,
+      },
+    },
+  }));
   const [open, setOpen] = useState(true);
   const [isNavigating, setIsNavigating] = useState(false);
   const { userRole } = useRole();
@@ -74,38 +83,40 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
       <body className="antialiased bg-[#f9f9fb] flex" suppressHydrationWarning>
-        <ToastProvider>
-          <ErrorBoundary>
-          {isLoggedIn &&
-            (useCentralInventorySidebar ? (
-              <CentralInventorySidebar open={open} setOpen={setOpen} />
-            ) : useInventoryManagerSidebar ? (
-              <InventoryManagerSidebar open={open} setOpen={setOpen} />
-            ) : useSCSidebar ? (
-              <SCSidebar open={open} setOpen={setOpen} role={userRole} />
-            ) : (
-              <Sidebar open={open} setOpen={setOpen} />
-            ))}
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <ErrorBoundary>
+              {isLoggedIn &&
+                (useCentralInventorySidebar ? (
+                  <CentralInventorySidebar open={open} setOpen={setOpen} />
+                ) : useInventoryManagerSidebar ? (
+                  <InventoryManagerSidebar open={open} setOpen={setOpen} />
+                ) : useSCSidebar ? (
+                  <SCSidebar open={open} setOpen={setOpen} role={userRole} />
+                ) : (
+                  <Sidebar open={open} setOpen={setOpen} />
+                ))}
 
-          <TopLoadingBar isLoading={isNavigating} />
-          <div
-            className={`flex-1 flex flex-col transition-all duration-300 relative overflow-x-hidden ${isLoggedIn
-                ? open
-                  ? "ml-64 md:ml-64"
-                  : "ml-0 md:ml-20"
-                : "ml-0"
-              }`}
-          >
-            {isLoggedIn && <Navbar open={open} setOpen={setOpen} isLoggedIn={isLoggedIn} />}
+              <TopLoadingBar isLoading={isNavigating} />
+              <div
+                className={`flex-1 flex flex-col transition-all duration-300 relative overflow-x-hidden ${isLoggedIn
+                  ? open
+                    ? "ml-64 md:ml-64"
+                    : "ml-0 md:ml-20"
+                  : "ml-0"
+                  }`}
+              >
+                {isLoggedIn && <Navbar open={open} setOpen={setOpen} isLoggedIn={isLoggedIn} />}
 
-            <main className={`relative min-h-[calc(100vh-4rem)] overflow-x-hidden ${isLoggedIn ? "pt-16 px-6 md:px-8" : "px-0"}`}>
-              <ErrorBoundary>
-                {children}
-              </ErrorBoundary>
-            </main>
-          </div>
-        </ErrorBoundary>
-        </ToastProvider>
+                <main className={`relative min-h-[calc(100vh-4rem)] overflow-x-hidden ${isLoggedIn ? "pt-16 px-6 md:px-8" : "px-0"}`}>
+                  <ErrorBoundary>
+                    {children}
+                  </ErrorBoundary>
+                </main>
+              </div>
+            </ErrorBoundary>
+          </ToastProvider>
+        </QueryClientProvider>
       </body>
     </html>
   );

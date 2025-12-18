@@ -52,6 +52,10 @@ import CheckInSlip, { generateCheckInSlipNumber, type CheckInSlipData } from "@/
 import type { EnhancedCheckInSlipData } from "@/shared/types/check-in-slip.types";
 import { convertCheckInSlipFormToData } from "../components/check-in-slip/utils";
 import { SERVICE_CENTER_CODE_MAP } from "../appointments/constants";
+import { generateQuotationNumber } from "@/shared/utils/quotation.utils";
+import { getServiceCenterCode, normalizeServiceCenterId } from "@/shared/utils/service-center.utils";
+import { CreateQuotationModal } from "../components/quotations/CreateQuotationModal";
+import { ViewQuotationModal } from "../components/quotations/ViewQuotationModal";
 
 const createEmptyCustomer = (): CustomerWithVehicles => ({
   id: "",
@@ -62,21 +66,7 @@ const createEmptyCustomer = (): CustomerWithVehicles => ({
   vehicles: [],
 });
 
-const normalizeServiceCenterId = (id?: string | number | null): string => {
-  if (!id) return "sc-001";
-  const raw = id.toString();
-  if (raw.startsWith("sc-")) {
-    return raw;
-  }
-  const digits = raw.replace(/\D/g, "");
-  if (!digits) return "sc-001";
-  return `sc-${digits.padStart(3, "0")}`;
-};
 
-const getServiceCenterCode = (id?: string | number | null): string => {
-  const normalized = normalizeServiceCenterId(id);
-  return SERVICE_CENTER_CODE_MAP[normalized] || "SC001";
-};
 
 function QuotationsContent() {
   const { userInfo, userRole } = useRole();
@@ -92,7 +82,7 @@ function QuotationsContent() {
     normalizeServiceCenterId(serviceCenterContext.serviceCenterId)
   );
   const [activeCustomerId, setActiveCustomerId] = useState<string>("");
-  
+
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [filter, setFilter] = useState<QuotationFilterType>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -102,7 +92,7 @@ function QuotationsContent() {
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
   const [showCheckInSlipModal, setShowCheckInSlipModal] = useState<boolean>(false);
   const [checkInSlipData, setCheckInSlipData] = useState<CheckInSlipData | null>(null);
-  
+
   // Form state
   const [form, setForm] = useState<CreateQuotationForm>({
     customerId: "",
@@ -183,7 +173,7 @@ function QuotationsContent() {
   useEffect(() => {
     if (fromAppointment && typeof window !== "undefined") {
       const quotationData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
-      
+
       if (quotationData && quotationData.appointmentData) {
         const appointmentData = quotationData.appointmentData;
         const normalizedCenterId = normalizeServiceCenterId(
@@ -201,17 +191,17 @@ function QuotationsContent() {
               const customer = customers.find(
                 (c) => c.phone === quotationData.phone || c.name === quotationData.customerName
               );
-              
+
               if (customer) {
                 setSelectedCustomer(customer);
                 setActiveCustomerId(customer.id?.toString() || "");
-                
+
                 // Extract insurance data from appointment
                 const insuranceCompanyName = appointmentData.insuranceCompanyName || "";
                 const insuranceStartDate = appointmentData.insuranceStartDate || "";
                 const insuranceEndDate = appointmentData.insuranceEndDate || "";
                 const hasInsuranceData = !!(insuranceCompanyName || insuranceStartDate || insuranceEndDate);
-                
+
                 // Try to match insurance company name to insurer list
                 let matchedInsurerId = "";
                 if (insuranceCompanyName && insurers.length > 0) {
@@ -228,7 +218,7 @@ function QuotationsContent() {
                     matchedInsurerId = matchedInsurer.id;
                   }
                 }
-                
+
                 setForm((prev) => ({
                   ...prev,
                   customerId: String(customer.id),
@@ -242,13 +232,13 @@ function QuotationsContent() {
                   insuranceStartDate: insuranceStartDate || "",
                   insuranceEndDate: insuranceEndDate || "",
                 }));
-                
+
                 // Find matching vehicle
                 if (customer.vehicles && customer.vehicles.length > 0) {
                   const vehicle = customer.vehicles.find(
                     (v) => v.registration === appointmentData.registrationNumber
                   ) || customer.vehicles[0];
-                  
+
                   if (vehicle) {
                     setForm((prev) => ({
                       ...prev,
@@ -256,10 +246,10 @@ function QuotationsContent() {
                     }));
                   }
                 }
-                
+
                 // Open create modal
                 setShowCreateModal(true);
-                
+
                 // Clear the stored data
                 safeStorage.removeItem("pendingQuotationFromAppointment");
               }
@@ -275,7 +265,7 @@ function QuotationsContent() {
             console.error("Error finding customer:", error);
           }
         };
-        
+
         findCustomer();
       }
     }
@@ -286,7 +276,7 @@ function QuotationsContent() {
   useEffect(() => {
     if (fromJobCard && typeof window !== "undefined") {
       const quotationData = safeStorage.getItem<any>("pendingQuotationFromJobCard", null);
-      
+
       if (quotationData && quotationData.jobCardData) {
         const jobCard = quotationData.jobCardData;
         const normalizedCenterId = normalizeServiceCenterId(
@@ -302,26 +292,26 @@ function QuotationsContent() {
             } else if (jobCard.part1?.mobilePrimary) {
               await performCustomerSearch(jobCard.part1.mobilePrimary, "auto");
             }
-            
+
             // Wait a bit for search results
             setTimeout(() => {
               const customers = customerSearchResults;
               const customer = customers.find(
-                (c) => c.id === quotationData.customerId || 
-                       c.phone === jobCard.part1?.mobilePrimary ||
-                       c.name === quotationData.customerName
+                (c) => c.id === quotationData.customerId ||
+                  c.phone === jobCard.part1?.mobilePrimary ||
+                  c.name === quotationData.customerName
               );
-              
+
               if (customer) {
                 setSelectedCustomer(customer);
                 setActiveCustomerId(customer.id?.toString() || "");
-                
+
                 // Extract insurance data from job card PART 1
                 const insuranceCompanyName = jobCard.part1?.insuranceCompanyName || "";
                 const insuranceStartDate = jobCard.part1?.insuranceStartDate || "";
                 const insuranceEndDate = jobCard.part1?.insuranceEndDate || "";
                 const hasInsuranceData = !!(insuranceCompanyName || insuranceStartDate || insuranceEndDate);
-                
+
                 // Try to match insurance company name to insurer list
                 let matchedInsurerId = "";
                 if (insuranceCompanyName && insurers.length > 0) {
@@ -338,7 +328,7 @@ function QuotationsContent() {
                     matchedInsurerId = matchedInsurer.id;
                   }
                 }
-                
+
                 setForm((prev) => ({
                   ...prev,
                   customerId: String(customer.id),
@@ -352,14 +342,14 @@ function QuotationsContent() {
                   insuranceStartDate: insuranceStartDate || "",
                   insuranceEndDate: insuranceEndDate || "",
                 }));
-                
+
                 // Find matching vehicle
                 if (customer.vehicles && customer.vehicles.length > 0) {
                   const vehicle = customer.vehicles.find(
-                    (v) => v.registration === jobCard.part1?.registrationNumber || 
-                           v.id === quotationData.vehicleId
+                    (v) => v.registration === jobCard.part1?.registrationNumber ||
+                      v.id === quotationData.vehicleId
                   ) || customer.vehicles[0];
-                  
+
                   if (vehicle) {
                     setForm((prev) => ({
                       ...prev,
@@ -367,10 +357,10 @@ function QuotationsContent() {
                     }));
                   }
                 }
-                
+
                 // Open create modal
                 setShowCreateModal(true);
-                
+
                 // Clear the stored data
                 safeStorage.removeItem("pendingQuotationFromJobCard");
               } else if (quotationData.customerId) {
@@ -385,7 +375,7 @@ function QuotationsContent() {
             console.error("Error finding customer from job card:", error);
           }
         };
-        
+
         findCustomer();
       }
     }
@@ -407,7 +397,7 @@ function QuotationsContent() {
     // For now, using flat 18% GST. In production, this should calculate CGST/SGST/IGST based on states
     const gstRate = 0.18;
     const taxAmount = preGstAmount * gstRate;
-    
+
     // Split into CGST and SGST (9% each) for intra-state, or IGST (18%) for inter-state
     // This should be calculated based on customer state vs service center state
     const cgst = taxAmount / 2;
@@ -428,195 +418,187 @@ function QuotationsContent() {
     };
   }, [form.items, form.discount]);
 
-const totals = calculateTotals();
+  const totals = calculateTotals();
 
-const validateQuotationForm = () => {
-  if (!form.customerId) {
-    alert("Please select a customer");
-    return false;
-  }
+  const validateQuotationForm = () => {
+    if (!form.customerId) {
+      alert("Please select a customer");
+      return false;
+    }
 
-  if (form.items.length === 0) {
-    alert("Please add at least one item");
-    return false;
-  }
+    if (form.items.length === 0) {
+      alert("Please add at least one item");
+      return false;
+    }
 
-  return true;
-};
+    return true;
+  };
 
-const buildQuotationFromForm = (): Quotation => {
-  const updatedTotals = calculateTotals();
-  const quotationDate = new Date(form.quotationDate);
-  const validUntil = new Date(quotationDate);
-  validUntil.setDate(validUntil.getDate() + form.validUntilDays);
-  const year = quotationDate.getFullYear();
-  const month = String(quotationDate.getMonth() + 1).padStart(2, "0");
-  const resolvedServiceCenterId = normalizeServiceCenterId(
-    activeServiceCenterId || serviceCenterContext.serviceCenterId
-  );
-  const resolvedCustomerId = form.customerId || activeCustomerId || "";
-  const serviceCenterCode = getServiceCenterCode(resolvedServiceCenterId);
-  const monthKey = `${year}${month}`;
-  const existingForCenterMonth = quotations.filter((quotation) => {
-    if (quotation.serviceCenterId !== resolvedServiceCenterId) return false;
-    return quotation.quotationDate.startsWith(`${year}-${month}`);
-  });
-  const nextSequence = existingForCenterMonth.length + 1;
-  const quotationNumber = `QT-${serviceCenterCode}-${monthKey}-${String(nextSequence).padStart(4, "0")}`;
+  const buildQuotationFromForm = (): Quotation => {
+    const updatedTotals = calculateTotals();
+    const quotationDate = new Date(form.quotationDate);
+    const validUntil = new Date(quotationDate);
+    validUntil.setDate(validUntil.getDate() + form.validUntilDays);
+    const resolvedServiceCenterId = normalizeServiceCenterId(
+      activeServiceCenterId || serviceCenterContext.serviceCenterId
+    );
+    const resolvedCustomerId = form.customerId || activeCustomerId || "";
+    const serviceCenterCode = getServiceCenterCode(resolvedServiceCenterId);
+    const quotationNumber = generateQuotationNumber(resolvedServiceCenterId, quotationDate, quotations);
 
-  const customer = selectedCustomer ?? createEmptyCustomer();
-  const selectedInsurer = insurers.find((i) => i.id === form.insurerId);
-  const selectedTemplate = noteTemplates.find((t) => t.id === form.noteTemplateId);
-  const vehicle = customer.vehicles?.find((v) => v.id.toString() === form.vehicleId);
-  const centerMeta = staticServiceCenters.find(
-    (center) => normalizeServiceCenterId(center.id) === resolvedServiceCenterId
-  );
+    const customer = selectedCustomer ?? createEmptyCustomer();
+    const selectedInsurer = insurers.find((i) => i.id === form.insurerId);
+    const selectedTemplate = noteTemplates.find((t) => t.id === form.noteTemplateId);
+    const vehicle = customer.vehicles?.find((v) => v.id.toString() === form.vehicleId);
+    const centerMeta = staticServiceCenters.find(
+      (center) => normalizeServiceCenterId(center.id) === resolvedServiceCenterId
+    );
 
-  // Get appointmentId from pendingQuotationFromAppointment if available
-  const pendingQuotationData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
-  const appointmentId = pendingQuotationData?.appointmentId || undefined;
-  
-  // Get jobCardId from pendingQuotationFromJobCard if available
-  const pendingJobCardData = safeStorage.getItem<any>("pendingQuotationFromJobCard", null);
-  const jobCardId = pendingJobCardData?.jobCardId || jobCardIdParam || undefined;
+    // Get appointmentId from pendingQuotationFromAppointment if available
+    const pendingQuotationData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
+    const appointmentId = pendingQuotationData?.appointmentId || undefined;
 
-  return {
-    id: `qt-${Date.now()}`,
-    quotationNumber,
-    serviceCenterId: resolvedServiceCenterId,
-    customerId: resolvedCustomerId,
-    vehicleId: form.vehicleId,
-    serviceAdvisorId: userInfo?.id || "user-001",
-    appointmentId: appointmentId,
-    jobCardId: jobCardId,
-    documentType: form.documentType,
-    quotationDate: form.quotationDate,
-    validUntil: validUntil.toISOString().split("T")[0],
-    hasInsurance: form.hasInsurance,
-    insurerId: form.insurerId,
-    insuranceStartDate: form.insuranceStartDate,
-    insuranceEndDate: form.insuranceEndDate,
-    subtotal: updatedTotals.subtotal,
-    discount: updatedTotals.discount,
-    discountPercent: updatedTotals.discountPercent,
-    preGstAmount: updatedTotals.preGstAmount,
-    cgstAmount: updatedTotals.cgst,
-    sgstAmount: updatedTotals.sgst,
-    igstAmount: updatedTotals.igst,
-    totalAmount: updatedTotals.totalAmount,
-    notes: form.notes || selectedTemplate?.content || "",
-    batterySerialNumber: form.batterySerialNumber,
-    customNotes: form.customNotes,
-    noteTemplateId: form.noteTemplateId,
-    status: "draft",
-    passedToManager: false,
-    passedToManagerAt: undefined,
-    managerId: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    items: form.items.map((item, index) => ({
-      id: `item-${Date.now()}-${index}`,
-      ...item,
-    })),
-    customer: {
-      id: resolvedCustomerId,
-      firstName: customer.name?.split(" ")[0] || "Customer",
-      lastName: customer.name?.split(" ").slice(1).join(" ") || "",
-      phone: customer.phone || "",
-      email: customer.email || "",
-      address: customer.address || "",
-      city: customer.cityState?.split(",")[0] || "",
-      state: customer.cityState?.split(",")[1]?.trim() || "",
-      pincode: customer.pincode || "",
-    },
-    vehicle: form.vehicleId
-      ? {
+    // Get jobCardId from pendingQuotationFromJobCard if available
+    const pendingJobCardData = safeStorage.getItem<any>("pendingQuotationFromJobCard", null);
+    const jobCardId = pendingJobCardData?.jobCardId || jobCardIdParam || undefined;
+
+    return {
+      id: `qt-${Date.now()}`,
+      quotationNumber,
+      serviceCenterId: resolvedServiceCenterId,
+      customerId: resolvedCustomerId,
+      vehicleId: form.vehicleId,
+      serviceAdvisorId: userInfo?.id || "user-001",
+      appointmentId: appointmentId,
+      jobCardId: jobCardId,
+      documentType: form.documentType,
+      quotationDate: form.quotationDate,
+      validUntil: validUntil.toISOString().split("T")[0],
+      hasInsurance: form.hasInsurance,
+      insurerId: form.insurerId,
+      insuranceStartDate: form.insuranceStartDate,
+      insuranceEndDate: form.insuranceEndDate,
+      subtotal: updatedTotals.subtotal,
+      discount: updatedTotals.discount,
+      discountPercent: updatedTotals.discountPercent,
+      preGstAmount: updatedTotals.preGstAmount,
+      cgstAmount: updatedTotals.cgst,
+      sgstAmount: updatedTotals.sgst,
+      igstAmount: updatedTotals.igst,
+      totalAmount: updatedTotals.totalAmount,
+      notes: form.notes || selectedTemplate?.content || "",
+      batterySerialNumber: form.batterySerialNumber,
+      customNotes: form.customNotes,
+      noteTemplateId: form.noteTemplateId,
+      status: "draft",
+      passedToManager: false,
+      passedToManagerAt: undefined,
+      managerId: undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      items: form.items.map((item, index) => ({
+        id: `item-${Date.now()}-${index}`,
+        ...item,
+      })),
+      customer: {
+        id: resolvedCustomerId,
+        firstName: customer.name?.split(" ")[0] || "Customer",
+        lastName: customer.name?.split(" ").slice(1).join(" ") || "",
+        phone: customer.phone || "",
+        email: customer.email || "",
+        address: customer.address || "",
+        city: customer.cityState?.split(",")[0] || "",
+        state: customer.cityState?.split(",")[1]?.trim() || "",
+        pincode: customer.pincode || "",
+      },
+      vehicle: form.vehicleId
+        ? {
           id: form.vehicleId,
           make: vehicle?.vehicleMake || "",
           model: vehicle?.vehicleModel || "",
           registration: vehicle?.registration || "",
           vin: vehicle?.vin || "",
         }
-      : undefined,
-    insurer: selectedInsurer,
-    serviceCenter: {
-      id: resolvedServiceCenterId,
-      name:
-        centerMeta?.name ??
-        serviceCenterContext.serviceCenterName ??
-        "Service Center",
-      code: serviceCenterCode,
-      address: centerMeta?.location ?? "",
-      city: centerMeta?.location ?? "",
-      state: "",
-      pincode: "",
-      phone: "",
-      gstNumber: "",
-      panNumber: "",
-    },
+        : undefined,
+      insurer: selectedInsurer,
+      serviceCenter: {
+        id: resolvedServiceCenterId,
+        name:
+          centerMeta?.name ??
+          serviceCenterContext.serviceCenterName ??
+          "Service Center",
+        code: serviceCenterCode,
+        address: centerMeta?.location ?? "",
+        city: centerMeta?.location ?? "",
+        state: "",
+        pincode: "",
+        phone: "",
+        gstNumber: "",
+        panNumber: "",
+      },
+    };
   };
-};
 
-const persistQuotation = (quotation: Quotation) => {
-  const updatedQuotations = [quotation, ...quotations];
-  setQuotations(updatedQuotations);
-  safeStorage.setItem("quotations", updatedQuotations);
-  
-  // Update appointment status if quotation is linked to an appointment
-  if (quotation.appointmentId) {
-    const appointments = safeStorage.getItem<any[]>("appointments", []);
-    const appointmentIndex = appointments.findIndex((apt) => apt.id === quotation.appointmentId);
-    
-    if (appointmentIndex !== -1) {
-      const appointment = appointments[appointmentIndex];
-      // Check if this is the first quotation for this appointment
-      const existingQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
-      const quotationsForAppointment = existingQuotations.filter(
-        (q) => q.appointmentId === quotation.appointmentId && q.id !== quotation.id
-      );
-      
-      // Update appointment status to "Quotation Created" if first quotation
-      // For subsequent quotations, status remains "Quotation Created" (allows multiple quotations)
-      if (quotationsForAppointment.length === 0 || appointment.status !== "Quotation Created") {
-        appointments[appointmentIndex] = {
-          ...appointment,
-          status: "Quotation Created",
-        };
-        safeStorage.setItem("appointments", appointments);
+  const persistQuotation = (quotation: Quotation) => {
+    const updatedQuotations = [quotation, ...quotations];
+    setQuotations(updatedQuotations);
+    safeStorage.setItem("quotations", updatedQuotations);
+
+    // Update appointment status if quotation is linked to an appointment
+    if (quotation.appointmentId) {
+      const appointments = safeStorage.getItem<any[]>("appointments", []);
+      const appointmentIndex = appointments.findIndex((apt) => apt.id === quotation.appointmentId);
+
+      if (appointmentIndex !== -1) {
+        const appointment = appointments[appointmentIndex];
+        // Check if this is the first quotation for this appointment
+        const existingQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
+        const quotationsForAppointment = existingQuotations.filter(
+          (q) => q.appointmentId === quotation.appointmentId && q.id !== quotation.id
+        );
+
+        // Update appointment status to "Quotation Created" if first quotation
+        // For subsequent quotations, status remains "Quotation Created" (allows multiple quotations)
+        if (quotationsForAppointment.length === 0 || appointment.status !== "Quotation Created") {
+          appointments[appointmentIndex] = {
+            ...appointment,
+            status: "Quotation Created",
+          };
+          safeStorage.setItem("appointments", appointments);
+        }
       }
     }
-  }
-};
+  };
 
-// Helper function to validate WhatsApp number
-const validateWhatsAppNumber = (phone: string): boolean => {
-  if (!phone || phone.trim() === "") return false;
-  const cleaned = phone.replace(/\D/g, "");
-  // Indian phone numbers should be 10 digits, with optional country code
-  return cleaned.length >= 10 && cleaned.length <= 13;
-};
+  // Helper function to validate WhatsApp number
+  const validateWhatsAppNumber = (phone: string): boolean => {
+    if (!phone || phone.trim() === "") return false;
+    const cleaned = phone.replace(/\D/g, "");
+    // Indian phone numbers should be 10 digits, with optional country code
+    return cleaned.length >= 10 && cleaned.length <= 13;
+  };
 
-// Helper function to generate complete quotation HTML for PDF/Print
-const generateQuotationHTML = (
-  quotation: Quotation,
-  serviceCenter: any,
-  serviceAdvisor: any
-): string => {
-  const quotationDate = new Date(quotation.quotationDate).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-  const validUntilDate = quotation.validUntil
-    ? new Date(quotation.validUntil).toLocaleDateString("en-IN", {
+  // Helper function to generate complete quotation HTML for PDF/Print
+  const generateQuotationHTML = (
+    quotation: Quotation,
+    serviceCenter: any,
+    serviceAdvisor: any
+  ): string => {
+    const quotationDate = new Date(quotation.quotationDate).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+    const validUntilDate = quotation.validUntil
+      ? new Date(quotation.validUntil).toLocaleDateString("en-IN", {
         day: "2-digit",
         month: "long",
         year: "numeric",
       })
-    : "N/A";
+      : "N/A";
 
-  const itemsHTML = quotation.items && quotation.items.length > 0
-    ? quotation.items
+    const itemsHTML = quotation.items && quotation.items.length > 0
+      ? quotation.items
         .map(
           (item, index) => `
           <tr>
@@ -632,11 +614,11 @@ const generateQuotationHTML = (
         `
         )
         .join("")
-    : '<tr><td colspan="8" style="border: 1px solid #ddd; padding: 8px; text-align: center;">No items added</td></tr>';
+      : '<tr><td colspan="8" style="border: 1px solid #ddd; padding: 8px; text-align: center;">No items added</td></tr>';
 
-  const insuranceHTML =
-    quotation.hasInsurance && (quotation.insurer || quotation.insuranceStartDate || quotation.insuranceEndDate)
-      ? `
+    const insuranceHTML =
+      quotation.hasInsurance && (quotation.insurer || quotation.insuranceStartDate || quotation.insuranceEndDate)
+        ? `
       <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border: 1px solid #bfdbfe; margin-bottom: 24px;">
         <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1e40af;">Insurance Details</h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 14px;">
@@ -646,9 +628,9 @@ const generateQuotationHTML = (
         </div>
       </div>
     `
-      : "";
+        : "";
 
-  return `
+    return `
     <!DOCTYPE html>
     <html>
       <head>
@@ -1056,28 +1038,28 @@ const generateQuotationHTML = (
       </body>
     </html>
   `;
-};
+  };
 
-// Helper function to format WhatsApp message
-const formatWhatsAppMessage = (quotation: Quotation, serviceCenter: any): string => {
-  const customerName = quotation.customer?.firstName || "Customer";
-  const vehicleInfo = quotation.vehicle
-    ? `${quotation.vehicle.make} ${quotation.vehicle.model} (${quotation.vehicle.registration})`
-    : "N/A";
+  // Helper function to format WhatsApp message
+  const formatWhatsAppMessage = (quotation: Quotation, serviceCenter: any): string => {
+    const customerName = quotation.customer?.firstName || "Customer";
+    const vehicleInfo = quotation.vehicle
+      ? `${quotation.vehicle.make} ${quotation.vehicle.model} (${quotation.vehicle.registration})`
+      : "N/A";
 
-  // Show first 3 items, then count of remaining
-  const itemsCount = quotation.items?.length || 0;
-  const firstItems = quotation.items?.slice(0, 3) || [];
-  const remainingCount = itemsCount > 3 ? itemsCount - 3 : 0;
+    // Show first 3 items, then count of remaining
+    const itemsCount = quotation.items?.length || 0;
+    const firstItems = quotation.items?.slice(0, 3) || [];
+    const remainingCount = itemsCount > 3 ? itemsCount - 3 : 0;
 
-  const itemsSummary = firstItems
-    .map((item, idx) => `${idx + 1}. ${item.partName} (Qty: ${item.quantity}) - ₹${item.amount.toLocaleString("en-IN")}`)
-    .join("\n");
+    const itemsSummary = firstItems
+      .map((item, idx) => `${idx + 1}. ${item.partName} (Qty: ${item.quantity}) - ₹${item.amount.toLocaleString("en-IN")}`)
+      .join("\n");
 
-  const approvalLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=approve`;
-  const rejectionLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=reject`;
+    const approvalLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=approve`;
+    const rejectionLink = `${window.location.origin}/sc/quotations?quotationId=${quotation.id}&action=reject`;
 
-  return `Hello ${customerName}! 👋
+    return `Hello ${customerName}! 👋
 
 📄 *${quotation.documentType === "Proforma Invoice" ? "Proforma Invoice" : "Quotation"} ${quotation.quotationNumber}*
 
@@ -1101,25 +1083,25 @@ Or reply with "APPROVE" or "REJECT"
 
 📞 Contact: ${serviceCenter.phone || "N/A"}
 🏢 ${serviceCenter.name || "Service Center"}`;
-};
+  };
 
-const sendQuotationToCustomerById = async (
-  quotationId: string,
-  options?: { manageLoading?: boolean }
-) => {
-  const quotation = quotations.find((q) => q.id === quotationId);
-  if (!quotation) return;
+  const sendQuotationToCustomerById = async (
+    quotationId: string,
+    options?: { manageLoading?: boolean }
+  ) => {
+    const quotation = quotations.find((q) => q.id === quotationId);
+    if (!quotation) return;
 
-  const { manageLoading = true } = options ?? {};
+    const { manageLoading = true } = options ?? {};
 
-  try {
-    if (manageLoading) {
-      setLoading(true);
-    }
+    try {
+      if (manageLoading) {
+        setLoading(true);
+      }
 
-    const updatedQuotations = quotations.map((q) =>
-      q.id === quotationId
-        ? {
+      const updatedQuotations = quotations.map((q) =>
+        q.id === quotationId
+          ? {
             ...q,
             status: "sent_to_customer" as const,
             sentToCustomer: true,
@@ -1127,107 +1109,107 @@ const sendQuotationToCustomerById = async (
             whatsappSent: true,
             whatsappSentAt: new Date().toISOString(),
           }
-        : q
-    );
+          : q
+      );
 
-    setQuotations(updatedQuotations);
-    safeStorage.setItem("quotations", updatedQuotations);
+      setQuotations(updatedQuotations);
+      safeStorage.setItem("quotations", updatedQuotations);
 
-    // Get service center and advisor details
-    const serviceCenterData: any = quotation.serviceCenter || {
-      name: "42 EV Tech & Services",
-      address: "123 Main Street, Industrial Area",
-      city: "Pune",
-      state: "Maharashtra",
-      pincode: "411001",
-      phone: "+91-20-12345678",
-      gstNumber: (quotation.serviceCenter as any)?.gstNumber || "",
-      panNumber: (quotation.serviceCenter as any)?.panNumber || "",
-    };
+      // Get service center and advisor details
+      const serviceCenterData: any = quotation.serviceCenter || {
+        name: "42 EV Tech & Services",
+        address: "123 Main Street, Industrial Area",
+        city: "Pune",
+        state: "Maharashtra",
+        pincode: "411001",
+        phone: "+91-20-12345678",
+        gstNumber: (quotation.serviceCenter as any)?.gstNumber || "",
+        panNumber: (quotation.serviceCenter as any)?.panNumber || "",
+      };
 
-    const serviceAdvisor = {
-      name: userInfo?.name || "Service Advisor",
-      phone: (userInfo as any)?.phone || "+91-9876543210",
-    };
+      const serviceAdvisor = {
+        name: userInfo?.name || "Service Advisor",
+        phone: (userInfo as any)?.phone || "+91-9876543210",
+      };
 
-    // Validate WhatsApp number
-    const rawWhatsapp =
-      (quotation.customer as any)?.whatsappNumber || quotation.customer?.phone || "";
-    const customerWhatsapp = rawWhatsapp.replace(/\D/g, "");
+      // Validate WhatsApp number
+      const rawWhatsapp =
+        (quotation.customer as any)?.whatsappNumber || quotation.customer?.phone || "";
+      const customerWhatsapp = rawWhatsapp.replace(/\D/g, "");
 
-    if (!validateWhatsAppNumber(customerWhatsapp)) {
-      alert("Customer WhatsApp number is missing or invalid. Please update customer contact information.");
+      if (!validateWhatsAppNumber(customerWhatsapp)) {
+        alert("Customer WhatsApp number is missing or invalid. Please update customer contact information.");
+        if (manageLoading) {
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Generate quotation HTML
+      const quotationHTML = generateQuotationHTML(quotation, serviceCenterData, serviceAdvisor);
+
+      // Print quotation
+      const printQuotation = () => {
+        try {
+          const printWindow = window.open("", "_blank");
+          if (!printWindow) {
+            alert("Please allow popups to generate PDF. The quotation details will be shown in the message.");
+            return false;
+          }
+
+          printWindow.document.write(quotationHTML);
+          printWindow.document.close();
+
+          // Wait for content to load, then trigger print
+          setTimeout(() => {
+            try {
+              printWindow.focus();
+              printWindow.print();
+              // Close window after a delay
+              setTimeout(() => {
+                if (!printWindow.closed) {
+                  printWindow.close();
+                }
+              }, 2000);
+            } catch (printError) {
+              console.error("Print error:", printError);
+              // Keep window open if print fails
+            }
+          }, 500);
+          return true;
+        } catch (error) {
+          console.error("Error opening print window:", error);
+          alert("Could not open print dialog. The quotation will still be sent via WhatsApp.");
+          return false;
+        }
+      };
+
+      // Generate PDF
+      printQuotation();
+
+      // Format WhatsApp message
+      const message = formatWhatsAppMessage(quotation, serviceCenterData);
+      const whatsappUrl = `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(message)}`;
+
+      // Open WhatsApp with delay to allow PDF generation
+      setTimeout(() => {
+        try {
+          window.open(whatsappUrl, "_blank");
+          alert("Quotation PDF generated and sent to customer via WhatsApp!\n\nCustomer can approve or reject via the links provided.");
+        } catch (error) {
+          console.error("Error opening WhatsApp:", error);
+          alert("Could not open WhatsApp. Please copy this link manually:\n\n" + whatsappUrl);
+        }
+      }, 1500);
+    } catch (error) {
+      console.error("Error sending quotation:", error);
+      alert("Failed to send quotation via WhatsApp. Please try again.");
+    } finally {
       if (manageLoading) {
         setLoading(false);
       }
-      return;
     }
-
-    // Generate quotation HTML
-    const quotationHTML = generateQuotationHTML(quotation, serviceCenterData, serviceAdvisor);
-
-    // Print quotation
-    const printQuotation = () => {
-      try {
-        const printWindow = window.open("", "_blank");
-        if (!printWindow) {
-          alert("Please allow popups to generate PDF. The quotation details will be shown in the message.");
-          return false;
-        }
-
-        printWindow.document.write(quotationHTML);
-        printWindow.document.close();
-
-        // Wait for content to load, then trigger print
-        setTimeout(() => {
-          try {
-            printWindow.focus();
-            printWindow.print();
-            // Close window after a delay
-            setTimeout(() => {
-              if (!printWindow.closed) {
-                printWindow.close();
-              }
-            }, 2000);
-          } catch (printError) {
-            console.error("Print error:", printError);
-            // Keep window open if print fails
-          }
-        }, 500);
-        return true;
-      } catch (error) {
-        console.error("Error opening print window:", error);
-        alert("Could not open print dialog. The quotation will still be sent via WhatsApp.");
-        return false;
-      }
-    };
-
-    // Generate PDF
-    printQuotation();
-
-    // Format WhatsApp message
-    const message = formatWhatsAppMessage(quotation, serviceCenterData);
-    const whatsappUrl = `https://wa.me/${customerWhatsapp}?text=${encodeURIComponent(message)}`;
-
-    // Open WhatsApp with delay to allow PDF generation
-    setTimeout(() => {
-      try {
-        window.open(whatsappUrl, "_blank");
-        alert("Quotation PDF generated and sent to customer via WhatsApp!\n\nCustomer can approve or reject via the links provided.");
-      } catch (error) {
-        console.error("Error opening WhatsApp:", error);
-        alert("Could not open WhatsApp. Please copy this link manually:\n\n" + whatsappUrl);
-      }
-    }, 1500);
-  } catch (error) {
-    console.error("Error sending quotation:", error);
-    alert("Failed to send quotation via WhatsApp. Please try again.");
-  } finally {
-    if (manageLoading) {
-      setLoading(false);
-    }
-  }
-};
+  };
 
 
   // Add item
@@ -1264,12 +1246,12 @@ const sendQuotationToCustomerById = async (
   const updateItem = (index: number, field: keyof QuotationItem, value: string | number) => {
     const newItems = [...form.items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
+
     // Recalculate amount
     if (field === "rate" || field === "quantity") {
       newItems[index].amount = newItems[index].rate * newItems[index].quantity;
     }
-    
+
     setForm({ ...form, items: newItems });
   };
 
@@ -1285,175 +1267,175 @@ const sendQuotationToCustomerById = async (
     }
   };
 
-// Submit quotation or check-in slip
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  // Submit quotation or check-in slip
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  // Handle check-in slip
-  if (form.documentType === "Check-in Slip") {
-    if (!selectedCustomer) {
-      alert("Please select a customer");
+    // Handle check-in slip
+    if (form.documentType === "Check-in Slip") {
+      if (!selectedCustomer) {
+        alert("Please select a customer");
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const vehicle = selectedCustomer.vehicles?.find((v) => String(v.id) === form.vehicleId) || selectedCustomer.vehicles?.[0] || null;
+
+        // Get appointment data if available
+        const quotationDataFromStorage = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
+        const appointmentData = quotationDataFromStorage?.appointmentData;
+
+        // Get service center info
+        const normalizedServiceCenterId = activeServiceCenterId || serviceCenterContext.serviceCenterId?.toString() || "sc-001";
+        const serviceCenter = staticServiceCenters.find(
+          (sc) => (sc as any).serviceCenterId === normalizedServiceCenterId || sc.id?.toString() === normalizedServiceCenterId
+        );
+        const serviceCenterName = serviceCenter?.name || serviceCenterContext.serviceCenterName || "Service Center";
+
+        // Convert form data to enhanced check-in slip data
+        const enhancedData = convertCheckInSlipFormToData(
+          checkInSlipFormData,
+          selectedCustomer,
+          vehicle,
+          appointmentData,
+          normalizedServiceCenterId,
+          serviceCenterName
+        );
+
+        setCheckInSlipData(enhancedData);
+
+        // Convert check-in slip to quotation format and save it
+        const checkInSlipQuotation: Quotation = {
+          id: `checkin-${Date.now()}`,
+          quotationNumber: enhancedData.slipNumber,
+          serviceCenterId: normalizedServiceCenterId,
+          customerId: selectedCustomer.id?.toString() || "",
+          vehicleId: vehicle?.id?.toString(),
+          serviceAdvisorId: userInfo?.id || "",
+          appointmentId: appointmentData?.id || quotationDataFromStorage?.appointmentId,
+          documentType: "Check-in Slip",
+          quotationDate: enhancedData.checkInDate,
+          validUntil: undefined,
+          hasInsurance: false,
+          insurerId: undefined,
+          subtotal: 0,
+          discount: 0,
+          discountPercent: 0,
+          preGstAmount: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          totalAmount: 0,
+          notes: enhancedData.notes || enhancedData.customerFeedback || "",
+          batterySerialNumber: enhancedData.batterySerialNumber,
+          customNotes: enhancedData.technicalObservation || "",
+          noteTemplateId: undefined,
+          status: "draft",
+          passedToManager: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          items: [],
+          customer: {
+            id: selectedCustomer.id?.toString() || "",
+            firstName: selectedCustomer.name?.split(" ")[0] || "Customer",
+            lastName: selectedCustomer.name?.split(" ").slice(1).join(" ") || "",
+            phone: selectedCustomer.phone || "",
+            email: selectedCustomer.email,
+            address: selectedCustomer.address,
+            city: selectedCustomer.cityState?.split(",")[0] || "",
+            state: selectedCustomer.cityState?.split(",")[1]?.trim() || "",
+            pincode: selectedCustomer.pincode || "",
+          },
+          vehicle: vehicle ? {
+            id: vehicle.id?.toString() || "",
+            make: vehicle.vehicleMake || "",
+            model: vehicle.vehicleModel || "",
+            registration: vehicle.registration || "",
+            vin: vehicle.vin || "",
+          } : undefined,
+          serviceCenter: {
+            id: normalizedServiceCenterId,
+            name: serviceCenterName,
+            code: SERVICE_CENTER_CODE_MAP[normalizedServiceCenterId] || "SC001",
+            address: enhancedData.serviceCenterAddress,
+            city: enhancedData.serviceCenterCity,
+            state: enhancedData.serviceCenterState,
+            pincode: enhancedData.serviceCenterPincode,
+            phone: enhancedData.serviceCenterPhone,
+          },
+        };
+
+        // Save check-in slip as quotation
+        persistQuotation(checkInSlipQuotation);
+
+        // Store enhanced check-in slip data for display
+        safeStorage.setItem(`checkInSlip_${checkInSlipQuotation.id}`, enhancedData);
+
+        setShowCheckInSlipModal(true);
+        // Keep form open so user can send via WhatsApp
+        // setShowCreateModal(false);
+
+        // Clear stored appointment data if exists
+        if (quotationDataFromStorage) {
+          safeStorage.removeItem("pendingQuotationFromAppointment");
+        }
+
+        alert("Check-in slip generated successfully! You can now send it to the customer via WhatsApp.");
+      } catch (error) {
+        console.error("Error creating check-in slip:", error);
+        alert("Failed to create check-in slip. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Handle quotation/proforma invoice
+    if (!validateQuotationForm()) {
       return;
     }
 
     try {
       setLoading(true);
-      
-      const vehicle = selectedCustomer.vehicles?.find((v) => String(v.id) === form.vehicleId) || selectedCustomer.vehicles?.[0] || null;
-      
-      // Get appointment data if available
-      const quotationDataFromStorage = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
-      const appointmentData = quotationDataFromStorage?.appointmentData;
+      const newQuotation = buildQuotationFromForm();
+      persistQuotation(newQuotation);
+      setFilter("draft");
 
-      // Get service center info
-      const normalizedServiceCenterId = activeServiceCenterId || serviceCenterContext.serviceCenterId?.toString() || "sc-001";
-      const serviceCenter = staticServiceCenters.find(
-        (sc) => (sc as any).serviceCenterId === normalizedServiceCenterId || sc.id?.toString() === normalizedServiceCenterId
-      );
-      const serviceCenterName = serviceCenter?.name || serviceCenterContext.serviceCenterName || "Service Center";
-
-      // Convert form data to enhanced check-in slip data
-      const enhancedData = convertCheckInSlipFormToData(
-        checkInSlipFormData,
-        selectedCustomer,
-        vehicle,
-        appointmentData,
-        normalizedServiceCenterId,
-        serviceCenterName
-      );
-
-      setCheckInSlipData(enhancedData);
-      
-      // Convert check-in slip to quotation format and save it
-      const checkInSlipQuotation: Quotation = {
-        id: `checkin-${Date.now()}`,
-        quotationNumber: enhancedData.slipNumber,
-        serviceCenterId: normalizedServiceCenterId,
-        customerId: selectedCustomer.id?.toString() || "",
-        vehicleId: vehicle?.id?.toString(),
-        serviceAdvisorId: userInfo?.id || "",
-        appointmentId: appointmentData?.id || quotationDataFromStorage?.appointmentId,
-        documentType: "Check-in Slip",
-        quotationDate: enhancedData.checkInDate,
-        validUntil: undefined,
-        hasInsurance: false,
-        insurerId: undefined,
-        subtotal: 0,
-        discount: 0,
-        discountPercent: 0,
-        preGstAmount: 0,
-        cgstAmount: 0,
-        sgstAmount: 0,
-        igstAmount: 0,
-        totalAmount: 0,
-        notes: enhancedData.notes || enhancedData.customerFeedback || "",
-        batterySerialNumber: enhancedData.batterySerialNumber,
-        customNotes: enhancedData.technicalObservation || "",
-        noteTemplateId: undefined,
-        status: "draft",
-        passedToManager: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        items: [],
-        customer: {
-          id: selectedCustomer.id?.toString() || "",
-          firstName: selectedCustomer.name?.split(" ")[0] || "Customer",
-          lastName: selectedCustomer.name?.split(" ").slice(1).join(" ") || "",
-          phone: selectedCustomer.phone || "",
-          email: selectedCustomer.email,
-          address: selectedCustomer.address,
-          city: selectedCustomer.cityState?.split(",")[0] || "",
-          state: selectedCustomer.cityState?.split(",")[1]?.trim() || "",
-          pincode: selectedCustomer.pincode || "",
-        },
-        vehicle: vehicle ? {
-          id: vehicle.id?.toString() || "",
-          make: vehicle.vehicleMake || "",
-          model: vehicle.vehicleModel || "",
-          registration: vehicle.registration || "",
-          vin: vehicle.vin || "",
-        } : undefined,
-        serviceCenter: {
-          id: normalizedServiceCenterId,
-          name: serviceCenterName,
-          code: SERVICE_CENTER_CODE_MAP[normalizedServiceCenterId] || "SC001",
-          address: enhancedData.serviceCenterAddress,
-          city: enhancedData.serviceCenterCity,
-          state: enhancedData.serviceCenterState,
-          pincode: enhancedData.serviceCenterPincode,
-          phone: enhancedData.serviceCenterPhone,
-        },
-      };
-
-      // Save check-in slip as quotation
-      persistQuotation(checkInSlipQuotation);
-      
-      // Store enhanced check-in slip data for display
-      safeStorage.setItem(`checkInSlip_${checkInSlipQuotation.id}`, enhancedData);
-      
-      setShowCheckInSlipModal(true);
-      // Keep form open so user can send via WhatsApp
-      // setShowCreateModal(false);
-      
-      // Clear stored appointment data if exists
-      if (quotationDataFromStorage) {
-        safeStorage.removeItem("pendingQuotationFromAppointment");
-      }
-      
-      alert("Check-in slip generated successfully! You can now send it to the customer via WhatsApp.");
+      alert("Quotation created successfully!");
+      setShowCreateModal(false);
+      resetForm();
     } catch (error) {
-      console.error("Error creating check-in slip:", error);
-      alert("Failed to create check-in slip. Please try again.");
+      console.error("Error creating quotation:", error);
+      alert("Failed to create quotation. Please try again.");
     } finally {
       setLoading(false);
     }
-    return;
-  }
+  };
 
-  // Handle quotation/proforma invoice
-  if (!validateQuotationForm()) {
-    return;
-  }
+  const handleCreateAndSendToCustomer = async () => {
+    if (!validateQuotationForm()) {
+      return;
+    }
 
-  try {
-    setLoading(true);
-    const newQuotation = buildQuotationFromForm();
-    persistQuotation(newQuotation);
-    setFilter("draft");
+    try {
+      setLoading(true);
+      const newQuotation = buildQuotationFromForm();
+      persistQuotation(newQuotation);
+      setFilter("sent_to_customer");
 
-    alert("Quotation created successfully!");
-    setShowCreateModal(false);
-    resetForm();
-  } catch (error) {
-    console.error("Error creating quotation:", error);
-    alert("Failed to create quotation. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+      await sendQuotationToCustomerById(newQuotation.id, { manageLoading: false });
 
-const handleCreateAndSendToCustomer = async () => {
-  if (!validateQuotationForm()) {
-    return;
-  }
-
-  try {
-    setLoading(true);
-    const newQuotation = buildQuotationFromForm();
-    persistQuotation(newQuotation);
-    setFilter("sent_to_customer");
-
-    await sendQuotationToCustomerById(newQuotation.id, { manageLoading: false });
-
-    setShowCreateModal(false);
-    resetForm();
-  } catch (error) {
-    console.error("Error creating and sending quotation:", error);
-    alert("Failed to create and send quotation. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+      setShowCreateModal(false);
+      resetForm();
+    } catch (error) {
+      console.error("Error creating and sending quotation:", error);
+      alert("Failed to create and send quotation. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Generate and Send Check-in Slip to Customer
   const handleGenerateAndSendCheckInSlip = async () => {
@@ -1464,9 +1446,9 @@ const handleCreateAndSendToCustomer = async () => {
 
     try {
       setLoading(true);
-      
+
       const vehicle = selectedCustomer.vehicles?.find((v) => String(v.id) === form.vehicleId) || selectedCustomer.vehicles?.[0] || null;
-      
+
       // Get appointment data if available
       const quotationDataFromStorage = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
       const appointmentData = quotationDataFromStorage?.appointmentData;
@@ -1489,7 +1471,7 @@ const handleCreateAndSendToCustomer = async () => {
       );
 
       setCheckInSlipData(enhancedData);
-      
+
       // Convert check-in slip to quotation format and save it
       const checkInSlipQuotation: Quotation = {
         id: `checkin-${Date.now()}`,
@@ -1553,10 +1535,10 @@ const handleCreateAndSendToCustomer = async () => {
 
       // Save check-in slip as quotation
       persistQuotation(checkInSlipQuotation);
-      
+
       // Store enhanced check-in slip data for display
       safeStorage.setItem(`checkInSlip_${checkInSlipQuotation.id}`, enhancedData);
-      
+
       // Clear stored appointment data if exists
       if (quotationDataFromStorage) {
         safeStorage.removeItem("pendingQuotationFromAppointment");
@@ -1583,12 +1565,12 @@ const handleCreateAndSendToCustomer = async () => {
       });
       const checkInTime = enhancedData.checkInTime.includes(":")
         ? (() => {
-            const [hours, minutes] = enhancedData.checkInTime.split(":");
-            const hour = parseInt(hours, 10);
-            const ampm = hour >= 12 ? "PM" : "AM";
-            const displayHour = hour % 12 || 12;
-            return `${displayHour}:${minutes} ${ampm}`;
-          })()
+          const [hours, minutes] = enhancedData.checkInTime.split(":");
+          const hour = parseInt(hours, 10);
+          const ampm = hour >= 12 ? "PM" : "AM";
+          const displayHour = hour % 12 || 12;
+          return `${displayHour}:${minutes} ${ampm}`;
+        })()
         : enhancedData.checkInTime;
 
       // Create WhatsApp message
@@ -1604,7 +1586,7 @@ Please keep this slip safe for vehicle collection.`;
 
       // Open WhatsApp
       window.open(whatsappUrl, "_blank");
-      
+
       alert("Check-in slip generated and sent to customer via WhatsApp!");
       setShowCreateModal(false);
       resetForm();
@@ -1646,12 +1628,12 @@ Please keep this slip safe for vehicle collection.`;
       });
       const checkInTime = checkInSlipData.checkInTime.includes(":")
         ? (() => {
-            const [hours, minutes] = checkInSlipData.checkInTime.split(":");
-            const hour = parseInt(hours, 10);
-            const ampm = hour >= 12 ? "PM" : "AM";
-            const displayHour = hour % 12 || 12;
-            return `${displayHour}:${minutes} ${ampm}`;
-          })()
+          const [hours, minutes] = checkInSlipData.checkInTime.split(":");
+          const hour = parseInt(hours, 10);
+          const ampm = hour >= 12 ? "PM" : "AM";
+          const displayHour = hour % 12 || 12;
+          return `${displayHour}:${minutes} ${ampm}`;
+        })()
         : checkInSlipData.checkInTime;
 
       // Create WhatsApp message
@@ -1683,27 +1665,27 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
-      
+
       // Update quotation status
       const updatedQuotations = quotations.map((q) =>
         q.id === quotationId
           ? {
-              ...q,
-              status: "sent_to_customer" as const,
-              sentToCustomer: true,
-              sentToCustomerAt: new Date().toISOString(),
-              whatsappSent: true,
-              whatsappSentAt: new Date().toISOString(),
-            }
+            ...q,
+            status: "sent_to_customer" as const,
+            sentToCustomer: true,
+            sentToCustomerAt: new Date().toISOString(),
+            whatsappSent: true,
+            whatsappSentAt: new Date().toISOString(),
+          }
           : q
       );
-      
+
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
-      
+
       // Create or update lead when quotation is sent to customer
       createOrUpdateLeadFromQuotation(quotation);
-      
+
       // Get service center and advisor details
       const serviceCenterData: any = quotation.serviceCenter || {
         name: "42 EV Tech & Services",
@@ -1800,12 +1782,12 @@ Please keep this slip safe for vehicle collection.`;
 
   // Convert Quotation to Job Card
   const convertQuotationToJobCard = (quotation: Quotation) => {
-  const resolvedServiceCenterId = normalizeServiceCenterId(quotation.serviceCenterId);
-  const serviceCenterCode = getServiceCenterCode(resolvedServiceCenterId);
+    const resolvedServiceCenterId = normalizeServiceCenterId(quotation.serviceCenterId);
+    const serviceCenterCode = getServiceCenterCode(resolvedServiceCenterId);
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
-    
+
     // Get next sequence number
     const existingJobCards = safeStorage.getItem<any[]>("jobCards", []);
     const lastJobCard = existingJobCards
@@ -1815,13 +1797,13 @@ Please keep this slip safe for vehicle collection.`;
         const bSeq = parseInt(b.jobCardNumber?.split("-")[3] || "0");
         return bSeq - aSeq;
       })[0];
-    
+
     const nextSequence = lastJobCard
       ? parseInt(lastJobCard.jobCardNumber?.split("-")[3] || "0") + 1
       : 1;
-    
+
     const jobCardNumber = `${serviceCenterCode}-${year}-${month}-${String(nextSequence).padStart(4, "0")}`;
-    
+
     // Create job card from quotation
     const newJobCard = {
       id: `JC-${Date.now()}`,
@@ -1849,21 +1831,21 @@ Please keep this slip safe for vehicle collection.`;
       hasInsurance: quotation.hasInsurance,
       insurerName: quotation.insurer?.name,
     };
-    
+
     // Save job card
     const updatedJobCards = [...existingJobCards, newJobCard];
     safeStorage.setItem("jobCards", updatedJobCards);
-    
+
     return newJobCard;
   };
 
   // Create or Update Lead from Quotation (when sent to customer)
   const createOrUpdateLeadFromQuotation = (quotation: Quotation) => {
     const existingLeads = safeStorage.getItem<any[]>("leads", []);
-    
+
     // Check if lead already exists for this quotation
     const existingLeadIndex = existingLeads.findIndex((l) => l.quotationId === quotation.id);
-    
+
     const leadData: any = {
       customerId: quotation.customerId,
       customerName: quotation.customer?.firstName + " " + (quotation.customer?.lastName || "") || "Customer",
@@ -1883,7 +1865,7 @@ Please keep this slip safe for vehicle collection.`;
       serviceCenterId: quotation.serviceCenterId,
       updatedAt: new Date().toISOString(),
     };
-    
+
     if (existingLeadIndex !== -1) {
       // Update existing lead
       existingLeads[existingLeadIndex] = {
@@ -1911,13 +1893,13 @@ Please keep this slip safe for vehicle collection.`;
   const updateLeadOnJobCardCreation = (quotationId: string, jobCardId: string, jobCardNumber: string) => {
     const existingLeads = safeStorage.getItem<any[]>("leads", []);
     const leadIndex = existingLeads.findIndex((l) => l.quotationId === quotationId);
-    
+
     if (leadIndex !== -1) {
       const lead = existingLeads[leadIndex];
-      const updatedNotes = lead.notes 
+      const updatedNotes = lead.notes
         ? `${lead.notes}\nJob card created: ${jobCardNumber}`
         : `Job card created: ${jobCardNumber}`;
-      
+
       existingLeads[leadIndex] = {
         ...lead,
         status: "job_card_in_progress" as const,
@@ -1929,7 +1911,7 @@ Please keep this slip safe for vehicle collection.`;
       safeStorage.setItem("leads", existingLeads);
       return existingLeads[leadIndex];
     }
-    
+
     // If no lead exists, create one with job_card_in_progress status
     const quotation = quotations.find((q) => q.id === quotationId);
     if (quotation) {
@@ -1959,14 +1941,14 @@ Please keep this slip safe for vehicle collection.`;
       safeStorage.setItem("leads", updatedLeads);
       return newLead;
     }
-    
+
     return null;
   };
 
   // Add Rejected Quotation to Leads
   const addRejectedQuotationToLeads = (quotation: Quotation) => {
     const existingLeads = safeStorage.getItem<any[]>("leads", []);
-    
+
     const newLead: any = {
       id: `lead-${Date.now()}`,
       customerId: quotation.customerId,
@@ -1989,10 +1971,10 @@ Please keep this slip safe for vehicle collection.`;
       convertedTo: "quotation" as const,
       convertedId: quotation.id,
     };
-    
+
     const updatedLeads = [...existingLeads, newLead];
     safeStorage.setItem("leads", updatedLeads);
-    
+
     return newLead;
   };
 
@@ -2004,34 +1986,34 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
-      
+
       const quotation = quotations.find((q) => q.id === quotationId);
       if (!quotation) {
         alert("Quotation not found!");
         return;
       }
-      
+
       // Update quotation status
       const updatedQuotations = quotations.map((q) =>
         q.id === quotationId
           ? {
-              ...q,
-              status: "customer_approved" as const,
-              customerApproved: true,
-              customerApprovedAt: new Date().toISOString(),
-            }
+            ...q,
+            status: "customer_approved" as const,
+            customerApproved: true,
+            customerApprovedAt: new Date().toISOString(),
+          }
           : q
       );
-      
+
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
-      
+
       // Find temporary job card linked to quotation
       const storedJobCards = safeStorage.getItem<any[]>("jobCards", []);
-      const tempJobCard = storedJobCards.find((jc) => 
+      const tempJobCard = storedJobCards.find((jc) =>
         jc.id === quotation.jobCardId && jc.isTemporary === true
       );
-      
+
       let jobCard;
       if (tempJobCard) {
         // Convert job card in-place
@@ -2050,13 +2032,13 @@ Please keep this slip safe for vehicle collection.`;
         // Fallback: Create new job card if temporary one not found
         jobCard = convertQuotationToJobCard(quotation);
       }
-      
+
       // Update lead status to job_card_in_progress or converted
       updateLeadOnJobCardCreation(quotation.id, jobCard.id, jobCard.jobCardNumber);
-      
+
       // Show notification to advisor
       alert(`✅ Customer Approved!\n\nQuotation ${quotation.quotationNumber} has been approved by the customer.\n\nJob Card: ${jobCard.jobCardNumber}\n\nJob card has been automatically sent to Service Manager for technician assignment and parts monitoring.`);
-      
+
       // In production, you would send a notification/email to the advisor and manager here
       console.log("Notification to advisor:", {
         advisorId: quotation.serviceAdvisorId,
@@ -2064,13 +2046,13 @@ Please keep this slip safe for vehicle collection.`;
         quotationId: quotation.id,
         jobCardId: jobCard.id,
       });
-      
+
       console.log("Notification to manager:", {
         message: `New job card ${jobCard.jobCardNumber} requires technician assignment and parts monitoring.`,
         jobCardId: jobCard.id,
         jobCardNumber: jobCard.jobCardNumber,
       });
-      
+
     } catch (error) {
       console.error("Error approving quotation:", error);
       alert("Failed to approve quotation. Please try again.");
@@ -2087,34 +2069,34 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
-      
+
       const quotation = quotations.find((q) => q.id === quotationId);
       if (!quotation) {
         alert("Quotation not found!");
         return;
       }
-      
+
       // Update quotation status
       const updatedQuotations = quotations.map((q) =>
         q.id === quotationId
           ? {
-              ...q,
-              status: "customer_rejected" as const,
-              customerRejected: true,
-              customerRejectedAt: new Date().toISOString(),
-            }
+            ...q,
+            status: "customer_rejected" as const,
+            customerRejected: true,
+            customerRejectedAt: new Date().toISOString(),
+          }
           : q
       );
-      
+
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
-      
+
       // Add to leads for follow-up
       const lead = addRejectedQuotationToLeads(quotation);
-      
+
       // Show notification to advisor
       alert(`⚠️ Customer Rejected Quotation\n\nQuotation ${quotation.quotationNumber} has been rejected by the customer.\n\nAdded to Leads for follow-up.\n\nLead ID: ${lead.id}\n\nPlease follow up with the customer to understand their concerns.`);
-      
+
       // In production, you would send a notification/email to the advisor here
       console.log("Notification to advisor:", {
         advisorId: quotation.serviceAdvisorId,
@@ -2122,7 +2104,7 @@ Please keep this slip safe for vehicle collection.`;
         quotationId: quotation.id,
         leadId: lead.id,
       });
-      
+
       alert("Quotation marked as customer rejected.");
     } catch (error) {
       console.error("Error rejecting quotation:", error);
@@ -2140,21 +2122,21 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
-      
+
       const updatedQuotations = quotations.map((q) =>
         q.id === quotationId
           ? {
-              ...q,
-              status: "sent_to_manager" as const,
-              sentToManager: true,
-              sentToManagerAt: new Date().toISOString(),
-            }
+            ...q,
+            status: "sent_to_manager" as const,
+            sentToManager: true,
+            sentToManagerAt: new Date().toISOString(),
+          }
           : q
       );
-      
+
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
-      
+
       alert("Quotation sent to manager!");
     } catch (error) {
       console.error("Error sending to manager:", error);
@@ -2172,22 +2154,22 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
-      
+
       const updatedQuotations = quotations.map((q) =>
         q.id === quotationId
           ? {
-              ...q,
-              status: "manager_approved" as const,
-              managerApproved: true,
-              managerApprovedAt: new Date().toISOString(),
-              managerId: userInfo?.id || "",
-            }
+            ...q,
+            status: "manager_approved" as const,
+            managerApproved: true,
+            managerApprovedAt: new Date().toISOString(),
+            managerId: userInfo?.id || "",
+          }
           : q
       );
-      
+
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
-      
+
       alert("Quotation approved by manager!");
     } catch (error) {
       console.error("Error approving quotation:", error);
@@ -2205,22 +2187,22 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
-      
+
       const updatedQuotations = quotations.map((q) =>
         q.id === quotationId
           ? {
-              ...q,
-              status: "manager_rejected" as const,
-              managerRejected: true,
-              managerRejectedAt: new Date().toISOString(),
-              managerId: userInfo?.id || "",
-            }
+            ...q,
+            status: "manager_rejected" as const,
+            managerRejected: true,
+            managerRejectedAt: new Date().toISOString(),
+            managerId: userInfo?.id || "",
+          }
           : q
       );
-      
+
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
-      
+
       alert("Quotation rejected by manager.");
     } catch (error) {
       console.error("Error rejecting quotation:", error);
@@ -2326,24 +2308,23 @@ Please keep this slip safe for vehicle collection.`;
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
-        </div>
+            </div>
             <div className="flex gap-2">
               {(["all", "draft", "sent_to_customer", "customer_approved", "customer_rejected", "sent_to_manager", "manager_approved", "manager_rejected"] as QuotationFilterType[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-4 py-2 rounded-lg font-medium transition ${
-                    filter === f
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg font-medium transition ${filter === f
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
                 >
-                  {f === "all" 
-                    ? "All" 
+                  {f === "all"
+                    ? "All"
                     : f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ")}
                 </button>
               ))}
-      </div>
+            </div>
           </div>
         </div>
 
@@ -2606,1216 +2587,5 @@ export default function Quotations() {
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
       <QuotationsContent />
     </Suspense>
-  );
-}
-
-// Create Quotation Modal Component (will be split due to size)
-function CreateQuotationModal({
-  form,
-  setForm,
-  selectedCustomer,
-  setSelectedCustomer,
-  activeServiceCenterId,
-  setActiveCustomerId,
-  customerSearchQuery,
-  setCustomerSearchQuery,
-  customerSearchResults,
-  clearCustomerSearch,
-  insurers,
-  noteTemplates,
-  totals,
-  addItem,
-  removeItem,
-  updateItem,
-  handleNoteTemplateChange,
-  handleSubmit,
-  handleCreateAndSendToCustomer,
-  handleGenerateAndSendCheckInSlip,
-  handleSendCheckInSlipToCustomer,
-  checkInSlipFormData,
-  setCheckInSlipFormData,
-  userInfo,
-  checkInSlipData,
-  onClose,
-  loading,
-}: any) {
-  // Get appointment data directly from localStorage as fallback
-  const appointmentDataFromStorage = typeof window !== "undefined" 
-    ? safeStorage.getItem<any>("pendingQuotationFromAppointment", null)?.appointmentData 
-    : null;
-  
-  // Get selected vehicle
-  const selectedVehicle = selectedCustomer?.vehicles?.find(
-    (v: Vehicle) => String(v.id) === form.vehicleId
-  ) || selectedCustomer?.vehicles?.[0] || null;
-  
-  // Get insurance data from form, vehicle, or appointment data (priority: form > vehicle > appointment)
-  const insuranceCompanyName = 
-    form.insuranceCompanyName || 
-    selectedVehicle?.insuranceCompanyName || 
-    appointmentDataFromStorage?.insuranceCompanyName || 
-    "";
-  const insuranceStartDate = 
-    form.insuranceStartDate || 
-    selectedVehicle?.insuranceStartDate || 
-    appointmentDataFromStorage?.insuranceStartDate || 
-    "";
-  const insuranceEndDate = 
-    form.insuranceEndDate || 
-    selectedVehicle?.insuranceEndDate || 
-    appointmentDataFromStorage?.insuranceEndDate || 
-    "";
-  const hasInsuranceData = !!(insuranceCompanyName || insuranceStartDate || insuranceEndDate);
-  
-  // This is a placeholder - the full modal will be implemented
-  // Due to size constraints, I'll create a comprehensive but focused version
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-[101]">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {form.documentType === "Check-in Slip" ? "Create Check-in Slip" : "Create Quotation"}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={24} />
-          </button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Document Type & Dates */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
-              <select
-                value={form.documentType}
-                onChange={(e) => setForm({ ...form, documentType: e.target.value as any })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value="Quotation">Quotation</option>
-                <option value="Proforma Invoice">Proforma Invoice</option>
-                <option value="Check-in Slip">Check-in Slip</option>
-              </select>
-            </div>
-            {form.documentType !== "Check-in Slip" && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Quotation Date</label>
-                  <input
-                    type="date"
-                    value={form.quotationDate}
-                    onChange={(e) => setForm({ ...form, quotationDate: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Valid Until (Days)</label>
-                  <select
-                    value={form.validUntilDays}
-                    onChange={(e) => setForm({ ...form, validUntilDays: Number(e.target.value) })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  >
-                    <option value={15}>15 days</option>
-                    <option value={30}>30 days</option>
-                    <option value={60}>60 days</option>
-                    <option value={90}>90 days</option>
-                  </select>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Customer Selection - Available for both Quotations and Check-in Slips */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Customer *</label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search customer by name, phone, or vehicle number..."
-                value={customerSearchQuery}
-                onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-              {customerSearchResults.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {customerSearchResults.map((customer: CustomerWithVehicles) => (
-                    <div
-                      key={customer.id}
-                      onClick={() => {
-                        setSelectedCustomer(customer);
-                        const firstVehicle = customer.vehicles?.[0];
-                        const vehicleId = firstVehicle?.id?.toString() || "";
-                        
-                        // Auto-populate insurance data from first vehicle if available
-                        setForm({ 
-                          ...form, 
-                          customerId: customer.id.toString(), 
-                          vehicleId: vehicleId,
-                          insuranceCompanyName: firstVehicle?.insuranceCompanyName || form.insuranceCompanyName || "",
-                          insuranceStartDate: firstVehicle?.insuranceStartDate || form.insuranceStartDate || "",
-                          insuranceEndDate: firstVehicle?.insuranceEndDate || form.insuranceEndDate || "",
-                          hasInsurance: !!(firstVehicle?.insuranceCompanyName || firstVehicle?.insuranceStartDate || firstVehicle?.insuranceEndDate || form.hasInsurance),
-                        });
-                        setActiveCustomerId(customer.id.toString());
-                        setCustomerSearchQuery("");
-                        clearCustomerSearch();
-                      }}
-                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="font-medium">{customer.name}</div>
-                      <div className="text-sm text-gray-500">{customer.phone}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {selectedCustomer && (
-              <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                <div className="font-medium">{selectedCustomer.name}</div>
-                <div className="text-sm text-gray-600">{selectedCustomer.phone}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Vehicle Selection - Available for both Quotations and Check-in Slips */}
-          {selectedCustomer && selectedCustomer.vehicles && selectedCustomer.vehicles.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle</label>
-              <select
-                value={form.vehicleId}
-                onChange={(e) => {
-                  const vehicleId = e.target.value;
-                  const vehicle = selectedCustomer.vehicles?.find((v: any) => String(v.id) === vehicleId);
-                  
-                  // Auto-populate insurance data from selected vehicle
-                  setForm({ 
-                    ...form, 
-                    vehicleId: vehicleId,
-                    insuranceCompanyName: vehicle?.insuranceCompanyName || form.insuranceCompanyName || "",
-                    insuranceStartDate: vehicle?.insuranceStartDate || form.insuranceStartDate || "",
-                    insuranceEndDate: vehicle?.insuranceEndDate || form.insuranceEndDate || "",
-                    hasInsurance: !!(vehicle?.insuranceCompanyName || vehicle?.insuranceStartDate || vehicle?.insuranceEndDate || form.hasInsurance),
-                  });
-                }}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value="">Select Vehicle</option>
-                {selectedCustomer.vehicles.map((vehicle: any) => (
-                  <option key={vehicle.id} value={vehicle.id.toString()}>
-                    {vehicle.vehicleMake} {vehicle.vehicleModel} - {vehicle.registration}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Check-in Slip Form */}
-          {form.documentType === "Check-in Slip" ? (
-            <CheckInSlipForm
-              formData={checkInSlipFormData}
-              onUpdate={(updates) => setCheckInSlipFormData((prev: CheckInSlipFormData) => ({ ...prev, ...updates }))}
-              customer={selectedCustomer}
-              vehicle={selectedCustomer?.vehicles?.find((v: Vehicle) => String(v.id) === form.vehicleId) || selectedCustomer?.vehicles?.[0] || null}
-              appointmentData={safeStorage.getItem<any>("pendingQuotationFromAppointment", null)?.appointmentData}
-              defaultServiceAdvisor={userInfo?.name}
-            />
-          ) : (
-            <>
-
-          {/* Insurance Details - Show pre-filled from appointment form */}
-          {hasInsuranceData && (
-            <div className="border border-gray-200 rounded-lg p-4 bg-blue-50">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <span>Insurance Details</span>
-                <span className="text-xs font-normal text-gray-500">(from appointment)</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {insuranceCompanyName && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Insurance Company Name</label>
-                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 font-medium">
-                      {insuranceCompanyName}
-                    </div>
-                    {!form.insurerId && (
-                      <div className="mt-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Select Matching Insurer (Optional)</label>
-                        <select
-                          value={form.insurerId || ""}
-                          onChange={(e) => setForm({ ...form, insurerId: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm bg-white"
-                        >
-                          <option value="">Select Insurer</option>
-                          {insurers.map((insurer: Insurer) => (
-                            <option key={insurer.id} value={insurer.id}>
-                              {insurer.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {form.insurerId && (
-                      <div className="mt-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Matched Insurer</label>
-                        <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 font-medium">
-                          {insurers.find((i: Insurer) => i.id === form.insurerId)?.name || "Selected Insurer"}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {insuranceStartDate && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Insurance Start Date</label>
-                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900">
-                      {new Date(insuranceStartDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </div>
-                  </div>
-                )}
-                
-                {insuranceEndDate && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Insurance End Date</label>
-                    <div className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900">
-                      {new Date(insuranceEndDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Parts & Services Table */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-gray-700">Parts & Services</label>
-              <button
-                type="button"
-                onClick={addItem}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
-                + Add Item
-              </button>
-            </div>
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Part Name *</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Part Number</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">HSN/SAC</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">GST %</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {form.items.map((item: QuotationItem, index: number) => (
-                    <tr key={index}>
-                      <td className="px-3 py-2">{item.serialNumber}</td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={item.partName}
-                          onChange={(e) => updateItem(index, "partName", e.target.value)}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                          required
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={item.partNumber}
-                          onChange={(e) => updateItem(index, "partNumber", e.target.value)}
-                          placeholder="MCU-"
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={item.hsnSacCode}
-                          onChange={(e) => updateItem(index, "hsnSacCode", e.target.value)}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
-                          min="1"
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                          required
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          value={item.rate}
-                          onChange={(e) => updateItem(index, "rate", Number(e.target.value))}
-                          min="0"
-                          step="0.01"
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                          required
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          value={item.gstPercent}
-                          onChange={(e) => updateItem(index, "gstPercent", Number(e.target.value))}
-                          min="0"
-                          max="100"
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="text-sm">₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Pricing Summary */}
-          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Pricing Summary</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-700">Subtotal:</span>
-                <span className="font-medium">₹{totals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-700">Discount ({totals.discountPercent.toFixed(1)}%):</span>
-                <span className="font-medium">-₹{totals.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-700">Pre-GST Amount:</span>
-                <span className="font-medium">₹{totals.preGstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-700">CGST (9%):</span>
-                <span className="font-medium">₹{totals.cgst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-700">SGST (9%):</span>
-                <span className="font-medium">₹{totals.sgst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-700">IGST (18%):</span>
-                <span className="font-medium">₹{totals.igst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="border-t border-gray-300 pt-2 mt-2 flex justify-between">
-                <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-                <span className="text-lg font-bold text-blue-600">₹{totals.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
-            </div>
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Discount (₹)</label>
-              <input
-                type="number"
-                value={form.discount}
-                onChange={(e) => setForm({ ...form, discount: Number(e.target.value) })}
-                min="0"
-                step="0.01"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Notes Section */}
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Notes</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Note Template</label>
-                <select
-                  value={form.noteTemplateId}
-                  onChange={(e) => handleNoteTemplateChange(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                >
-                  <option value="">Select Template</option>
-                  {noteTemplates.map((template: NoteTemplate) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Battery Serial Number</label>
-                <input
-                  type="text"
-                  value={form.batterySerialNumber}
-                  onChange={(e) => setForm({ ...form, batterySerialNumber: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  rows={4}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="Enter notes or select a template above"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Custom Notes</label>
-                <textarea
-                  value={form.customNotes}
-                  onChange={(e) => setForm({ ...form, customNotes: e.target.value })}
-                  rows={3}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="Additional custom notes"
-                />
-              </div>
-            </div>
-          </div>
-            </>
-          )}
-
-          {/* Actions */}
-          <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
-            >
-              Cancel
-            </button>
-            {form.documentType === "Check-in Slip" && checkInSlipData && (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleSendCheckInSlipToCustomer}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 inline-flex items-center gap-2"
-              >
-                <MessageCircle size={18} />
-                {loading ? "Sending..." : "Send to Customer via WhatsApp"}
-              </button>
-            )}
-            {form.documentType === "Check-in Slip" && selectedCustomer && handleGenerateAndSendCheckInSlip && (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleGenerateAndSendCheckInSlip}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
-              >
-                {loading ? "Sending..." : "Generate & Send to Customer"}
-              </button>
-            )}
-            {form.documentType !== "Check-in Slip" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Pass to manager logic
-                    alert("Pass to manager functionality will be implemented");
-                  }}
-                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
-                >
-                  Pass to Manager
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={handleCreateAndSendToCustomer}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
-                >
-                  {loading ? "Sending..." : "Create & Send to Customer"}
-                </button>
-              </>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
-            >
-              {loading 
-                ? (form.documentType === "Check-in Slip" ? "Generating..." : "Creating...") 
-                : (form.documentType === "Check-in Slip" ? "Generate Check-in Slip" : "Create Quotation")
-              }
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// View Quotation Modal - Proforma Invoice Template
-function ViewQuotationModal({ 
-  quotation, 
-  onClose, 
-  onSendToCustomer,
-  onCustomerApproval,
-  onCustomerRejection,
-  onSendToManager,
-  onManagerApproval,
-  onManagerRejection,
-  userInfo,
-  userRole,
-  isServiceAdvisor,
-  isServiceManager,
-}: any) {
-  // Mock service center details (in production, fetch from service center data)
-  const serviceCenter = quotation.serviceCenter || {
-    name: "42 EV Tech & Services",
-    address: "123 Main Street, Industrial Area",
-    city: "Pune",
-    state: "Maharashtra",
-    pincode: "411001",
-    phone: "+91-20-12345678",
-    gstNumber: "27AAAAA0000A1Z5",
-    panNumber: "AAAAA0000A",
-  };
-
-  // Service advisor details from user info
-  const serviceAdvisor = {
-    name: userInfo?.name || "Service Advisor",
-    phone: userInfo?.phone || "+91-9876543210",
-  };
-
-  const validUntilDate = quotation.validUntil 
-    ? new Date(quotation.validUntil).toLocaleDateString("en-IN")
-    : "N/A";
-
-  const quotationDate = new Date(quotation.quotationDate).toLocaleDateString("en-IN");
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[95vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-[101] no-print">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {quotation.documentType === "Proforma Invoice" ? "Proforma Invoice" : "Quotation"}
-          </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm inline-flex items-center gap-2"
-            >
-              <Printer size={16} />
-              Print/Download
-            </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <X size={24} />
-            </button>
-          </div>
-        </div>
-
-        {/* Proforma Invoice Template */}
-        <div className="p-8 bg-white">
-          <style dangerouslySetInnerHTML={{__html: `
-            .pricing-summary-table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            .pricing-summary-table td {
-              padding: 8px 12px;
-              white-space: nowrap;
-            }
-            .pricing-summary-table td:first-child {
-              text-align: left;
-            }
-            .pricing-summary-table td:last-child {
-              text-align: right;
-            }
-            @media print {
-              * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-                height: auto !important;
-              }
-              .no-print {
-                display: none !important;
-              }
-              body {
-                background: white !important;
-                margin: 0 !important;
-                padding: 10px 15px !important;
-                font-size: 12px !important;
-              }
-              @page {
-                margin: 0.8cm !important;
-                size: A4;
-              }
-              @page :first {
-                margin: 0.8cm !important;
-              }
-              .border-b-2 {
-                padding-bottom: 10px !important;
-                margin-bottom: 12px !important;
-              }
-              .mb-6 {
-                margin-bottom: 12px !important;
-              }
-              h3 {
-                font-size: 14px !important;
-                margin-bottom: 8px !important;
-              }
-              .text-xl {
-                font-size: 16px !important;
-              }
-              table {
-                font-size: 11px !important;
-                margin: 12px 0 !important;
-              }
-              th, td {
-                padding: 6px 4px !important;
-                font-size: 11px !important;
-              }
-              .text-lg {
-                font-size: 14px !important;
-              }
-              .text-sm {
-                font-size: 11px !important;
-              }
-              .grid {
-                gap: 8px !important;
-              }
-              .space-y-1 {
-                gap: 4px !important;
-              }
-              .pricing-summary-container {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-                max-width: 100% !important;
-                width: 100% !important;
-                margin-left: 0 !important;
-                margin-right: 0 !important;
-                margin-bottom: 12px !important;
-              }
-              .pricing-summary-table {
-                width: 100% !important;
-                max-width: 100% !important;
-                table-layout: fixed !important;
-                font-size: 12px !important;
-              }
-              .pricing-summary-table td {
-                white-space: nowrap !important;
-                overflow: visible !important;
-                padding: 6px 8px !important;
-                font-size: 12px !important;
-              }
-              .pricing-summary-table td:first-child {
-                width: 65% !important;
-                text-align: left !important;
-                padding-right: 15px !important;
-              }
-              .pricing-summary-table td:last-child {
-                width: 35% !important;
-                text-align: right !important;
-                padding-left: 15px !important;
-              }
-              .pricing-summary-row {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-              .border-t-2 {
-                padding-top: 8px !important;
-              }
-              .text-lg.font-bold {
-                font-size: 14px !important;
-              }
-            }
-          `}} />
-          {/* Header Section */}
-          <div className="border-b-2 border-gray-300 pb-6 mb-6">
-            <div className="flex justify-between items-start">
-              {/* Company Logo & Details */}
-              <div className="flex-1">
-                <div className="mb-4">
-                  {/* Logo placeholder - in production, use actual logo */}
-                  <div className="w-32 h-20 bg-gray-200 rounded flex items-center justify-center mb-3">
-                    <Building2 className="text-gray-400" size={40} />
-                  </div>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <h3 className="text-xl font-bold text-gray-900">{serviceCenter.name}</h3>
-                  <p className="text-gray-700">{serviceCenter.address}</p>
-                  <p className="text-gray-700">
-                    {serviceCenter.city}, {serviceCenter.state} - {serviceCenter.pincode}
-                  </p>
-                  <p className="text-gray-700">Phone: {serviceCenter.phone}</p>
-                  {serviceCenter.panNumber && (
-                    <p className="text-gray-700">PAN: {serviceCenter.panNumber}</p>
-                  )}
-                  {serviceCenter.gstNumber && (
-                    <p className="text-gray-700">GST: {serviceCenter.gstNumber}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Document Type & Details */}
-              <div className="text-right">
-                <div className="mb-4">
-                  <h2 className="text-3xl font-bold text-blue-600 mb-2">
-                    {quotation.documentType === "Proforma Invoice" ? "PROFORMA INVOICE" : "QUOTATION"}
-                  </h2>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="font-semibold text-gray-700">Document No:</span>
-                    <p className="text-gray-900 font-medium">{quotation.quotationNumber}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Date:</span>
-                    <p className="text-gray-900">{quotationDate}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Valid Till:</span>
-                    <p className="text-gray-900">{validUntilDate}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Service Advisor Details */}
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex gap-6 text-sm">
-                <div>
-                  <span className="font-semibold text-gray-700">Service Advisor:</span>
-                  <span className="text-gray-900 ml-2">{serviceAdvisor.name}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-gray-700">Phone:</span>
-                  <span className="text-gray-900 ml-2">{serviceAdvisor.phone}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Customer & Vehicle Details */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-2">
-              Customer & Vehicle Details
-            </h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-1">Customer Name</p>
-                <p className="text-gray-900">
-                  {quotation.customer?.firstName || ""} {quotation.customer?.lastName || ""}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-1">Phone Number</p>
-                <p className="text-gray-900">{quotation.customer?.phone || "N/A"}</p>
-              </div>
-              {quotation.vehicle && (
-                <>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Number</p>
-                    <p className="text-gray-900">{quotation.vehicle.registration || "N/A"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700 mb-1">Brand and Model</p>
-                    <p className="text-gray-900">
-                      {quotation.vehicle.make || ""} {quotation.vehicle.model || ""}
-                    </p>
-                  </div>
-                </>
-              )}
-              {quotation.vehicleLocation && (
-                <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-1">Vehicle Location</p>
-                  <p className="text-gray-900">
-                    {quotation.vehicleLocation === "with_customer" ? "Vehicle with Customer" : "Vehicle at Workshop"}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Insurance Details */}
-          {quotation.hasInsurance && (quotation.insurer || quotation.insuranceStartDate || quotation.insuranceEndDate) && (
-            <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Insurance Details</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {quotation.insurer && (
-                  <>
-                    <div>
-                      <p className="font-semibold text-gray-700 mb-1">Insurer Name</p>
-                      <p className="text-gray-900">{quotation.insurer.name}</p>
-                    </div>
-                    {quotation.insurer.gstNumber && (
-                      <div>
-                        <p className="font-semibold text-gray-700 mb-1">Insurer GST Number</p>
-                        <p className="text-gray-900">{quotation.insurer.gstNumber}</p>
-                      </div>
-                    )}
-                    {quotation.insurer.address && (
-                      <div className="col-span-2">
-                        <p className="font-semibold text-gray-700 mb-1">Insurer Address</p>
-                        <p className="text-gray-900">{quotation.insurer.address}</p>
-                      </div>
-                    )}
-                  </>
-                )}
-                {quotation.insuranceStartDate && (
-                  <div>
-                    <p className="font-semibold text-gray-700 mb-1">Insurance Start Date</p>
-                    <p className="text-gray-900">
-                      {new Date(quotation.insuranceStartDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                )}
-                {quotation.insuranceEndDate && (
-                  <div>
-                    <p className="font-semibold text-gray-700 mb-1">Insurance End Date</p>
-                    <p className="text-gray-900">
-                      {new Date(quotation.insuranceEndDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Parts & Services Table */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-2">
-              Parts & Services
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-gray-300 px-4 py-2 text-left text-sm font-semibold text-gray-700">
-                      S.No
-                    </th>
-                    <th className="border border-gray-300 px-4 py-2 text-left text-sm font-semibold text-gray-700">
-                      Part Name
-                    </th>
-                    <th className="border border-gray-300 px-4 py-2 text-left text-sm font-semibold text-gray-700">
-                      Part Number
-                    </th>
-                    <th className="border border-gray-300 px-4 py-2 text-left text-sm font-semibold text-gray-700">
-                      HSN/SAC Code
-                    </th>
-                    <th className="border border-gray-300 px-4 py-2 text-center text-sm font-semibold text-gray-700">
-                      Quantity
-                    </th>
-                    <th className="border border-gray-300 px-4 py-2 text-right text-sm font-semibold text-gray-700">
-                      Rate (₹)
-                    </th>
-                    <th className="border border-gray-300 px-4 py-2 text-center text-sm font-semibold text-gray-700">
-                      GST %
-                    </th>
-                    <th className="border border-gray-300 px-4 py-2 text-right text-sm font-semibold text-gray-700">
-                      Amount (₹)
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quotation.items && quotation.items.length > 0 ? (
-                    quotation.items.map((item: QuotationItem, index: number) => (
-                      <tr key={item.id || index} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 px-4 py-2 text-sm text-gray-900">
-                          {item.serialNumber}
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-sm text-gray-900">
-                          {item.partName}
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-sm text-gray-900">
-                          {item.partNumber || "-"}
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-sm text-gray-900">
-                          {item.hsnSacCode || "-"}
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-sm text-center text-gray-900">
-                          {item.quantity}
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-sm text-right text-gray-900">
-                          {item.rate.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-sm text-center text-gray-900">
-                          {item.gstPercent}%
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2 text-sm text-right text-gray-900 font-medium">
-                          {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="border border-gray-300 px-4 py-4 text-center text-gray-500">
-                        No items added
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Pricing Summary */}
-          <div className="mb-6 pricing-summary-container">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b border-gray-200 pb-2">
-              Pricing Summary
-            </h3>
-            <div className="w-full">
-              <table className="w-full pricing-summary-table border-collapse" style={{ tableLayout: 'fixed' }}>
-                <tbody>
-                  <tr className="pricing-summary-row">
-                    <td className="text-gray-700 text-sm py-2 pr-4" style={{ width: '65%' }}>Subtotal:</td>
-                    <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ width: '35%', whiteSpace: 'nowrap' }}>
-                      ₹{quotation.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                  {quotation.discount > 0 && (
-                    <tr className="pricing-summary-row">
-                      <td className="text-gray-700 text-sm py-2 pr-4">
-                        Discount {quotation.discountPercent > 0 ? `(${quotation.discountPercent.toFixed(1)}%)` : ""}:
-                      </td>
-                      <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ whiteSpace: 'nowrap' }}>
-                        -₹{quotation.discount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  )}
-                  <tr className="pricing-summary-row border-t border-gray-200">
-                    <td className="text-gray-700 text-sm py-2 pr-4 pt-3">Pre-GST Amount:</td>
-                    <td className="text-gray-900 font-medium text-sm py-2 pt-3 text-right" style={{ whiteSpace: 'nowrap' }}>
-                      ₹{quotation.preGstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                  {quotation.cgstAmount > 0 && (
-                    <tr className="pricing-summary-row">
-                      <td className="text-gray-700 text-sm py-2 pr-4">CGST (9%):</td>
-                      <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ whiteSpace: 'nowrap' }}>
-                        ₹{quotation.cgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  )}
-                  {quotation.sgstAmount > 0 && (
-                    <tr className="pricing-summary-row">
-                      <td className="text-gray-700 text-sm py-2 pr-4">SGST (9%):</td>
-                      <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ whiteSpace: 'nowrap' }}>
-                        ₹{quotation.sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  )}
-                  {quotation.igstAmount > 0 && (
-                    <tr className="pricing-summary-row">
-                      <td className="text-gray-700 text-sm py-2 pr-4">IGST (18%):</td>
-                      <td className="text-gray-900 font-medium text-sm py-2 text-right" style={{ whiteSpace: 'nowrap' }}>
-                        ₹{quotation.igstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  )}
-                  <tr className="pricing-summary-row border-t-2 border-gray-400">
-                    <td className="text-lg font-bold text-gray-900 py-2 pt-3">Total Amount:</td>
-                    <td className="text-lg font-bold text-blue-600 py-2 pt-3 text-right" style={{ whiteSpace: 'nowrap' }}>
-                      ₹{quotation.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Notes Section */}
-          {(quotation.notes || quotation.batterySerialNumber || quotation.customNotes) && (
-            <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Notes</h3>
-              <div className="space-y-2 text-sm text-gray-700">
-                {quotation.batterySerialNumber && (
-                  <div>
-                    <span className="font-semibold">Battery Serial Number:</span>
-                    <span className="ml-2">{quotation.batterySerialNumber}</span>
-                  </div>
-                )}
-                {quotation.notes && (
-                  <div>
-                    <p className="whitespace-pre-wrap">{quotation.notes}</p>
-                  </div>
-                )}
-                {quotation.customNotes && (
-                  <div>
-                    <p className="font-semibold mb-1">Additional Notes:</p>
-                    <p className="whitespace-pre-wrap">{quotation.customNotes}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="mt-8 pt-6 border-t-2 border-gray-300 text-center text-xs text-gray-500">
-            <p>This is a {quotation.documentType.toLowerCase()}. Terms and conditions apply.</p>
-            <p className="mt-1">For queries, please contact: {serviceCenter.phone}</p>
-          </div>
-        </div>
-
-        {/* Approval Status Display */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 no-print">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Approval Status</h3>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              {quotation.sentToCustomer ? (
-                <CheckCircle className="text-green-600" size={16} />
-              ) : (
-                <Clock className="text-gray-400" size={16} />
-              )}
-              <span className="text-sm text-gray-700">
-                Sent to Customer: {quotation.sentToCustomer ? "Yes" : "No"}
-                {quotation.sentToCustomerAt && ` (${new Date(quotation.sentToCustomerAt).toLocaleString()})`}
-              </span>
-            </div>
-            {quotation.customerApproved !== undefined && (
-              <div className="flex items-center gap-2">
-                {quotation.customerApproved ? (
-                  <UserCheck className="text-green-600" size={16} />
-                ) : (
-                  <UserX className="text-red-600" size={16} />
-                )}
-                <span className="text-sm text-gray-700">
-                  Customer: {quotation.customerApproved ? "Approved" : "Rejected"}
-                  {quotation.customerApprovedAt && ` (${new Date(quotation.customerApprovedAt).toLocaleString()})`}
-                  {quotation.customerRejectedAt && ` (${new Date(quotation.customerRejectedAt).toLocaleString()})`}
-                </span>
-              </div>
-            )}
-            {quotation.sentToManager && (
-              <div className="flex items-center gap-2">
-                <ArrowRight className="text-blue-600" size={16} />
-                <span className="text-sm text-gray-700">
-                  Sent to Manager: {quotation.sentToManagerAt && new Date(quotation.sentToManagerAt).toLocaleString()}
-                </span>
-              </div>
-            )}
-            {quotation.managerApproved !== undefined && (
-              <div className="flex items-center gap-2">
-                {quotation.managerApproved ? (
-                  <ShieldCheck className="text-green-600" size={16} />
-                ) : (
-                  <ShieldX className="text-red-600" size={16} />
-                )}
-                <span className="text-sm text-gray-700">
-                  Manager: {quotation.managerApproved ? "Approved" : "Rejected"}
-                  {quotation.managerApprovedAt && ` (${new Date(quotation.managerApprovedAt).toLocaleString()})`}
-                  {quotation.managerRejectedAt && ` (${new Date(quotation.managerRejectedAt).toLocaleString()})`}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex gap-3 justify-end no-print">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
-          >
-            Close
-          </button>
-          
-          {/* Service Advisor Actions (shown for all roles for now so feature is visible) */}
-          {(
-            <>
-              {quotation.status === "draft" && onSendToCustomer && (
-                <button
-                  onClick={() => onSendToCustomer(quotation.id)}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
-                >
-                  <MessageCircle size={18} />
-                  Send to Customer (WhatsApp)
-                </button>
-              )}
-              {quotation.status === "sent_to_customer" && onCustomerApproval && onCustomerRejection && (
-                <>
-                  <button
-                    onClick={() => onCustomerRejection(quotation.id)}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-2"
-                  >
-                    <UserX size={18} />
-                    Customer Rejected
-                  </button>
-                  <button
-                    onClick={() => onCustomerApproval(quotation.id)}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
-                  >
-                    <UserCheck size={18} />
-                    Customer Approved
-                  </button>
-                </>
-              )}
-              {quotation.status === "customer_approved" && onSendToManager && (
-                <button
-                  onClick={() => onSendToManager(quotation.id)}
-                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium inline-flex items-center gap-2"
-                >
-                  <ArrowRight size={18} />
-                  Send to Manager
-                </button>
-              )}
-            </>
-          )}
-
-          {/* Service Manager Actions */}
-          {isServiceManager && onManagerApproval && onManagerRejection && (
-            <>
-              {quotation.status === "sent_to_manager" && (
-                <>
-                  <button
-                    onClick={() => onManagerRejection(quotation.id)}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-2"
-                  >
-                    <ShieldX size={18} />
-                    Reject
-                  </button>
-                  <button
-                    onClick={() => onManagerApproval(quotation.id)}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
-                  >
-                    <ShieldCheck size={18} />
-                    Approve
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
