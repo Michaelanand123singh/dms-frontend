@@ -1280,8 +1280,7 @@ export default function JobCards() {
                                 return (
                                   <div
                                     key={job.id}
-                                    className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-lg hover:border-blue-300 transition-all duration-200 cursor-pointer group"
-                                    onClick={() => handleJobCardClick(job)}
+                                    className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-lg hover:border-blue-300 transition-all duration-200 group"
                                   >
                                     {/* Card Header */}
                                     <div className="flex items-start justify-between mb-3">
@@ -1331,9 +1330,46 @@ export default function JobCards() {
                                       </div>
                                     )}
 
-                                    {/* Click hint */}
-                                    <div className="mt-3 pt-3 border-t border-gray-100">
-                                      <p className="text-xs text-blue-600 font-medium">Click to request parts</p>
+                                    {/* Status Change Buttons for Service Engineer */}
+                                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                                      {job.status === "Assigned" && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm(`Start work on job card ${job.jobCardNumber || job.id}?`)) {
+                                              updateStatus(job.id, "In Progress");
+                                            }
+                                          }}
+                                          className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition"
+                                        >
+                                          Start Work (In Progress)
+                                        </button>
+                                      )}
+                                      {job.status === "In Progress" && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm(`Mark job card ${job.jobCardNumber || job.id} as completed?`)) {
+                                              updateStatus(job.id, "Completed");
+                                            }
+                                          }}
+                                          className="w-full px-3 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition"
+                                        >
+                                          Mark as Completed
+                                        </button>
+                                      )}
+                                      {/* Request Parts Button */}
+                                      {(job.status === "Assigned" || job.status === "In Progress" || job.status === "Parts Pending") && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleJobCardClick(job);
+                                          }}
+                                          className="w-full px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                                        >
+                                          Request Parts
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -1378,8 +1414,7 @@ export default function JobCards() {
                       return (
                         <div
                           key={job.id}
-                          className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
-                          onClick={() => handleJobCardClick(job)}
+                          className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
@@ -1409,8 +1444,44 @@ export default function JobCards() {
                               </div>
                             </div>
                           </div>
-                          <div className="mt-3 pt-3 border-t border-gray-100">
-                            <p className="text-xs text-blue-600 font-medium">Click to request parts</p>
+                          <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col gap-2">
+                            {/* Status Change Buttons for Service Engineer */}
+                            {job.status === "Assigned" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Start work on job card ${job.jobCardNumber || job.id}?`)) {
+                                    updateStatus(job.id, "In Progress");
+                                  }
+                                }}
+                                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                              >
+                                Start Work (In Progress)
+                              </button>
+                            )}
+                            {job.status === "In Progress" && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Mark job card ${job.jobCardNumber || job.id} as completed?`)) {
+                                    updateStatus(job.id, "Completed");
+                                  }
+                                }}
+                                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
+                              >
+                                Mark as Completed
+                              </button>
+                            )}
+                            {/* Parts Request Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleJobCardClick(job);
+                              }}
+                              className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition"
+                            >
+                              Request Parts
+                            </button>
                           </div>
                         </div>
                       );

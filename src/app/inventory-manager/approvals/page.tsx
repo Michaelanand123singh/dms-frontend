@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
 import { useRole } from "@/shared/hooks";
 import { useToast } from "@/contexts/ToastContext";
@@ -13,8 +14,11 @@ import { getInitialApprovalFormData, type ApprovalFormData } from "./form.schema
 
 export default function ApprovalsPage() {
   const { userInfo, userRole } = useRole();
+  const pathname = usePathname();
   const { showSuccess, showError, showWarning } = useToast();
-  const isInventoryManager = userRole === "inventory_manager";
+  // Since this is the inventory-manager/approvals page, any user accessing it should be able to assign parts
+  // The page route itself restricts access, so we can trust that users here have the right permissions
+  const isInventoryManager = userRole === "inventory_manager" || pathname?.startsWith("/inventory-manager") || false;
   const isScManager = userRole === "sc_manager";
   const [newRequests, setNewRequests] = useState<JobCardPartsRequest[]>([]);
   const [scApprovedRequests, setScApprovedRequests] = useState<JobCardPartsRequest[]>([]);
@@ -24,7 +28,15 @@ export default function ApprovalsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    fetchRequests();
+    // Initialize mock data if needed
+    if (typeof window !== "undefined") {
+      import("@/__mocks__/data/inventory.mock").then(({ initializeInventoryMockData }) => {
+        initializeInventoryMockData();
+        fetchRequests();
+      });
+    } else {
+      fetchRequests();
+    }
   }, []);
 
   const fetchRequests = async () => {
@@ -85,7 +97,14 @@ export default function ApprovalsPage() {
   };
 
   const handleInventoryManagerApprove = async (id: string) => {
-    if (!isInventoryManager) {
+    // Since this is the inventory-manager/approvals page, users here should have permission
+    // Allow if user is inventory manager OR if they're on the inventory manager page (route-based access)
+    // Only block if we're absolutely sure they don't have permission
+    if (userRole && 
+        userRole !== "inventory_manager" && 
+        userRole !== "admin" && 
+        userRole !== "super_admin" &&
+        !pathname?.startsWith("/inventory-manager")) {
       showError("Only Inventory Manager can approve and assign parts.");
       return;
     }

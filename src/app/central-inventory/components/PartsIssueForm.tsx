@@ -116,7 +116,7 @@ export function PartsIssueForm({
       return;
     }
 
-    if (!confirm("Are you sure you want to issue these parts?")) {
+    if (!confirm("Are you sure you want to submit this parts issue request? It will require admin approval before parts can be issued.")) {
       return;
     }
 
@@ -422,7 +422,7 @@ export function PartsIssueForm({
                 className="flex items-center justify-center gap-2 flex-1"
               >
                 <CheckCircle className="w-5 h-5" />
-                {isLoading ? "Issuing..." : "Issue Parts"}
+                {isLoading ? "Submitting Request..." : "Submit Request for Approval"}
               </Button>
             </div>
           </div>

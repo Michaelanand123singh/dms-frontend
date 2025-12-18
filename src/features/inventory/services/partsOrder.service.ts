@@ -5,7 +5,7 @@
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import type { PartsOrderFormData } from "@/shared/types/inventory.types";
 
-export type PartsOrderStatus = "pending" | "approved" | "rejected" | "received";
+export type PartsOrderStatus = "draft" | "order" | "acknowledge" | "pending" | "in_transit" | "checked_in" | "approved" | "rejected" | "received";
 
 export interface PartsOrderItem {
   partId: string;
@@ -77,7 +77,8 @@ class PartsOrderService {
   async create(
     items: PartsOrderItem[],
     orderNotes?: string,
-    requestedBy: string = "Inventory Manager"
+    requestedBy: string = "Inventory Manager",
+    status: PartsOrderStatus = "order"
   ): Promise<PartsOrder> {
     if (!items || items.length === 0) {
       throw new Error("At least one part is required to create an order");
@@ -87,7 +88,7 @@ class PartsOrderService {
       id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       orderNumber: this.generateOrderNumber(),
       items,
-      status: "pending",
+      status,
       orderNotes,
       requestedBy,
       requestedAt: new Date().toISOString(),
@@ -97,6 +98,94 @@ class PartsOrderService {
     safeStorage.setItem(STORAGE_KEY, [order, ...orders]);
 
     return order;
+  }
+
+  async saveDraft(
+    items: PartsOrderItem[],
+    orderNotes?: string,
+    requestedBy: string = "Inventory Manager",
+    draftId?: string
+  ): Promise<PartsOrder> {
+    // If draftId is provided, update existing draft
+    if (draftId) {
+      return this.updateDraft(draftId, items, orderNotes);
+    }
+    // Otherwise create new draft
+    return this.create(items, orderNotes, requestedBy, "draft");
+  }
+
+  async updateDraft(
+    id: string,
+    items: PartsOrderItem[],
+    orderNotes?: string
+  ): Promise<PartsOrder> {
+    const orders = await this.getAll();
+    const index = orders.findIndex((o) => o.id === id);
+    if (index === -1) {
+      throw new Error("Draft order not found");
+    }
+
+    const order = orders[index];
+    if (order.status !== "draft") {
+      throw new Error("Can only update draft orders");
+    }
+
+    orders[index] = {
+      ...order,
+      items,
+      orderNotes,
+    };
+    safeStorage.setItem(STORAGE_KEY, orders);
+
+    return orders[index];
+  }
+
+  async submitDraft(id: string): Promise<PartsOrder> {
+    const orders = await this.getAll();
+    const index = orders.findIndex((o) => o.id === id);
+    if (index === -1) {
+      throw new Error("Draft order not found");
+    }
+
+    const order = orders[index];
+    if (order.status !== "draft") {
+      throw new Error("Can only submit draft orders");
+    }
+
+    orders[index] = {
+      ...order,
+      status: "order",
+    };
+    safeStorage.setItem(STORAGE_KEY, orders);
+
+    return orders[index];
+  }
+
+  async acknowledgeOrder(
+    id: string,
+    acknowledgedBy: string
+  ): Promise<PartsOrder> {
+    const orders = await this.getAll();
+    const index = orders.findIndex((o) => o.id === id);
+    if (index === -1) {
+      throw new Error("Order not found");
+    }
+
+    const order = orders[index];
+    // Only acknowledge if status is "order" or "pending"
+    if (order.status !== "order" && order.status !== "pending") {
+      throw new Error(`Cannot acknowledge order with status: ${order.status}`);
+    }
+
+    orders[index] = {
+      ...order,
+      status: "acknowledge",
+      approvedBy: acknowledgedBy,
+      approvedAt: new Date().toISOString(),
+    };
+    safeStorage.setItem(STORAGE_KEY, orders);
+
+    return orders[index];
   }
 
   // Legacy method for backward compatibility (single part)
@@ -135,14 +224,19 @@ class PartsOrderService {
       orderNotes: notes || orders[index].orderNotes,
     };
 
-    if (status === "approved") {
+    if (status === "approved" || status === "acknowledge") {
       update.approvedBy = updatedBy;
       update.approvedAt = new Date().toISOString();
     } else if (status === "rejected") {
       update.rejectedBy = updatedBy;
       update.rejectedAt = new Date().toISOString();
-    } else if (status === "received") {
+    } else if (status === "received" || status === "checked_in") {
       update.receivedAt = new Date().toISOString();
+    } else if (status === "in_transit") {
+      // Track when order went in transit
+      if (!orders[index].approvedAt) {
+        update.approvedAt = new Date().toISOString();
+      }
     }
 
     orders[index] = { ...orders[index], ...update };

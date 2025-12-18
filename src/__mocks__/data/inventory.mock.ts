@@ -339,15 +339,17 @@ export const mockParts: Part[] = [
 
 /**
  * Mock Job Card Parts Requests
+ * Previously placed in: src/__mocks__/data/inventory.mock.ts
+ * This mock data is used for parts request approvals workflow
  */
 export const mockJobCardPartsRequests: JobCardPartsRequest[] = [
   {
     id: "req-1",
-    jobCardId: "JC-2024-01-001",
+    jobCardId: "JC-ENG-001",
     vehicleId: "veh-001",
-    vehicleNumber: "MH12AB1234",
+    vehicleNumber: "MH-12-AB-1234",
     customerName: "Rajesh Kumar",
-    requestedBy: "SC Manager - Pune Phase 1",
+    requestedBy: "Service Engineer",
     requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
     status: "pending",
     parts: [
@@ -365,11 +367,11 @@ export const mockJobCardPartsRequests: JobCardPartsRequest[] = [
   },
   {
     id: "req-2",
-    jobCardId: "JC-2024-01-002",
+    jobCardId: "JC-ENG-002",
     vehicleId: "veh-002",
-    vehicleNumber: "MH12CD5678",
+    vehicleNumber: "MH-12-CD-5678",
     customerName: "Priya Sharma",
-    requestedBy: "SC Manager - Mumbai",
+    requestedBy: "Service Engineer",
     requestedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
     status: "pending",
     parts: [
@@ -385,22 +387,82 @@ export const mockJobCardPartsRequests: JobCardPartsRequest[] = [
       },
     ],
   },
+  // SC Manager Approved Requests - Ready for Inventory Manager to assign parts
   {
     id: "req-3",
-    jobCardId: "JC-2024-01-003",
+    jobCardId: "JC-ENG-003",
     vehicleId: "veh-003",
-    vehicleNumber: "MH12EF9012",
+    vehicleNumber: "MH-12-EF-9012",
     customerName: "Amit Patel",
-    requestedBy: "SC Manager - Pune Phase 1",
+    requestedBy: "Service Engineer",
     requestedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-    status: "approved",
-    approvedBy: "Inventory Manager",
-    approvedAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
+    status: "pending",
+    scManagerApproved: true,
+    scManagerApprovedBy: "SC Manager - Pune Phase 1",
+    scManagerApprovedAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(), // 20 hours ago
+    inventoryManagerAssigned: false,
     parts: [
       {
         partId: "part-3",
         partName: "Air Filter Element",
         quantity: 2,
+      },
+      {
+        partId: "part-1",
+        partName: "Brake Pad Set - Front",
+        quantity: 1,
+      },
+    ],
+  },
+  {
+    id: "req-4",
+    jobCardId: "JC-ENG-005",
+    vehicleId: "veh-005",
+    vehicleNumber: "MH-12-IJ-7890",
+    customerName: "Vikram Singh",
+    requestedBy: "Service Engineer",
+    requestedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
+    status: "pending",
+    scManagerApproved: true,
+    scManagerApprovedBy: "SC Manager - Pune Phase 1",
+    scManagerApprovedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
+    inventoryManagerAssigned: false,
+    parts: [
+      {
+        partId: "part-1",
+        partName: "Engine Oil",
+        quantity: 4,
+      },
+      {
+        partId: "part-8",
+        partName: "Gasket Set",
+        quantity: 1,
+      },
+    ],
+  },
+  {
+    id: "req-5",
+    jobCardId: "JC-2025-001",
+    vehicleId: "veh-001",
+    vehicleNumber: "MH12AB1234",
+    customerName: "Rajesh Kumar",
+    requestedBy: "Service Engineer",
+    requestedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
+    status: "pending",
+    scManagerApproved: true,
+    scManagerApprovedBy: "SC Manager - Pune Phase 1",
+    scManagerApprovedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
+    inventoryManagerAssigned: false,
+    parts: [
+      {
+        partId: "part-2",
+        partName: "Engine Oil Filter",
+        quantity: 1,
+      },
+      {
+        partId: "part-3",
+        partName: "Air Filter Element",
+        quantity: 1,
       },
     ],
   },
