@@ -100,7 +100,7 @@ function AppointmentsContent() {
       }
 
       // If appointment has assignedServiceCenter (name) but no serviceCenterId, resolve it
-      const assignedCenter = (appointment as any).assignedServiceCenter;
+      const assignedCenter = appointment.assignedServiceCenter;
       if (assignedCenter && !appointment.serviceCenterId) {
         const center = staticServiceCenters.find(
           (c) => c.name === assignedCenter
@@ -363,9 +363,74 @@ function AppointmentsContent() {
     [appointments, closeDetailModal, showToast, clearAppointmentCustomerSearch]
   );
 
+  // Get job card ID for an appointment
+  const getJobCardId = useCallback((appointmentId: number): string | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const { migrateAllJobCards } = require("../job-cards/utils/migrateJobCards.util");
+      const jobCards: JobCard[] = migrateAllJobCards();
+      const jobCard = jobCards.find((card: JobCard) => card.sourceAppointmentId === appointmentId);
+      return jobCard?.id || null;
+    } catch (error) {
+      console.error("Error finding job card:", error);
+      return null;
+    }
+  }, []);
+
 
   // Convert Appointment to Job Card
   const convertAppointmentToJobCard = useCallback(async (appointment: AppointmentRecord): Promise<JobCard> => {
+    // Diagnostic logging for field transfer
+    if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+      console.group(`[ConvertAppointmentToJobCard] Converting Appointment ${appointment.id}`);
+      console.log("Appointment fields:", {
+        customerName: appointment.customerName,
+        phone: appointment.phone,
+        whatsappNumber: appointment.whatsappNumber,
+        alternateMobile: appointment.alternateMobile,
+        email: appointment.email,
+        address: appointment.address,
+        cityState: appointment.cityState,
+        pincode: appointment.pincode,
+        vehicleBrand: appointment.vehicleBrand,
+        vehicleModel: appointment.vehicleModel,
+        vehicleYear: appointment.vehicleYear,
+        registrationNumber: appointment.registrationNumber,
+        vinChassisNumber: appointment.vinChassisNumber,
+        variantBatteryCapacity: appointment.variantBatteryCapacity,
+        motorNumber: appointment.motorNumber,
+        chargerSerialNumber: appointment.chargerSerialNumber,
+        dateOfPurchase: appointment.dateOfPurchase,
+        vehicleColor: appointment.vehicleColor,
+        warrantyStatus: appointment.warrantyStatus,
+        insuranceStartDate: appointment.insuranceStartDate,
+        insuranceEndDate: appointment.insuranceEndDate,
+        insuranceCompanyName: appointment.insuranceCompanyName,
+        batterySerialNumber: appointment.batterySerialNumber,
+        mcuSerialNumber: appointment.mcuSerialNumber,
+        vcuSerialNumber: appointment.vcuSerialNumber,
+        otherPartSerialNumber: appointment.otherPartSerialNumber,
+        technicianObservation: appointment.technicianObservation,
+        previousServiceHistory: appointment.previousServiceHistory,
+        odometerReading: appointment.odometerReading,
+        pickupAddress: appointment.pickupAddress,
+        pickupState: appointment.pickupState,
+        pickupCity: appointment.pickupCity,
+        pickupPincode: appointment.pickupPincode,
+        dropAddress: appointment.dropAddress,
+        dropState: appointment.dropState,
+        dropCity: appointment.dropCity,
+        dropPincode: appointment.dropPincode,
+        preferredCommunicationMode: appointment.preferredCommunicationMode,
+        pickupDropRequired: appointment.pickupDropRequired,
+        arrivalMode: appointment.arrivalMode,
+        checkInNotes: appointment.checkInNotes,
+        checkInSlipNumber: appointment.checkInSlipNumber,
+        checkInDate: appointment.checkInDate,
+        checkInTime: appointment.checkInTime,
+      });
+    }
+
     const serviceCenterId = serviceCenterContext.serviceCenterId?.toString() || appointment.serviceCenterId?.toString() || "sc-001";
     const serviceCenterCode = SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
     const now = new Date();
@@ -424,24 +489,63 @@ function AppointmentsContent() {
         {
           customerFeedback: appointment.customerComplaintIssue || "",
           estimatedDeliveryDate: appointment.estimatedDeliveryDate || "",
-          warrantyStatus: "", // Will be filled from service intake form
+          warrantyStatus: appointment.warrantyStatus || "",
+          technicianObservation: appointment.technicianObservation || "",
+          insuranceStartDate: appointment.insuranceStartDate || "",
+          insuranceEndDate: appointment.insuranceEndDate || "",
+          insuranceCompanyName: appointment.insuranceCompanyName || "",
+          batterySerialNumber: appointment.batterySerialNumber || "",
+          mcuSerialNumber: appointment.mcuSerialNumber || "",
+          vcuSerialNumber: appointment.vcuSerialNumber || "",
+          otherPartSerialNumber: appointment.otherPartSerialNumber || "",
+          variantBatteryCapacity: appointment.variantBatteryCapacity || "",
         }
       )
       : createEmptyJobCardPart1(jobCardNumber);
 
-    // If customer/vehicle data not found, populate from appointment
-    if (!customerData) {
-      part1.fullName = appointment.customerName;
-      part1.mobilePrimary = appointment.phone;
-      part1.customerType = appointment.customerType || "";
-      part1.customerFeedback = appointment.customerComplaintIssue || "";
-      part1.estimatedDeliveryDate = appointment.estimatedDeliveryDate || "";
+    // Populate PART 1 from appointment fields (overrides customer/vehicle data if appointment has more details)
+    part1.fullName = appointment.customerName || part1.fullName;
+    part1.mobilePrimary = appointment.phone || part1.mobilePrimary;
+    part1.customerType = (appointment.customerType || part1.customerType) as "B2C" | "B2B" | "";
+    part1.customerFeedback = appointment.customerComplaintIssue || part1.customerFeedback;
+    part1.estimatedDeliveryDate = appointment.estimatedDeliveryDate || part1.estimatedDeliveryDate;
+    
+    // Build full customer address with city/state/pincode
+    const fullAddress = [
+      appointment.address,
+      appointment.cityState,
+      appointment.pincode
+    ].filter(Boolean).join(", ");
+    part1.customerAddress = fullAddress || part1.customerAddress;
+    
+    // Append previous service history to customer feedback if available
+    if (appointment.previousServiceHistory) {
+      const existingFeedback = part1.customerFeedback || "";
+      const serviceHistory = `Previous Service History: ${appointment.previousServiceHistory}`;
+      part1.customerFeedback = existingFeedback 
+        ? `${existingFeedback}\n\n${serviceHistory}`
+        : serviceHistory;
     }
-    if (!vehicleData) {
-      part1.vehicleBrand = vehicleMake;
-      part1.vehicleModel = vehicleModel;
-      part1.registrationNumber = ""; // Will be filled from service intake form
-    }
+    
+    // Vehicle fields from appointment
+    part1.vehicleBrand = appointment.vehicleBrand || vehicleMake || part1.vehicleBrand;
+    part1.vehicleModel = appointment.vehicleModel || vehicleModel || part1.vehicleModel;
+    part1.registrationNumber = appointment.registrationNumber || part1.registrationNumber;
+    part1.vinChassisNumber = appointment.vinChassisNumber || part1.vinChassisNumber;
+    part1.variantBatteryCapacity = appointment.variantBatteryCapacity || part1.variantBatteryCapacity;
+    
+    // Warranty and insurance fields from appointment
+    part1.warrantyStatus = appointment.warrantyStatus || part1.warrantyStatus;
+    part1.technicianObservation = appointment.technicianObservation || part1.technicianObservation;
+    part1.insuranceStartDate = appointment.insuranceStartDate || part1.insuranceStartDate;
+    part1.insuranceEndDate = appointment.insuranceEndDate || part1.insuranceEndDate;
+    part1.insuranceCompanyName = appointment.insuranceCompanyName || part1.insuranceCompanyName;
+    
+    // Serial numbers from appointment
+    part1.batterySerialNumber = appointment.batterySerialNumber || part1.batterySerialNumber;
+    part1.mcuSerialNumber = appointment.mcuSerialNumber || part1.mcuSerialNumber;
+    part1.vcuSerialNumber = appointment.vcuSerialNumber || part1.vcuSerialNumber;
+    part1.otherPartSerialNumber = appointment.otherPartSerialNumber || part1.otherPartSerialNumber;
 
     // Create job card from appointment with structured PART 1
     const newJobCard: JobCard = {
@@ -449,17 +553,18 @@ function AppointmentsContent() {
       jobCardNumber,
       serviceCenterId: appointment.serviceCenterId?.toString() || serviceCenterContext.serviceCenterId?.toString() || "sc-001",
       serviceCenterCode,
+      serviceCenterName: appointment.serviceCenterName || serviceCenterContext.serviceCenterName || undefined,
       customerId: customerData?.id?.toString() || appointment.customerExternalId?.toString() || `customer-${appointment.id}`,
       customerName: appointment.customerName,
-      vehicleId: vehicleData?.id?.toString(),
+      vehicleId: vehicleData?.id?.toString() || appointment.vehicleExternalId?.toString(),
       vehicle: appointment.vehicle,
-      registration: vehicleData?.registration || "",
-      vehicleMake,
-      vehicleModel,
+      registration: appointment.registrationNumber || vehicleData?.registration || part1.registrationNumber || "",
+      vehicleMake: appointment.vehicleBrand || vehicleMake || "",
+      vehicleModel: appointment.vehicleModel || vehicleModel || "",
       customerType: appointment.customerType,
       serviceType: appointment.serviceType,
       description: appointment.customerComplaintIssue || `Service: ${appointment.serviceType}`,
-      status: "Created",
+      status: "Awaiting Quotation Approval",
       priority: "Normal",
       assignedEngineer: appointment.assignedTechnician || null,
       estimatedCost: appointment.estimatedCost ? `₹${appointment.estimatedCost}` : "₹0",
@@ -471,12 +576,106 @@ function AppointmentsContent() {
       sourceAppointmentId: appointment.id,
       isTemporary: true,
       customerArrivalTimestamp: new Date().toISOString(),
+      // Additional appointment data fields
+      customerWhatsappNumber: appointment.whatsappNumber,
+      customerAlternateMobile: appointment.alternateMobile,
+      customerEmail: appointment.email,
+      vehicleYear: appointment.vehicleYear,
+      motorNumber: appointment.motorNumber,
+      chargerSerialNumber: appointment.chargerSerialNumber,
+      dateOfPurchase: appointment.dateOfPurchase,
+      vehicleColor: appointment.vehicleColor,
+      previousServiceHistory: appointment.previousServiceHistory,
+      odometerReading: appointment.odometerReading,
+      pickupAddress: appointment.pickupAddress,
+      pickupState: appointment.pickupState,
+      pickupCity: appointment.pickupCity,
+      pickupPincode: appointment.pickupPincode,
+      dropAddress: appointment.dropAddress,
+      dropState: appointment.dropState,
+      dropCity: appointment.dropCity,
+      dropPincode: appointment.dropPincode,
+      preferredCommunicationMode: appointment.preferredCommunicationMode,
+      pickupDropRequired: appointment.pickupDropRequired,
+      arrivalMode: appointment.arrivalMode,
+      checkInNotes: appointment.checkInNotes,
+      checkInSlipNumber: appointment.checkInSlipNumber,
+      checkInDate: appointment.checkInDate,
+      checkInTime: appointment.checkInTime,
       // Structured PART 1 data
       part1,
       // PART 2 will be populated when parts are added
       part2: [],
       // PART 2A and PART 3 will be populated later if needed
     };
+
+    // Diagnostic logging for created job card
+    if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+      console.log("Created JobCard fields:", {
+        id: newJobCard.id,
+        jobCardNumber: newJobCard.jobCardNumber,
+        customerName: newJobCard.customerName,
+        customerWhatsappNumber: newJobCard.customerWhatsappNumber,
+        customerAlternateMobile: newJobCard.customerAlternateMobile,
+        customerEmail: newJobCard.customerEmail,
+        vehicleYear: newJobCard.vehicleYear,
+        motorNumber: newJobCard.motorNumber,
+        chargerSerialNumber: newJobCard.chargerSerialNumber,
+        dateOfPurchase: newJobCard.dateOfPurchase,
+        vehicleColor: newJobCard.vehicleColor,
+        previousServiceHistory: newJobCard.previousServiceHistory,
+        odometerReading: newJobCard.odometerReading,
+        registration: newJobCard.registration,
+        vehicleMake: newJobCard.vehicleMake,
+        vehicleModel: newJobCard.vehicleModel,
+        part1: {
+          fullName: newJobCard.part1?.fullName,
+          mobilePrimary: newJobCard.part1?.mobilePrimary,
+          customerType: newJobCard.part1?.customerType,
+          vehicleBrand: newJobCard.part1?.vehicleBrand,
+          vehicleModel: newJobCard.part1?.vehicleModel,
+          registrationNumber: newJobCard.part1?.registrationNumber,
+          vinChassisNumber: newJobCard.part1?.vinChassisNumber,
+          variantBatteryCapacity: newJobCard.part1?.variantBatteryCapacity,
+          warrantyStatus: newJobCard.part1?.warrantyStatus,
+          customerAddress: newJobCard.part1?.customerAddress,
+          customerFeedback: newJobCard.part1?.customerFeedback,
+          technicianObservation: newJobCard.part1?.technicianObservation,
+          insuranceStartDate: newJobCard.part1?.insuranceStartDate,
+          insuranceEndDate: newJobCard.part1?.insuranceEndDate,
+          insuranceCompanyName: newJobCard.part1?.insuranceCompanyName,
+          batterySerialNumber: newJobCard.part1?.batterySerialNumber,
+          mcuSerialNumber: newJobCard.part1?.mcuSerialNumber,
+          vcuSerialNumber: newJobCard.part1?.vcuSerialNumber,
+          otherPartSerialNumber: newJobCard.part1?.otherPartSerialNumber,
+        },
+      });
+
+      // Check for missing field transfers
+      const missingFields: string[] = [];
+      if (appointment.whatsappNumber && !newJobCard.customerWhatsappNumber) missingFields.push("whatsappNumber");
+      if (appointment.alternateMobile && !newJobCard.customerAlternateMobile) missingFields.push("alternateMobile");
+      if (appointment.email && !newJobCard.customerEmail) missingFields.push("email");
+      if (appointment.vehicleYear && !newJobCard.vehicleYear) missingFields.push("vehicleYear");
+      if (appointment.motorNumber && !newJobCard.motorNumber) missingFields.push("motorNumber");
+      if (appointment.chargerSerialNumber && !newJobCard.chargerSerialNumber) missingFields.push("chargerSerialNumber");
+      if (appointment.dateOfPurchase && !newJobCard.dateOfPurchase) missingFields.push("dateOfPurchase");
+      if (appointment.vehicleColor && !newJobCard.vehicleColor) missingFields.push("vehicleColor");
+      if (appointment.previousServiceHistory && !newJobCard.previousServiceHistory) missingFields.push("previousServiceHistory");
+      if (appointment.odometerReading && !newJobCard.odometerReading) missingFields.push("odometerReading");
+      if (appointment.phone && !newJobCard.part1?.mobilePrimary) missingFields.push("phone -> mobilePrimary");
+      if (appointment.registrationNumber && !newJobCard.part1?.registrationNumber && !newJobCard.registration) missingFields.push("registrationNumber");
+      if (appointment.vehicleBrand && !newJobCard.part1?.vehicleBrand && !newJobCard.vehicleMake) missingFields.push("vehicleBrand");
+      if (appointment.vehicleModel && !newJobCard.part1?.vehicleModel && !newJobCard.vehicleModel) missingFields.push("vehicleModel");
+      if (appointment.address && !newJobCard.part1?.customerAddress) missingFields.push("address -> customerAddress");
+
+      if (missingFields.length > 0) {
+        console.warn(`[ConvertAppointmentToJobCard] Missing field transfers for Appointment ${appointment.id}:`, missingFields);
+      } else {
+        console.log(`[ConvertAppointmentToJobCard] All fields transferred successfully for Appointment ${appointment.id}`);
+      }
+      console.groupEnd();
+    }
 
     // Save job card
     const updatedJobCards = [...existingJobCards, newJobCard];
@@ -534,11 +733,11 @@ function AppointmentsContent() {
     const vehicleModel = vehicleParts ? vehicleParts[2] : selectedAppointment.vehicle.split(" ").slice(1, -1).join(" ") || "";
 
     // Get registration from appointment or job card
-    const registrationNumber = (selectedAppointment as any).registrationNumber || currentJobCard?.registration || "";
-    const vin = (selectedAppointment as any).vinChassisNumber || currentJobCard?.vehicleId || "";
+    const registrationNumber = selectedAppointment.registrationNumber || currentJobCard?.registration || "";
+    const vin = selectedAppointment.vinChassisNumber || currentJobCard?.vehicleId || "";
 
     // Get customer email if available
-    const customerEmail = detailCustomer?.email || (selectedAppointment as any).email || undefined;
+    const customerEmail = detailCustomer?.email || selectedAppointment.email || undefined;
 
     // Parse service center location for address components
     const locationParts = serviceCenter?.location?.split(",") || [];
@@ -566,7 +765,7 @@ function AppointmentsContent() {
       serviceCenterPhone: undefined, // Can be added to service center data
       expectedServiceDate: selectedAppointment.estimatedDeliveryDate || undefined,
       serviceType: selectedAppointment.serviceType || undefined,
-      notes: (selectedAppointment as any).technicianObservation || selectedAppointment.customerComplaintIssue || undefined,
+      notes: selectedAppointment.technicianObservation || selectedAppointment.customerComplaintIssue || undefined,
     };
   }, [selectedAppointment, currentJobCard, detailCustomer, serviceCenterContext]);
 
@@ -829,106 +1028,30 @@ function AppointmentsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Handle Create Quotation from Form (when customer has arrived)
-  const handleCreateQuotationFromForm = useCallback(async (form: AppointmentFormType) => {
-    if (!selectedAppointment) return;
-
-    // First, save/update the appointment with form data
-    const selectedServiceCenter = form.serviceCenterName
-      ? staticServiceCenters.find((center) => center.name === form.serviceCenterName)
-      : null;
-    const serviceCenterId = (selectedServiceCenter as any)?.serviceCenterId || selectedServiceCenter?.id?.toString() || null;
-    const serviceCenterName = form.serviceCenterName || null;
-
-    const appointmentData: any = {
-      ...form,
-      status: "In Progress", // Ensure status is In Progress
-      serviceCenterId: serviceCenterId,
-      serviceCenterName: serviceCenterName,
-      time: formatTime(form.time),
-      duration: `${form.duration} hours`,
-      createdByRole: selectedAppointment.createdByRole,
-    };
-
-    // Update appointment in storage
-    const existingAppointments = safeStorage.getItem<Array<any>>("appointments", []);
-    const updatedAppointments = existingAppointments.map((apt: any) =>
-      apt.id === selectedAppointment.id
-        ? { ...apt, ...appointmentData }
-        : apt
-    );
-    safeStorage.setItem("appointments", updatedAppointments);
-    setAppointments(updatedAppointments);
-
-    // Update selectedAppointment state
-    const updatedAppointment = { ...selectedAppointment, ...appointmentData };
-    setSelectedAppointment(updatedAppointment);
-
-    // Ensure job card exists
-    if (!currentJobCardId) {
-      const jobCard = await convertAppointmentToJobCard(updatedAppointment);
-      setCurrentJobCardId(jobCard.id);
+  // Handle opening job card from appointment
+  const handleOpenJobCard = useCallback((appointmentId: number) => {
+    try {
+      const { migrateAllJobCards } = require("../job-cards/utils/migrateJobCards.util");
+      const jobCards: JobCard[] = migrateAllJobCards();
+      const jobCard = jobCards.find((card: JobCard) => card.sourceAppointmentId === appointmentId);
+      
+      if (jobCard) {
+        router.push(`/sc/job-cards/${jobCard.id}`);
+      } else {
+        showToast("Job card not found for this appointment.", "error");
+      }
+    } catch (error) {
+      console.error("Error opening job card:", error);
+      showToast("Failed to open job card. Please try again.", "error");
     }
-
-    // Prepare quotation data from appointment form
-    const customerIdForQuotation =
-      selectedAppointmentCustomer?.id?.toString() ||
-      updatedAppointment.customerExternalId ||
-      undefined;
-    const serviceCenterIdForQuotation =
-      serviceCenterId ||
-      serviceCenterContext.serviceCenterId ||
-      undefined;
-    const serviceCenterNameForQuotation =
-      serviceCenterName ||
-      serviceCenterContext.serviceCenterName ||
-      undefined;
-
-    const quotationData = {
-      appointmentId: updatedAppointment.id,
-      customerName: updatedAppointment.customerName,
-      phone: updatedAppointment.phone,
-      vehicle: updatedAppointment.vehicle,
-      customerId: customerIdForQuotation,
-      serviceCenterId: serviceCenterIdForQuotation,
-      serviceCenterName: serviceCenterNameForQuotation,
-      jobCardId: currentJobCardId || undefined,
-      appointmentData: updatedAppointment, // Store full appointment data
-    };
-
-    // Store appointment data for quotation page
-    safeStorage.setItem("pendingQuotationFromAppointment", quotationData);
-
-    // Clean up file URLs
-    if (form.customerIdProof?.urls) {
-      form.customerIdProof.urls.forEach((url: string) => URL.revokeObjectURL(url));
-    }
-    if (form.vehicleRCCopy?.urls) {
-      form.vehicleRCCopy.urls.forEach((url: string) => URL.revokeObjectURL(url));
-    }
-    if (form.warrantyCardServiceBook?.urls) {
-      form.warrantyCardServiceBook.urls.forEach((url: string) => URL.revokeObjectURL(url));
-    }
-    if (form.photosVideos?.urls) {
-      form.photosVideos.urls.forEach((url: string) => URL.revokeObjectURL(url));
-    }
-
-    // Close modal
-    handleCloseAppointmentForm();
-
-    // Navigate to quotations page
-    router.push("/sc/quotations?fromAppointment=true");
-
-    showToast("Appointment saved. Redirecting to create quotation...", "success");
-  }, [selectedAppointment, selectedAppointmentCustomer, serviceCenterContext, currentJobCardId, convertAppointmentToJobCard, router, handleCloseAppointmentForm, showToast]);
-
+  }, [router, showToast]);
 
   // Convert Appointment to Quotation
   const handleConvertToQuotation = useCallback(async () => {
     if (!selectedAppointment) return;
 
     // Basic validation - use appointment data
-    const appointment = selectedAppointment as any;
+    const appointment = selectedAppointment;
     if (!appointment.vehicleBrand && !appointment.vehicle) {
       showToast("Please ensure vehicle information is available in the appointment.", "error");
       return;
@@ -990,8 +1113,8 @@ function AppointmentsContent() {
     if (appointment.insuranceCompanyName) part1.insuranceCompanyName = appointment.insuranceCompanyName;
 
     // Populate PART 2A if documentation files exist
-    const hasPhotos = appointment.photosVideos?.urls?.length > 0 || appointment.documentationFiles?.photosVideos > 0;
-    const hasWarranty = appointment.warrantyCardServiceBook?.urls?.length > 0 || appointment.documentationFiles?.warrantyCardServiceBook > 0;
+    const hasPhotos = (appointment.photosVideos?.urls?.length ?? 0) > 0 || (appointment.documentationFiles?.photosVideos ?? 0) > 0;
+    const hasWarranty = (appointment.warrantyCardServiceBook?.urls?.length ?? 0) > 0 || (appointment.documentationFiles?.warrantyCardServiceBook ?? 0) > 0;
     const part2A = (hasPhotos || hasWarranty)
       ? {
         videoEvidence: hasPhotos ? "Yes" : "No" as "Yes" | "No" | "",
@@ -1053,21 +1176,12 @@ function AppointmentsContent() {
     // Store appointment data for quotation page
     safeStorage.setItem("pendingQuotationFromAppointment", quotationData);
 
-    // Update appointment status to indicate customer has arrived and intake is done
-    const updatedAppointments = appointments.map((apt) =>
-      apt.id === selectedAppointment.id
-        ? { ...apt, status: "In Progress" }
-        : apt
-    );
-    setAppointments(updatedAppointments);
-    safeStorage.setItem("appointments", updatedAppointments);
-
     // Navigate to quotations page
     router.push("/sc/quotations?fromAppointment=true");
 
     // Close the appointment detail modal
     closeDetailModal();
-  }, [selectedAppointment, appointments, router, closeDetailModal, showToast, currentJobCardId, updateStoredJobCard, detailCustomer, serviceCenterContext, convertAppointmentToJobCard]);
+  }, [selectedAppointment, detailCustomer, currentJobCardId, updateStoredJobCard, serviceCenterContext, router, closeDetailModal, showToast]);
 
   const updateLeadForAppointment = useCallback(
     (appointment: AppointmentRecord) => {
@@ -1095,6 +1209,8 @@ function AppointmentsContent() {
 
   // ==================== Effects ====================
   // Sync customerArrivalStatus with appointment status
+  // Note: This effect should NOT auto-redirect when clicking appointment from grid
+  // Auto-redirect only happens when customer arrives (handled in AppointmentDetailModal)
   useEffect(() => {
     if (!selectedAppointment) {
       setCustomerArrivalStatus(null);
@@ -1102,26 +1218,22 @@ function AppointmentsContent() {
     }
 
     // If appointment status indicates customer has arrived, set arrival status
+    // But don't auto-redirect - let user choose to open job card via button
     if (selectedAppointment.status === "In Progress" || selectedAppointment.status === "Sent to Manager") {
       if (customerArrivalStatus !== "arrived") {
         setCustomerArrivalStatus("arrived");
       }
 
-      // Try to find associated job card, or create one if it doesn't exist
+      // Find associated job card if it exists, but don't auto-redirect
       if (!currentJobCardId) {
-        const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-        const associatedJobCard = storedJobCards.find(
-          (card) => card.sourceAppointmentId === selectedAppointment.id
+        const { migrateAllJobCards } = require("../job-cards/utils/migrateJobCards.util");
+        const jobCards: JobCard[] = migrateAllJobCards();
+        const associatedJobCard = jobCards.find(
+          (card: JobCard) => card.sourceAppointmentId === selectedAppointment.id
         );
         if (associatedJobCard) {
           setCurrentJobCardId(associatedJobCard.id);
-        } else {
-          // Auto-create job card when customer arrives
-          convertAppointmentToJobCard(selectedAppointment).then((jobCard) => {
-            setCurrentJobCardId(jobCard.id);
-          }).catch((error) => {
-            console.error("Error creating job card:", error);
-          });
+          // Don't auto-redirect - user can click "Open Job Card" button if they want
         }
       }
     } else if (selectedAppointment.status === "Confirmed" || selectedAppointment.status === "Pending") {
@@ -1130,7 +1242,7 @@ function AppointmentsContent() {
         setCustomerArrivalStatus(null);
       }
     }
-  }, [selectedAppointment, customerArrivalStatus, currentJobCardId, convertAppointmentToJobCard]);
+  }, [selectedAppointment, customerArrivalStatus, currentJobCardId]);
 
   // Watch for customer search results to populate vehicle details
   useEffect(() => {
@@ -1221,6 +1333,8 @@ function AppointmentsContent() {
             appointments={visibleAppointments}
             onAppointmentClick={handleAppointmentClick}
             onDeleteAppointment={handleDeleteAppointment}
+            onOpenJobCard={handleOpenJobCard}
+            getJobCardId={getJobCardId}
             isCallCenter={isCallCenter}
           />
         </div>
@@ -1246,7 +1360,6 @@ function AppointmentsContent() {
         setSelectedAppointment={setSelectedAppointment}
         showToast={showToast}
         appointments={appointments}
-        onConvertToQuotation={isServiceAdvisor && (selectedAppointment?.status === "In Progress" || selectedAppointment?.status === "Sent to Manager" || selectedAppointment?.status === "Quotation Created") ? handleConvertToQuotation : undefined}
         onGenerateCheckInSlip={handleGenerateCheckInSlip}
         currentJobCardId={currentJobCardId}
       />
@@ -1270,7 +1383,6 @@ function AppointmentsContent() {
           onCustomerArrived={isServiceAdvisor ? handleCustomerArrivedFromForm : undefined}
           appointmentStatus={selectedAppointment?.status}
           customerArrived={selectedAppointment?.status === "In Progress" || selectedAppointment?.status === "Sent to Manager"}
-          onCreateQuotation={isServiceAdvisor && (selectedAppointment?.status === "In Progress" || selectedAppointment?.status === "Sent to Manager" || selectedAppointment?.status === "Quotation Created") ? handleCreateQuotationFromForm : undefined}
         />
       )}
 

@@ -130,7 +130,9 @@ export default function JobCards() {
       setIsClient(true);
       // Load job cards after role is determined
       const loadJobCards = () => {
-        const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+        // Import and run migration for existing job cards
+        const { migrateAllJobCards } = require("./utils/migrateJobCards.util");
+        const storedJobCards = migrateAllJobCards();
         if (storedJobCards.length > 0) {
           // For service engineers, merge stored cards with service engineer mock data
           if (isTechnician) {
@@ -1015,6 +1017,7 @@ export default function JobCards() {
       check_in_only: "bg-indigo-50 text-indigo-700 border-indigo-200",
       no_response_lead: "bg-red-100 text-red-700 border-red-200",
       manager_quote: "bg-purple-50 text-purple-700 border-purple-200",
+      "Awaiting Quotation Approval": "bg-amber-100 text-amber-700 border-amber-300",
       Created: "bg-gray-100 text-gray-700 border-gray-300",
       Assigned: "bg-blue-100 text-blue-700 border-blue-300",
       "In Progress": "bg-yellow-100 text-yellow-700 border-yellow-300",
@@ -1038,7 +1041,7 @@ export default function JobCards() {
   const filteredJobs = visibleJobCards.filter((job) => {
     // Status filter
     if (filter === "draft" && !(job.draftIntake && job.status === "Created")) return false;
-    if (filter === "created" && job.status !== "Created") return false;
+    if (filter === "created" && job.status !== "Created" && job.status !== "Awaiting Quotation Approval") return false;
     if (filter === "assigned" && job.status !== "Assigned") return false;
     if (filter === "in_progress" && job.status !== "In Progress") return false;
     if (filter === "completed" && job.status !== "Completed") return false;
@@ -1102,6 +1105,7 @@ export default function JobCards() {
       check_in_only: ["manager_quote"],
       no_response_lead: [],
       manager_quote: ["Assigned"],
+      "Awaiting Quotation Approval": ["Created"], // Can transition to Created if quotation rejected/cancelled, or to Created after approval
       Created: ["Assigned"],
       Assigned: ["In Progress"],
       "In Progress": ["Parts Pending", "Completed"],
@@ -2309,6 +2313,36 @@ export default function JobCards() {
                         <Eye size={14} />
                         View
                       </button>
+                      {/* Service Advisor: Create Quotation for Awaiting Approval job cards */}
+                      {isServiceAdvisor && 
+                       job.status === "Awaiting Quotation Approval" && 
+                       job.isTemporary && 
+                       !(() => {
+                         if (typeof window === "undefined") return false;
+                         const quotations = safeStorage.getItem<any[]>("quotations", []);
+                         return quotations.some((q) => q.jobCardId === job.id);
+                       })() && (
+                        <button
+                          onClick={() => {
+                            // Store job card data for quotation page
+                            safeStorage.setItem("pendingQuotationFromJobCard", {
+                              jobCardId: job.id,
+                              jobCardNumber: job.jobCardNumber,
+                              customerName: job.customerName,
+                              customerId: job.customerId,
+                              vehicleId: job.vehicleId,
+                              serviceCenterId: job.serviceCenterId,
+                              serviceCenterName: job.serviceCenterName,
+                              jobCardData: job,
+                            });
+                            router.push(`/sc/quotations?fromJobCard=true&jobCardId=${job.id}`);
+                          }}
+                          className="flex-1 bg-indigo-600 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-medium hover:bg-indigo-700 transition inline-flex items-center gap-1 md:gap-2 justify-center"
+                        >
+                          <FileText size={14} />
+                          Create Quotation
+                        </button>
+                      )}
                       {/* Service Advisor: Edit Draft */}
                       {isServiceAdvisor && job.draftIntake && job.sourceAppointmentId && (
                         <button

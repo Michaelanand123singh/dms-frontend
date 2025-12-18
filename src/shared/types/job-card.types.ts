@@ -12,6 +12,7 @@ export type JobCardStatus =
   | "check_in_only"
   | "no_response_lead"
   | "manager_quote"
+  | "Awaiting Quotation Approval"
   | "Created"
   | "Assigned"
   | "In Progress"
@@ -173,6 +174,32 @@ export interface JobCard {
   invoiceSentToAdvisor?: boolean;
   invoiceSentToCustomer?: boolean;
   invoiceSentAt?: string;
+  
+  // Additional appointment data fields
+  customerWhatsappNumber?: string;
+  customerAlternateMobile?: string;
+  customerEmail?: string;
+  vehicleYear?: number;
+  motorNumber?: string;
+  chargerSerialNumber?: string;
+  dateOfPurchase?: string;
+  vehicleColor?: string;
+  previousServiceHistory?: string;
+  odometerReading?: string;
+  pickupAddress?: string;
+  pickupState?: string;
+  pickupCity?: string;
+  pickupPincode?: string;
+  dropAddress?: string;
+  dropState?: string;
+  dropCity?: string;
+  dropPincode?: string;
+  preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
+  pickupDropRequired?: boolean;
+  checkInNotes?: string;
+  checkInSlipNumber?: string;
+  checkInDate?: string;
+  checkInTime?: string;
   
   // NEW STRUCTURED DATA (PART 1, PART 2, PART 2A, PART 3)
   part1?: JobCardPart1; // Customer & Vehicle Information

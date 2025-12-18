@@ -54,6 +54,41 @@ export type CreateJobCardForm = {
   vcuSerialNumber: string;
   otherPartSerialNumber: string;
 
+  // Additional Customer Contact Fields
+  whatsappNumber?: string;
+  alternateMobile?: string;
+  email?: string;
+
+  // Additional Vehicle Details
+  vehicleYear?: number;
+  motorNumber?: string;
+  chargerSerialNumber?: string;
+  dateOfPurchase?: string;
+  vehicleColor?: string;
+
+  // Additional Service Details
+  previousServiceHistory?: string;
+  odometerReading?: string;
+
+  // Operational Fields
+  pickupDropRequired?: boolean;
+  pickupAddress?: string;
+  pickupState?: string;
+  pickupCity?: string;
+  pickupPincode?: string;
+  dropAddress?: string;
+  dropState?: string;
+  dropCity?: string;
+  dropPincode?: string;
+  preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
+
+  // Check-in Fields
+  arrivalMode?: "vehicle_present" | "vehicle_absent" | "check_in_only";
+  checkInNotes?: string;
+  checkInSlipNumber?: string;
+  checkInDate?: string;
+  checkInTime?: string;
+
   // PART 2A fields (Warranty/Insurance Case Details)
   videoEvidence: DocumentationFiles;
   vinImage: DocumentationFiles;
@@ -99,6 +134,36 @@ export const INITIAL_JOB_CARD_FORM: CreateJobCardForm = {
   mcuSerialNumber: "",
   vcuSerialNumber: "",
   otherPartSerialNumber: "",
+  // Additional Customer Contact Fields
+  whatsappNumber: "",
+  alternateMobile: "",
+  email: "",
+  // Additional Vehicle Details
+  vehicleYear: undefined,
+  motorNumber: "",
+  chargerSerialNumber: "",
+  dateOfPurchase: "",
+  vehicleColor: "",
+  // Additional Service Details
+  previousServiceHistory: "",
+  odometerReading: "",
+  // Operational Fields
+  pickupDropRequired: false,
+  pickupAddress: "",
+  pickupState: "",
+  pickupCity: "",
+  pickupPincode: "",
+  dropAddress: "",
+  dropState: "",
+  dropCity: "",
+  dropPincode: "",
+  preferredCommunicationMode: undefined,
+  // Check-in Fields
+  arrivalMode: undefined,
+  checkInNotes: "",
+  checkInSlipNumber: "",
+  checkInDate: "",
+  checkInTime: "",
   // PART 2A fields
   videoEvidence: { ...INITIAL_DOCUMENTATION_FILES },
   vinImage: { ...INITIAL_DOCUMENTATION_FILES },
@@ -119,16 +184,22 @@ const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
 interface JobCardFormModalProps {
   open: boolean;
   initialValues?: Partial<CreateJobCardForm>;
+  jobCardId?: string; // For edit mode
+  mode?: "create" | "edit"; // Form mode
   onClose: () => void;
   onCreated: (jobCard: JobCard) => void;
+  onUpdated?: (jobCard: JobCard) => void; // For edit mode
   onError?: (message: string) => void;
 }
 
 export default function JobCardFormModal({
   open,
   initialValues,
+  jobCardId,
+  mode = "create",
   onClose,
   onCreated,
+  onUpdated,
   onError,
 }: JobCardFormModalProps) {
   const [form, setForm] = useState<CreateJobCardForm>({
@@ -159,16 +230,34 @@ export default function JobCardFormModal({
     if (open) {
       const serviceCenterId = String(serviceCenterContext.serviceCenterId ?? "sc-001");
       const serviceCenterCode = SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
-      setPreviewJobCardNumber(generateJobCardNumber(serviceCenterCode));
+      
+      // In edit mode, load existing job card
+      if (mode === "edit" && jobCardId) {
+        const { migrateAllJobCards } = require("../../job-cards/utils/migrateJobCards.util");
+        const existingJobCards = migrateAllJobCards();
+        const existingJobCard = existingJobCards.find((jc) => jc.id === jobCardId);
+        if (existingJobCard) {
+          setPreviewJobCardNumber(existingJobCard.jobCardNumber);
+        } else {
+          setPreviewJobCardNumber(generateJobCardNumber(serviceCenterCode));
+        }
+      } else {
+        setPreviewJobCardNumber(generateJobCardNumber(serviceCenterCode));
+      }
 
-      // Check if there are any approved quotations
-      const allQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
-      const approvedQuotations = allQuotations.filter(
-        (q) => q.status === "customer_approved" && q.customerApproved === true
-      );
-      setHasApprovedQuotations(approvedQuotations.length > 0);
+      // Check if there are any approved quotations (only for create mode)
+      if (mode === "create") {
+        const allQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
+        const approvedQuotations = allQuotations.filter(
+          (q) => q.status === "customer_approved" && q.customerApproved === true
+        );
+        setHasApprovedQuotations(approvedQuotations.length > 0);
+      } else {
+        // In edit mode, skip quotation requirement
+        setHasApprovedQuotations(true);
+      }
     }
-  }, [open, serviceCenterContext.serviceCenterId]);
+  }, [open, serviceCenterContext.serviceCenterId, mode, jobCardId]);
 
   useEffect(() => {
     if (!open) {
@@ -734,7 +823,8 @@ export default function JobCardFormModal({
   };
 
   const generateJobCardNumber = (serviceCenterCode: string = "SC001") => {
-    const storedCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    const { migrateAllJobCards } = require("../../job-cards/utils/migrateJobCards.util");
+    const storedCards = migrateAllJobCards();
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -766,8 +856,8 @@ export default function JobCardFormModal({
       return;
     }
 
-    // Validate that a customer with approved quotation is selected
-    if (!selectedCustomer || !selectedQuotation) {
+    // Validate that a customer with approved quotation is selected (only for create mode)
+    if (mode === "create" && (!selectedCustomer || !selectedQuotation)) {
       onError?.("Please select a customer with an approved quotation.");
       return;
     }
@@ -777,7 +867,21 @@ export default function JobCardFormModal({
       const serviceCenterId = String(serviceCenterContext.serviceCenterId ?? "sc-001");
       const serviceCenterCode =
         SERVICE_CENTER_CODE_MAP[serviceCenterId] || "SC001";
-      const jobCardNumber = generateJobCardNumber(serviceCenterCode);
+      
+      // In edit mode, find existing job card and preserve its data
+      let existingJobCard: JobCard | null = null;
+      if (mode === "edit" && jobCardId) {
+        const { migrateAllJobCards } = require("../../job-cards/utils/migrateJobCards.util");
+        const existingJobCards = migrateAllJobCards();
+        existingJobCard = existingJobCards.find((jc) => jc.id === jobCardId) || null;
+        if (!existingJobCard) {
+          onError?.("Job card not found.");
+          setCreating(false);
+          return;
+        }
+      }
+      
+      const jobCardNumber = existingJobCard?.jobCardNumber || generateJobCardNumber(serviceCenterCode);
 
       // Try to fetch customer and vehicle data to populate PART 1
       let customerData = null;
@@ -878,52 +982,162 @@ export default function JobCardFormModal({
         defectPart: form.defectPart || "",
       };
 
-      const newJobCard: JobCard = {
-        id: `JC-${Date.now()}`,
-        jobCardNumber,
-        serviceCenterId,
-        serviceCenterCode,
-        customerId: form.customerId || `customer-${Date.now()}`,
-        customerName: form.customerName,
-        vehicleId: form.vehicleId,
-        vehicle: `${form.vehicleMake} ${form.vehicleModel}`.trim() || form.vehicleModel || form.vehicleMake,
-        registration: form.vehicleRegistration,
-        vehicleMake: form.vehicleMake,
-        vehicleModel: form.vehicleModel,
-        customerType: customerData?.customerType || "B2C",
-        serviceType: selectedQuotation?.items?.[0]?.partName || "General Service",
-        description: form.description,
-        status: "Created",
-        priority: "Normal",
-        assignedEngineer: null,
-        estimatedCost: selectedQuotation?.totalAmount
-          ? `₹${selectedQuotation.totalAmount.toLocaleString("en-IN")}`
-          : "₹0",
-        estimatedTime: "",
-        createdAt: new Date().toISOString(),
-        parts: form.selectedParts, // Legacy field for backward compatibility
-        location: "Station",
-        quotationId: selectedQuotation?.id, // Link to approved quotation
-        serviceCenterName:
-          serviceCenterContext.serviceCenterName || "Service Center",
-        // NEW STRUCTURED DATA
-        part1,
-        part2,
-        part2A,
-      };
+      if (mode === "edit" && existingJobCard) {
+        // Update existing job card
+        const updatedJobCard: JobCard = {
+          ...existingJobCard,
+          // Preserve important fields
+          id: existingJobCard.id,
+          jobCardNumber: existingJobCard.jobCardNumber,
+          sourceAppointmentId: existingJobCard.sourceAppointmentId,
+          isTemporary: existingJobCard.isTemporary,
+          customerArrivalTimestamp: existingJobCard.customerArrivalTimestamp,
+          // Update fields from form
+          customerId: form.customerId || existingJobCard.customerId,
+          customerName: form.customerName || existingJobCard.customerName,
+          vehicleId: form.vehicleId || existingJobCard.vehicleId,
+          vehicle: `${form.vehicleMake} ${form.vehicleModel}`.trim() || form.vehicleModel || form.vehicleMake || existingJobCard.vehicle,
+          registration: form.vehicleRegistration || existingJobCard.registration,
+          vehicleMake: form.vehicleMake || existingJobCard.vehicleMake,
+          vehicleModel: form.vehicleModel || existingJobCard.vehicleModel,
+          customerType: (form.customerType as "B2C" | "B2B") || existingJobCard.customerType || "B2C",
+          serviceType: form.description ? existingJobCard.serviceType : existingJobCard.serviceType,
+          description: form.description || existingJobCard.description,
+          // Preserve status (don't change from "Awaiting Quotation Approval" until quotation is approved)
+          status: existingJobCard.status,
+          priority: existingJobCard.priority,
+          assignedEngineer: existingJobCard.assignedEngineer,
+          estimatedCost: existingJobCard.estimatedCost,
+          estimatedTime: existingJobCard.estimatedTime,
+          createdAt: existingJobCard.createdAt,
+          parts: form.selectedParts.length > 0 ? form.selectedParts : existingJobCard.parts,
+          location: existingJobCard.location,
+          quotationId: existingJobCard.quotationId,
+          serviceCenterName: existingJobCard.serviceCenterName || serviceCenterContext.serviceCenterName || "Service Center",
+          // Update additional fields from form
+          customerWhatsappNumber: form.whatsappNumber !== undefined ? form.whatsappNumber : existingJobCard.customerWhatsappNumber,
+          customerAlternateMobile: form.alternateMobile !== undefined ? form.alternateMobile : existingJobCard.customerAlternateMobile,
+          customerEmail: form.email !== undefined ? form.email : existingJobCard.customerEmail,
+          vehicleYear: form.vehicleYear !== undefined ? form.vehicleYear : existingJobCard.vehicleYear,
+          motorNumber: form.motorNumber !== undefined ? form.motorNumber : existingJobCard.motorNumber,
+          chargerSerialNumber: form.chargerSerialNumber !== undefined ? form.chargerSerialNumber : existingJobCard.chargerSerialNumber,
+          dateOfPurchase: form.dateOfPurchase !== undefined ? form.dateOfPurchase : existingJobCard.dateOfPurchase,
+          vehicleColor: form.vehicleColor !== undefined ? form.vehicleColor : existingJobCard.vehicleColor,
+          previousServiceHistory: form.previousServiceHistory !== undefined ? form.previousServiceHistory : existingJobCard.previousServiceHistory,
+          odometerReading: form.odometerReading !== undefined ? form.odometerReading : existingJobCard.odometerReading,
+          pickupDropRequired: form.pickupDropRequired !== undefined ? form.pickupDropRequired : existingJobCard.pickupDropRequired,
+          pickupAddress: form.pickupAddress !== undefined ? form.pickupAddress : existingJobCard.pickupAddress,
+          pickupState: form.pickupState !== undefined ? form.pickupState : existingJobCard.pickupState,
+          pickupCity: form.pickupCity !== undefined ? form.pickupCity : existingJobCard.pickupCity,
+          pickupPincode: form.pickupPincode !== undefined ? form.pickupPincode : existingJobCard.pickupPincode,
+          dropAddress: form.dropAddress !== undefined ? form.dropAddress : existingJobCard.dropAddress,
+          dropState: form.dropState !== undefined ? form.dropState : existingJobCard.dropState,
+          dropCity: form.dropCity !== undefined ? form.dropCity : existingJobCard.dropCity,
+          dropPincode: form.dropPincode !== undefined ? form.dropPincode : existingJobCard.dropPincode,
+          preferredCommunicationMode: form.preferredCommunicationMode !== undefined ? form.preferredCommunicationMode : existingJobCard.preferredCommunicationMode,
+          arrivalMode: form.arrivalMode !== undefined ? form.arrivalMode : existingJobCard.arrivalMode,
+          checkInNotes: form.checkInNotes !== undefined ? form.checkInNotes : existingJobCard.checkInNotes,
+          checkInSlipNumber: form.checkInSlipNumber !== undefined ? form.checkInSlipNumber : existingJobCard.checkInSlipNumber,
+          checkInDate: form.checkInDate !== undefined ? form.checkInDate : existingJobCard.checkInDate,
+          checkInTime: form.checkInTime !== undefined ? form.checkInTime : existingJobCard.checkInTime,
+          // Update structured data
+          part1,
+          part2,
+          part2A,
+        };
 
-      const existingJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-      safeStorage.setItem("jobCards", [newJobCard, ...existingJobCards]);
+        const { migrateAllJobCards } = require("../../job-cards/utils/migrateJobCards.util");
+        const existingJobCards = migrateAllJobCards();
+        const updatedJobCards = existingJobCards.map((jc) =>
+          jc.id === existingJobCard.id ? updatedJobCard : jc
+        );
+        safeStorage.setItem("jobCards", updatedJobCards);
 
-      // If parts are selected, create a parts request for inventory manager
-      if (form.selectedParts.length > 0) {
-        const requestedBy = `${serviceCenterContext.serviceCenterName || "Service Center"} - ${serviceCenterContext.userRole || "SC Manager"}`;
-        await createPartsRequestFromJobCard(newJobCard, requestedBy);
+        // If parts are selected, create a parts request for inventory manager
+        if (form.selectedParts.length > 0) {
+          const requestedBy = `${serviceCenterContext.serviceCenterName || "Service Center"} - ${serviceCenterContext.userRole || "SC Manager"}`;
+          await createPartsRequestFromJobCard(updatedJobCard, requestedBy);
+        }
+
+        onUpdated?.(updatedJobCard);
+        resetForm();
+        onClose();
+      } else {
+        // Create new job card
+        const newJobCard: JobCard = {
+          id: `JC-${Date.now()}`,
+          jobCardNumber,
+          serviceCenterId,
+          serviceCenterCode,
+          customerId: form.customerId || `customer-${Date.now()}`,
+          customerName: form.customerName,
+          vehicleId: form.vehicleId,
+          vehicle: `${form.vehicleMake} ${form.vehicleModel}`.trim() || form.vehicleModel || form.vehicleMake,
+          registration: form.vehicleRegistration,
+          vehicleMake: form.vehicleMake,
+          vehicleModel: form.vehicleModel,
+          customerType: customerData?.customerType || "B2C",
+          serviceType: selectedQuotation?.items?.[0]?.partName || "General Service",
+          description: form.description,
+          status: "Created",
+          priority: "Normal",
+          assignedEngineer: null,
+          estimatedCost: selectedQuotation?.totalAmount
+            ? `₹${selectedQuotation.totalAmount.toLocaleString("en-IN")}`
+            : "₹0",
+          estimatedTime: "",
+          createdAt: new Date().toISOString(),
+          parts: form.selectedParts, // Legacy field for backward compatibility
+          location: "Station",
+          quotationId: selectedQuotation?.id, // Link to approved quotation
+          serviceCenterName:
+            serviceCenterContext.serviceCenterName || "Service Center",
+          // Additional fields from form
+          customerWhatsappNumber: form.whatsappNumber,
+          customerAlternateMobile: form.alternateMobile,
+          customerEmail: form.email,
+          vehicleYear: form.vehicleYear,
+          motorNumber: form.motorNumber,
+          chargerSerialNumber: form.chargerSerialNumber,
+          dateOfPurchase: form.dateOfPurchase,
+          vehicleColor: form.vehicleColor,
+          previousServiceHistory: form.previousServiceHistory,
+          odometerReading: form.odometerReading,
+          pickupDropRequired: form.pickupDropRequired,
+          pickupAddress: form.pickupAddress,
+          pickupState: form.pickupState,
+          pickupCity: form.pickupCity,
+          pickupPincode: form.pickupPincode,
+          dropAddress: form.dropAddress,
+          dropState: form.dropState,
+          dropCity: form.dropCity,
+          dropPincode: form.dropPincode,
+          preferredCommunicationMode: form.preferredCommunicationMode,
+          arrivalMode: form.arrivalMode,
+          checkInNotes: form.checkInNotes,
+          checkInSlipNumber: form.checkInSlipNumber,
+          checkInDate: form.checkInDate,
+          checkInTime: form.checkInTime,
+          // NEW STRUCTURED DATA
+          part1,
+          part2,
+          part2A,
+        };
+
+        const { migrateAllJobCards } = require("../../job-cards/utils/migrateJobCards.util");
+        const existingJobCards = migrateAllJobCards();
+        safeStorage.setItem("jobCards", [newJobCard, ...existingJobCards]);
+
+        // If parts are selected, create a parts request for inventory manager
+        if (form.selectedParts.length > 0) {
+          const requestedBy = `${serviceCenterContext.serviceCenterName || "Service Center"} - ${serviceCenterContext.userRole || "SC Manager"}`;
+          await createPartsRequestFromJobCard(newJobCard, requestedBy);
+        }
+
+        onCreated(newJobCard);
+        resetForm();
+        onClose();
       }
-
-      onCreated(newJobCard);
-      resetForm();
-      onClose();
     } catch (error) {
       console.error("Error creating job card:", error);
       onError?.("Failed to create job card. Please try again.");
@@ -939,9 +1153,13 @@ export default function JobCardFormModal({
       <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[95vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-6 border-b pb-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Create Job Card from Approved Quotation</h2>
+            <h2 className="text-2xl font-bold text-gray-800">
+              {mode === "edit" ? "Edit Job Card" : "Create Job Card from Approved Quotation"}
+            </h2>
             <p className="text-sm text-gray-500 mt-1">
-              Search for customers with approved quotations. All details will be pre-filled from the quotation.
+              {mode === "edit" 
+                ? "Complete the job card details. All fields are pre-filled from the appointment."
+                : "Search for customers with approved quotations. All details will be pre-filled from the quotation."}
             </p>
           </div>
           <button
@@ -957,7 +1175,8 @@ export default function JobCardFormModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* SEARCH CUSTOMER/VEHICLE - Only Approved Quotations */}
+          {/* SEARCH CUSTOMER/VEHICLE - Only Approved Quotations (Only in create mode) */}
+          {mode === "create" && (
           <div className="bg-green-50 rounded-xl p-4 border border-green-200 search-container">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle className="text-green-600" size={18} />
@@ -1185,6 +1404,7 @@ export default function JobCardFormModal({
               </div>
             )}
           </div>
+          )}
 
           {/* PART 1: CUSTOMER & VEHICLE INFORMATION */}
           <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
@@ -1229,6 +1449,45 @@ export default function JobCardFormModal({
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     required
                     placeholder="9876543210"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    WhatsApp Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={form.whatsappNumber || ""}
+                    onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="9876543210"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Alternate Mobile
+                  </label>
+                  <input
+                    type="tel"
+                    value={form.alternateMobile || ""}
+                    onChange={(e) => setForm({ ...form, alternateMobile: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="9876543210"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={form.email || ""}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="customer@example.com"
                   />
                 </div>
 
@@ -1317,6 +1576,72 @@ export default function JobCardFormModal({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vehicle Year
+                  </label>
+                  <input
+                    type="number"
+                    value={form.vehicleYear || ""}
+                    onChange={(e) => setForm({ ...form, vehicleYear: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="2023"
+                    min="1900"
+                    max="2100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Motor Number
+                  </label>
+                  <input
+                    type="text"
+                    value={form.motorNumber || ""}
+                    onChange={(e) => setForm({ ...form, motorNumber: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Motor serial number"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Charger Serial Number
+                  </label>
+                  <input
+                    type="text"
+                    value={form.chargerSerialNumber || ""}
+                    onChange={(e) => setForm({ ...form, chargerSerialNumber: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Charger serial number"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date of Purchase
+                  </label>
+                  <input
+                    type="date"
+                    value={form.dateOfPurchase || ""}
+                    onChange={(e) => setForm({ ...form, dateOfPurchase: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vehicle Color
+                  </label>
+                  <input
+                    type="text"
+                    value={form.vehicleColor || ""}
+                    onChange={(e) => setForm({ ...form, vehicleColor: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g., Red, Blue, Black"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Warranty Status
                   </label>
                   <input
@@ -1370,6 +1695,49 @@ export default function JobCardFormModal({
                     required
                     placeholder="Describe customer concerns or feedback..."
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Previous Service History
+                  </label>
+                  <textarea
+                    value={form.previousServiceHistory || ""}
+                    onChange={(e) => setForm({ ...form, previousServiceHistory: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    rows={3}
+                    placeholder="Previous service history and repairs..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Odometer Reading
+                  </label>
+                  <input
+                    type="text"
+                    value={form.odometerReading || ""}
+                    onChange={(e) => setForm({ ...form, odometerReading: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="e.g., 15000 km"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Preferred Communication Mode
+                  </label>
+                  <select
+                    value={form.preferredCommunicationMode || ""}
+                    onChange={(e) => setForm({ ...form, preferredCommunicationMode: e.target.value as "Phone" | "Email" | "SMS" | "WhatsApp" | undefined })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">Select Mode</option>
+                    <option value="Phone">Phone</option>
+                    <option value="Email">Email</option>
+                    <option value="SMS">SMS</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1968,6 +2336,202 @@ export default function JobCardFormModal({
                     rows={3}
                     placeholder="Describe the symptoms observed"
                   />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Operational & Check-in Details */}
+          <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+              <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">3</span>
+              Operational & Check-in Details
+            </h3>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Side - Pickup/Drop Details */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Pickup & Drop Service</h4>
+                
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="pickupDropRequired"
+                    checked={form.pickupDropRequired || false}
+                    onChange={(e) => setForm({ ...form, pickupDropRequired: e.target.checked })}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  />
+                  <label htmlFor="pickupDropRequired" className="text-sm font-medium text-gray-700">
+                    Pickup/Drop Service Required
+                  </label>
+                </div>
+
+                {form.pickupDropRequired && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Pickup Address
+                      </label>
+                      <textarea
+                        value={form.pickupAddress || ""}
+                        onChange={(e) => setForm({ ...form, pickupAddress: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        rows={2}
+                        placeholder="Enter pickup address"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Pickup State</label>
+                        <input
+                          type="text"
+                          value={form.pickupState || ""}
+                          onChange={(e) => setForm({ ...form, pickupState: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          placeholder="State"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Pickup City</label>
+                        <input
+                          type="text"
+                          value={form.pickupCity || ""}
+                          onChange={(e) => setForm({ ...form, pickupCity: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          placeholder="City"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Pickup Pincode</label>
+                        <input
+                          type="text"
+                          value={form.pickupPincode || ""}
+                          onChange={(e) => setForm({ ...form, pickupPincode: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          placeholder="Pincode"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Drop Address
+                      </label>
+                      <textarea
+                        value={form.dropAddress || ""}
+                        onChange={(e) => setForm({ ...form, dropAddress: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        rows={2}
+                        placeholder="Enter drop address"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Drop State</label>
+                        <input
+                          type="text"
+                          value={form.dropState || ""}
+                          onChange={(e) => setForm({ ...form, dropState: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          placeholder="State"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Drop City</label>
+                        <input
+                          type="text"
+                          value={form.dropCity || ""}
+                          onChange={(e) => setForm({ ...form, dropCity: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          placeholder="City"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Drop Pincode</label>
+                        <input
+                          type="text"
+                          value={form.dropPincode || ""}
+                          onChange={(e) => setForm({ ...form, dropPincode: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          placeholder="Pincode"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Right Side - Check-in Details */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Check-in Information</h4>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Arrival Mode
+                  </label>
+                  <select
+                    value={form.arrivalMode || ""}
+                    onChange={(e) => setForm({ ...form, arrivalMode: e.target.value as "vehicle_present" | "vehicle_absent" | "check_in_only" | undefined })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">Select Mode</option>
+                    <option value="vehicle_present">Vehicle Present</option>
+                    <option value="vehicle_absent">Vehicle Absent</option>
+                    <option value="check_in_only">Check-in Only</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Check-in Notes
+                  </label>
+                  <textarea
+                    value={form.checkInNotes || ""}
+                    onChange={(e) => setForm({ ...form, checkInNotes: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    rows={3}
+                    placeholder="Additional check-in notes..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Check-in Slip Number
+                  </label>
+                  <input
+                    type="text"
+                    value={form.checkInSlipNumber || ""}
+                    onChange={(e) => setForm({ ...form, checkInSlipNumber: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Check-in slip number"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Check-in Date
+                    </label>
+                    <input
+                      type="date"
+                      value={form.checkInDate || ""}
+                      onChange={(e) => setForm({ ...form, checkInDate: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Check-in Time
+                    </label>
+                    <input
+                      type="time"
+                      value={form.checkInTime || ""}
+                      onChange={(e) => setForm({ ...form, checkInTime: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

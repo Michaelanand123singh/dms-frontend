@@ -49,7 +49,6 @@ export interface AppointmentFormProps {
   onCustomerArrived?: (form: AppointmentFormType) => void;
   appointmentStatus?: string;
   customerArrived?: boolean;
-  onCreateQuotation?: (form: AppointmentFormType) => void;
 }
 
 export const AppointmentForm = ({
@@ -68,7 +67,6 @@ export const AppointmentForm = ({
   onCustomerArrived,
   appointmentStatus,
   customerArrived,
-  onCreateQuotation,
 }: AppointmentFormProps) => {
   const { userRole, userInfo } = useRole();
   const isCallCenter = userRole === "call_center";
@@ -1433,27 +1431,7 @@ export const AppointmentForm = ({
         >
           Cancel
         </button>
-        {customerArrived && onCreateQuotation ? (
-          <button
-            onClick={() => {
-              if (onCreateQuotation) {
-                // Ensure all state values are synced to formData
-                const finalFormData: AppointmentFormType = {
-                  ...formData,
-                  pickupState: pickupState || formData.pickupState,
-                  pickupCity: pickupCity || formData.pickupCity,
-                  dropState: dropState || formData.dropState,
-                  dropCity: dropCity || formData.dropCity,
-                };
-                onCreateQuotation(finalFormData);
-              }
-            }}
-            className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center gap-2"
-          >
-            <FileText size={18} />
-            Create Quotation
-          </button>
-        ) : (
+        {(
         <button
           onClick={handleSubmit}
           className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition"

@@ -84,6 +84,8 @@ function QuotationsContent() {
   const isServiceManager = userRole === "sc_manager";
   const searchParams = useSearchParams();
   const fromAppointment = searchParams.get("fromAppointment") === "true";
+  const fromJobCard = searchParams.get("fromJobCard") === "true";
+  const jobCardIdParam = searchParams.get("jobCardId");
 
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
   const [activeServiceCenterId, setActiveServiceCenterId] = useState<string>(() =>
@@ -280,6 +282,116 @@ function QuotationsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromAppointment]);
 
+  // Handle pre-filling form from job card data
+  useEffect(() => {
+    if (fromJobCard && typeof window !== "undefined") {
+      const quotationData = safeStorage.getItem<any>("pendingQuotationFromJobCard", null);
+      
+      if (quotationData && quotationData.jobCardData) {
+        const jobCard = quotationData.jobCardData;
+        const normalizedCenterId = normalizeServiceCenterId(
+          quotationData.serviceCenterId ?? serviceCenterContext.serviceCenterId
+        );
+        setActiveServiceCenterId(normalizedCenterId);
+
+        // Find customer by ID or phone
+        const findCustomer = async () => {
+          try {
+            if (quotationData.customerId) {
+              await performCustomerSearch(quotationData.customerId, "auto");
+            } else if (jobCard.part1?.mobilePrimary) {
+              await performCustomerSearch(jobCard.part1.mobilePrimary, "auto");
+            }
+            
+            // Wait a bit for search results
+            setTimeout(() => {
+              const customers = customerSearchResults;
+              const customer = customers.find(
+                (c) => c.id === quotationData.customerId || 
+                       c.phone === jobCard.part1?.mobilePrimary ||
+                       c.name === quotationData.customerName
+              );
+              
+              if (customer) {
+                setSelectedCustomer(customer);
+                setActiveCustomerId(customer.id?.toString() || "");
+                
+                // Extract insurance data from job card PART 1
+                const insuranceCompanyName = jobCard.part1?.insuranceCompanyName || "";
+                const insuranceStartDate = jobCard.part1?.insuranceStartDate || "";
+                const insuranceEndDate = jobCard.part1?.insuranceEndDate || "";
+                const hasInsuranceData = !!(insuranceCompanyName || insuranceStartDate || insuranceEndDate);
+                
+                // Try to match insurance company name to insurer list
+                let matchedInsurerId = "";
+                if (insuranceCompanyName && insurers.length > 0) {
+                  const matchedInsurer = insurers.find((insurer) => {
+                    const insurerNameLower = insurer.name.toLowerCase().trim();
+                    const companyNameLower = insuranceCompanyName.toLowerCase().trim();
+                    return (
+                      insurerNameLower === companyNameLower ||
+                      insurerNameLower.includes(companyNameLower) ||
+                      companyNameLower.includes(insurerNameLower)
+                    );
+                  });
+                  if (matchedInsurer) {
+                    matchedInsurerId = matchedInsurer.id;
+                  }
+                }
+                
+                setForm((prev) => ({
+                  ...prev,
+                  customerId: String(customer.id),
+                  documentType: "Quotation",
+                  notes: jobCard.part1?.customerFeedback || jobCard.description || "",
+                  customNotes: jobCard.part1?.technicianObservation || "",
+                  batterySerialNumber: jobCard.part1?.batterySerialNumber || "",
+                  hasInsurance: hasInsuranceData,
+                  insurerId: matchedInsurerId,
+                  insuranceCompanyName: insuranceCompanyName || "",
+                  insuranceStartDate: insuranceStartDate || "",
+                  insuranceEndDate: insuranceEndDate || "",
+                }));
+                
+                // Find matching vehicle
+                if (customer.vehicles && customer.vehicles.length > 0) {
+                  const vehicle = customer.vehicles.find(
+                    (v) => v.registration === jobCard.part1?.registrationNumber || 
+                           v.id === quotationData.vehicleId
+                  ) || customer.vehicles[0];
+                  
+                  if (vehicle) {
+                    setForm((prev) => ({
+                      ...prev,
+                      vehicleId: String(vehicle.id),
+                    }));
+                  }
+                }
+                
+                // Open create modal
+                setShowCreateModal(true);
+                
+                // Clear the stored data
+                safeStorage.removeItem("pendingQuotationFromJobCard");
+              } else if (quotationData.customerId) {
+                const decodedCustomerId = String(quotationData.customerId);
+                setForm((prev) => ({ ...prev, customerId: decodedCustomerId }));
+                setActiveCustomerId(decodedCustomerId);
+                setShowCreateModal(true);
+                safeStorage.removeItem("pendingQuotationFromJobCard");
+              }
+            }, 500);
+          } catch (error) {
+            console.error("Error finding customer from job card:", error);
+          }
+        };
+        
+        findCustomer();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromJobCard, jobCardIdParam]);
+
   // Calculate totals
   const calculateTotals = useCallback(() => {
     let subtotal = 0;
@@ -363,6 +475,10 @@ const buildQuotationFromForm = (): Quotation => {
   // Get appointmentId from pendingQuotationFromAppointment if available
   const pendingQuotationData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
   const appointmentId = pendingQuotationData?.appointmentId || undefined;
+  
+  // Get jobCardId from pendingQuotationFromJobCard if available
+  const pendingJobCardData = safeStorage.getItem<any>("pendingQuotationFromJobCard", null);
+  const jobCardId = pendingJobCardData?.jobCardId || jobCardIdParam || undefined;
 
   return {
     id: `qt-${Date.now()}`,
@@ -372,6 +488,7 @@ const buildQuotationFromForm = (): Quotation => {
     vehicleId: form.vehicleId,
     serviceAdvisorId: userInfo?.id || "user-001",
     appointmentId: appointmentId,
+    jobCardId: jobCardId,
     documentType: form.documentType,
     quotationDate: form.quotationDate,
     validUntil: validUntil.toISOString().split("T")[0],
@@ -1760,6 +1877,7 @@ Please keep this slip safe for vehicle collection.`;
       source: "quotation_sent",
       status: "in_discussion" as const,
       quotationId: quotation.id,
+      jobCardId: quotation.jobCardId, // Link to job card if available
       notes: `Quotation ${quotation.quotationNumber} sent to customer. Amount: ₹${quotation.totalAmount.toLocaleString("en-IN")}.`,
       assignedTo: quotation.serviceAdvisorId || userInfo?.id,
       serviceCenterId: quotation.serviceCenterId,
@@ -1908,27 +2026,36 @@ Please keep this slip safe for vehicle collection.`;
       setQuotations(updatedQuotations);
       safeStorage.setItem("quotations", updatedQuotations);
       
-      // Convert to job card
-      const jobCard = convertQuotationToJobCard(quotation);
+      // Find temporary job card linked to quotation
+      const storedJobCards = safeStorage.getItem<any[]>("jobCards", []);
+      const tempJobCard = storedJobCards.find((jc) => 
+        jc.id === quotation.jobCardId && jc.isTemporary === true
+      );
       
-      // Update lead status to job_card_in_progress
-      updateLeadOnJobCardCreation(quotation.id, jobCard.id, jobCard.jobCardNumber);
-      
-      // Automatically send job card to manager for technician assignment and parts monitoring
-      const updatedJobCards = safeStorage.getItem<any[]>("jobCards", []);
-      const jobCardIndex = updatedJobCards.findIndex((jc) => jc.id === jobCard.id);
-      if (jobCardIndex !== -1) {
-        updatedJobCards[jobCardIndex] = {
-          ...updatedJobCards[jobCardIndex],
-          status: "Created",
+      let jobCard;
+      if (tempJobCard) {
+        // Convert job card in-place
+        const jobCardIndex = storedJobCards.findIndex((jc) => jc.id === tempJobCard.id);
+        storedJobCards[jobCardIndex] = {
+          ...tempJobCard,
+          isTemporary: false,
+          status: "Created" as const, // Will be changed to "Ready for Assignment" if needed
+          quotationId: quotation.id,
           submittedToManager: true,
           submittedAt: new Date().toISOString(),
         };
-        safeStorage.setItem("jobCards", updatedJobCards);
+        safeStorage.setItem("jobCards", storedJobCards);
+        jobCard = storedJobCards[jobCardIndex];
+      } else {
+        // Fallback: Create new job card if temporary one not found
+        jobCard = convertQuotationToJobCard(quotation);
       }
       
+      // Update lead status to job_card_in_progress or converted
+      updateLeadOnJobCardCreation(quotation.id, jobCard.id, jobCard.jobCardNumber);
+      
       // Show notification to advisor
-      alert(`✅ Customer Approved!\n\nQuotation ${quotation.quotationNumber} has been approved by the customer.\n\nJob Card Created: ${jobCard.jobCardNumber}\n\nJob card has been automatically sent to Service Manager for technician assignment and parts monitoring.`);
+      alert(`✅ Customer Approved!\n\nQuotation ${quotation.quotationNumber} has been approved by the customer.\n\nJob Card: ${jobCard.jobCardNumber}\n\nJob card has been automatically sent to Service Manager for technician assignment and parts monitoring.`);
       
       // In production, you would send a notification/email to the advisor and manager here
       console.log("Notification to advisor:", {

@@ -36,6 +36,7 @@ export interface Quotation {
   vehicleId?: string;
   serviceAdvisorId?: string;
   appointmentId?: string | number; // Link to source appointment
+  jobCardId?: string; // Link to source job card
   documentType: "Quotation" | "Proforma Invoice" | "Check-in Slip";
   quotationDate: string;
   validUntil?: string;

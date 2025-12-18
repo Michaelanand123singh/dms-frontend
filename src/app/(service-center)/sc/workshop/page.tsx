@@ -42,7 +42,8 @@ export default function Workshop() {
   // Fetch all job cards from localStorage/defaultJobCards
   const [jobCards, setJobCards] = useState<JobCard[]>(() => {
     if (typeof window !== "undefined") {
-      const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+      const { migrateAllJobCards } = require("../job-cards/utils/migrateJobCards.util");
+      const storedJobCards = migrateAllJobCards();
       if (storedJobCards.length > 0) {
         return storedJobCards;
       }
@@ -58,7 +59,8 @@ export default function Workshop() {
 
   // Load job cards from localStorage on mount
   useEffect(() => {
-    const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
+    const { migrateAllJobCards } = require("../job-cards/utils/migrateJobCards.util");
+    const storedJobCards = migrateAllJobCards();
     if (storedJobCards.length > 0) {
       try {
         if (Array.isArray(storedJobCards) && storedJobCards.length > 0) {
@@ -190,6 +192,7 @@ export default function Workshop() {
       check_in_only: "bg-indigo-50 text-indigo-700 border-indigo-200",
       no_response_lead: "bg-red-100 text-red-700 border-red-200",
       manager_quote: "bg-purple-50 text-purple-700 border-purple-200",
+      "Awaiting Quotation Approval": "bg-amber-100 text-amber-700 border-amber-300",
       Created: "bg-gray-100 text-gray-700 border-gray-300",
       Assigned: "bg-blue-100 text-blue-700 border-blue-300",
       "In Progress": "bg-yellow-100 text-yellow-700 border-yellow-300",

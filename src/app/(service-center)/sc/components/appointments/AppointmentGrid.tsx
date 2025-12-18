@@ -1,5 +1,5 @@
 "use client";
-import { Calendar, Clock, Car, Phone, Building2, Trash2 } from "lucide-react";
+import { Calendar, Clock, Car, Phone, Building2, Trash2, ClipboardList } from "lucide-react";
 import type { AppointmentRecord } from "../../appointments/types";
 import { StatusBadge } from "./StatusBadge";
 
@@ -7,10 +7,12 @@ interface AppointmentGridProps {
   appointments: AppointmentRecord[];
   onAppointmentClick: (appointment: AppointmentRecord) => void;
   onDeleteAppointment: (id: number) => void;
+  onOpenJobCard?: (appointmentId: number) => void;
+  getJobCardId?: (appointmentId: number) => string | null;
   isCallCenter: boolean;
 }
 
-export function AppointmentGrid({ appointments, onAppointmentClick, onDeleteAppointment, isCallCenter }: AppointmentGridProps) {
+export function AppointmentGrid({ appointments, onAppointmentClick, onDeleteAppointment, onOpenJobCard, getJobCardId, isCallCenter }: AppointmentGridProps) {
   if (appointments.length === 0) {
     return (
       <div className="text-center py-12">
@@ -23,23 +25,57 @@ export function AppointmentGrid({ appointments, onAppointmentClick, onDeleteAppo
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {appointments.map((apt) => (
+      {appointments.map((apt) => {
+        const isInProgress = apt.status === "In Progress";
+        const jobCardId = isInProgress && getJobCardId ? getJobCardId(apt.id) : null;
+        const hasJobCard = jobCardId !== null && jobCardId !== undefined;
+        
+        return (
         <div
           key={apt.id}
           className="border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all duration-200 bg-white hover:bg-blue-50/30 relative group"
         >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (confirm(`Are you sure you want to delete the appointment for ${apt.customerName}?`)) {
-                onDeleteAppointment(apt.id);
-              }
-            }}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-red-50 text-red-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 z-10"
-            title="Delete appointment"
-          >
-            <Trash2 size={14} />
-          </button>
+          <div className="absolute top-2 right-2 flex gap-1 z-10">
+            {hasJobCard && onOpenJobCard && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenJobCard(apt.id);
+                }}
+                className="p-1.5 rounded-full bg-indigo-50 text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-100"
+                title="Open Job Card"
+              >
+                <ClipboardList size={14} />
+              </button>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Are you sure you want to delete the appointment for ${apt.customerName}?`)) {
+                  onDeleteAppointment(apt.id);
+                }
+              }}
+              className="p-1.5 rounded-full bg-red-50 text-red-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100"
+              title="Delete appointment"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+          
+          {hasJobCard && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenJobCard) {
+                  onOpenJobCard(apt.id);
+                }
+              }}
+              className="w-full mt-2 mb-2 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <ClipboardList size={16} />
+              Open Job Card
+            </button>
+          )}
           
           <div onClick={() => onAppointmentClick(apt)}>
             <div className="flex items-center justify-between mb-2">
@@ -67,7 +103,8 @@ export function AppointmentGrid({ appointments, onAppointmentClick, onDeleteAppo
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

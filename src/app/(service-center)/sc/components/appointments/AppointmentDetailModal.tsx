@@ -29,7 +29,6 @@ interface AppointmentDetailModalProps {
   setSelectedAppointment: (appointment: AppointmentRecord | null) => void;
   showToast: (message: string, type: "success" | "error") => void;
   appointments: AppointmentRecord[];
-  onConvertToQuotation?: () => void;
   onGenerateCheckInSlip?: () => void;
   currentJobCardId?: string | null;
 }
@@ -53,7 +52,6 @@ export function AppointmentDetailModal({
   setSelectedAppointment,
   showToast,
   appointments,
-  onConvertToQuotation,
   onGenerateCheckInSlip,
   currentJobCardId,
 }: AppointmentDetailModalProps) {
@@ -106,7 +104,11 @@ export function AppointmentDetailModal({
       // Create job card automatically when customer arrives
       // The job card will be created in the parent component via convertAppointmentToJobCard
       onCustomerArrived();
-      showToast("Customer arrival recorded. Job card will be created automatically. You can now create a quotation or generate a check-in slip.", "success");
+      
+      // Close the modal first
+      onClose();
+      
+      showToast("Customer arrival recorded. Redirecting to job card...", "success");
     } catch (error) {
       console.error("Error recording customer arrival:", error);
       showToast("Failed to record customer arrival. Please try again.", "error");
@@ -449,39 +451,18 @@ export function AppointmentDetailModal({
               </div>
 
               {/* Action Buttons */}
-              {(onConvertToQuotation || onGenerateCheckInSlip) && (
+              {onGenerateCheckInSlip && currentJobCardId && (
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Actions</h3>
-                  {(() => {
-                    // Check if quotation already exists for this appointment
-                    const existingQuotations = safeStorage.getItem<any[]>("quotations", []);
-                    const hasExistingQuotation = existingQuotations.some(
-                      (q) => q.appointmentId === appointment.id
-                    );
-                    
-                    return (
-                      <div className="flex gap-3">
-                        {onConvertToQuotation && (
-                          <button
-                            onClick={onConvertToQuotation}
-                            className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-indigo-600 text-white hover:bg-indigo-700 flex items-center justify-center gap-2"
-                          >
-                            <FileText size={18} />
-                            {hasExistingQuotation ? "Create New Quotation" : "Create Quotation"}
-                          </button>
-                        )}
-                    {onGenerateCheckInSlip && currentJobCardId && (
-                      <button
-                        onClick={onGenerateCheckInSlip}
-                        className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-2"
-                      >
-                        <FileText size={18} />
-                        Generate Check-in Slip
-                      </button>
-                    )}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={onGenerateCheckInSlip}
+                      className="flex-1 px-4 py-3 rounded-lg font-medium transition bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-2"
+                    >
+                      <FileText size={18} />
+                      Generate Check-in Slip
+                    </button>
                   </div>
-                    );
-                  })()}
                 </div>
               )}
             </div>

@@ -399,3 +399,5 @@ export function generateInvoiceHTML(invoice: ServiceCenterInvoice): string {
   `;
 }
 
+
+

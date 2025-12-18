@@ -38,7 +38,49 @@ export interface AppointmentRecord {
   dropCity?: string;
   dropPincode?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
+  arrivalMode?: "vehicle_present" | "vehicle_absent" | "check_in_only";
+  checkInNotes?: string;
+  checkInSlipNumber?: string;
+  checkInDate?: string;
+  checkInTime?: string;
   createdByRole?: "call_center" | "service_advisor" | "service_manager"; // Track who created the appointment
+  
+  // Customer Contact & Address Fields
+  whatsappNumber?: string;
+  alternateMobile?: string;
+  email?: string;
+  address?: string;
+  cityState?: string;
+  pincode?: string;
+  
+  // Vehicle Information Fields
+  vehicleBrand?: string;
+  vehicleModel?: string;
+  vehicleYear?: number;
+  registrationNumber?: string;
+  vinChassisNumber?: string;
+  variantBatteryCapacity?: string;
+  motorNumber?: string;
+  chargerSerialNumber?: string;
+  dateOfPurchase?: string;
+  warrantyStatus?: string;
+  insuranceStartDate?: string;
+  insuranceEndDate?: string;
+  insuranceCompanyName?: string;
+  vehicleColor?: string;
+  
+  // Job Card Conversion Fields
+  batterySerialNumber?: string;
+  mcuSerialNumber?: string;
+  vcuSerialNumber?: string;
+  otherPartSerialNumber?: string;
+  technicianObservation?: string;
+  
+  // Documentation Files (stored as objects with files and urls)
+  customerIdProof?: DocumentationFiles;
+  vehicleRCCopy?: DocumentationFiles;
+  warrantyCardServiceBook?: DocumentationFiles;
+  photosVideos?: DocumentationFiles;
 }
 
 export interface DocumentationFiles {

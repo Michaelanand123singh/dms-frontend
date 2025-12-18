@@ -12,6 +12,7 @@ export type JobCardStatus =
   | "check_in_only"
   | "no_response_lead"
   | "manager_quote"
+  | "Awaiting Quotation Approval"
   | "Created"
   | "Assigned"
   | "In Progress"
