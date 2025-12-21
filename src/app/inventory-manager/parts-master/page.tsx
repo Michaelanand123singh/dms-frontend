@@ -616,7 +616,10 @@ export default function PartsMasterPage() {
             isEditing={!!editingPart}
             showServiceCenter={false}
             submitButtonText={editingPart ? "Update" : "Create"}
-            submitButtonClass="bg-indigo-600 hover:bg-indigo-700 text-white"
+            submitButtonClass={editingPart 
+              ? "w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg text-base shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 mt-6"
+              : "w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg text-base shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 mt-6"
+            }
           />
         </Modal>
 

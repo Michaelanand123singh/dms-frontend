@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { Save, Plus } from "lucide-react";
 import {
   SECTION_LABELS,
   SECTION_ORDER,
@@ -329,7 +330,17 @@ export function PartsMasterForm({
       )}
 
       <button type="submit" className={submitButtonClass}>
-        {submitButtonText || (isEditing ? "Update Part" : "Add Part")}
+        {isEditing ? (
+          <>
+            <Save size={20} />
+            {submitButtonText || "Update Part"}
+          </>
+        ) : (
+          <>
+            <Plus size={20} />
+            {submitButtonText || "Add Part"}
+          </>
+        )}
       </button>
     </form>
   );
