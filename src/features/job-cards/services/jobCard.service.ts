@@ -82,23 +82,45 @@ class JobCardService {
   }
 
   async getAll(): Promise<JobCard[]> {
-    return safeStorage.getItem<JobCard[]>("jobCards", []);
+    if (this.useMock) {
+      return safeStorage.getItem<JobCard[]>("jobCards", []);
+    }
+    const response = await apiClient.get<JobCard[]>(API_ENDPOINTS.JOB_CARDS);
+    return response.data;
   }
 
-  async create(jobCard: JobCard): Promise<JobCard> {
-    const existing = await this.getAll();
-    const normalized = normalizeJobCard(jobCard) as JobCard;
-    const updated = [...existing, normalized];
-    safeStorage.setItem("jobCards", updated);
-    return jobCard;
+  async create(jobCard: Partial<JobCard>): Promise<JobCard> {
+    if (this.useMock) {
+      const existing = await this.getAll();
+      const normalized = normalizeJobCard(jobCard);
+      const newJobCard = { ...jobCard, ...normalized } as JobCard;
+      const updated = [...existing, newJobCard];
+      safeStorage.setItem("jobCards", updated);
+      return newJobCard;
+    }
+    const response = await apiClient.post<JobCard>(API_ENDPOINTS.JOB_CARDS, jobCard);
+    return response.data;
   }
 
-  async update(jobCardId: string, jobCard: JobCard): Promise<JobCard> {
-    const existing = await this.getAll();
-    const normalized = normalizeJobCard(jobCard) as JobCard;
-    const updated = existing.map(jc => jc.id === jobCardId ? normalized : jc);
-    safeStorage.setItem("jobCards", updated);
-    return jobCard;
+  async update(jobCardId: string, jobCard: Partial<JobCard>): Promise<JobCard> {
+    if (this.useMock) {
+      const existing = await this.getAll();
+      const existingJobCard = existing.find(jc => jc.id === jobCardId);
+      if (!existingJobCard) {
+        throw new Error(`Job card with id ${jobCardId} not found`);
+      }
+      // Merge the existing job card with the update
+      const merged = { ...existingJobCard, ...jobCard };
+      const normalized = normalizeJobCard(merged);
+      const updated = existing.map(jc => jc.id === jobCardId ? { ...jc, ...normalized } : jc);
+      safeStorage.setItem("jobCards", updated);
+      return updated.find(jc => jc.id === jobCardId) as JobCard;
+    }
+    const response = await apiClient.patch<JobCard>(
+      `${API_ENDPOINTS.JOB_CARDS}/${jobCardId}`,
+      jobCard
+    );
+    return response.data;
   }
 
   async createFromQuotation(quotationId: string, engineerId?: string): Promise<JobCard> {
@@ -152,9 +174,8 @@ class JobCardService {
         createdAt: new Date().toISOString(),
       };
     }
-    const response = await apiClient.patch<JobCard>(`${API_ENDPOINTS.JOB_CARD(jobCardId)}/assign-engineer`, {
+    const response = await apiClient.post<JobCard>(`${API_ENDPOINTS.JOB_CARD(jobCardId)}/assign-engineer`, {
       engineerId,
-      engineerName,
     });
     return response.data;
   }

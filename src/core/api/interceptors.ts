@@ -24,7 +24,7 @@ export function authRequestInterceptor(config: RequestInit, url: string): Reques
     // Get token from cookies (primary) or localStorage (fallback)
     const token = Cookies.get('auth_token') || safeStorage.getItem<string | null>('authToken', null);
 
-    if (token && token !== 'mock_token') {
+    if (token) {
         const headers = new Headers(config.headers);
         headers.set('Authorization', `Bearer ${token}`);
 

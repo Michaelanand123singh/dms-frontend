@@ -26,12 +26,12 @@ export const useAuthStore = create<AuthState>()(
             setAuth: (role, user) => {
                 // Sync with Cookie for Middleware
                 Cookies.set('auth_role', role, { expires: 7 });
-                Cookies.set('auth_token', 'mock_token', { expires: 7 });
+                // Note: auth_token is now set by auth.service.ts during actual login
 
                 set({
                     userRole: role,
                     userInfo: user,
-                    isAuthenticated: !!user && role !== 'admin'
+                    isAuthenticated: !!user
                 });
             },
 

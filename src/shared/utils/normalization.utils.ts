@@ -5,7 +5,7 @@ import { Appointment } from "../types/appointment.types";
  * Strips redundant master data from a Job Card to keep it normalized.
  * Returns only the "Process Data" and the Reference IDs.
  */
-export const normalizeJobCard = (jobCard: JobCard): Partial<JobCard> => {
+export const normalizeJobCard = (jobCard: Partial<JobCard>): Partial<JobCard> => {
     const {
         customerName,
         vehicle,

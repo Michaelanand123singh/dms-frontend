@@ -31,8 +31,17 @@ class ApiClient {
     /**
      * Build full URL with query parameters
      */
+    /**
+     * Build full URL with query parameters
+     */
     private buildUrl(path: string, params?: Record<string, any>): string {
-        const url = new URL(path.startsWith('/') ? path : `/${path}`, this.baseURL);
+        // Ensure baseURL doesn't have a trailing slash
+        const cleanBaseUrl = this.baseURL.replace(/\/$/, '');
+        // Ensure path starts with a slash
+        const cleanPath = path.startsWith('/') ? path : `/${path}`;
+
+        // Construct full URL string first to preserve Base URL path segments (like /api)
+        const url = new URL(cleanBaseUrl + cleanPath);
 
         if (params) {
             Object.keys(params).forEach(key => {
