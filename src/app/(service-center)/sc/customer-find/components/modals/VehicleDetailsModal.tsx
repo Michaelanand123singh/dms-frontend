@@ -46,6 +46,18 @@ export function VehicleDetailsModal({
         <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
             <div>
+              <p className="text-indigo-600 font-medium">Vehicle Brand</p>
+              <p className="text-gray-800 font-semibold">{vehicle.vehicleMake}</p>
+            </div>
+            <div>
+              <p className="text-indigo-600 font-medium">Vehicle Model</p>
+              <p className="text-gray-800 font-semibold">{vehicle.vehicleModel}</p>
+            </div>
+            <div>
+              <p className="text-indigo-600 font-medium">Manufacturing Year</p>
+              <p className="text-gray-800 font-semibold">{vehicle.vehicleYear}</p>
+            </div>
+            <div>
               <p className="text-indigo-600 font-medium">Registration Number</p>
               <p className="text-gray-800 font-semibold">{vehicle.registration}</p>
             </div>
@@ -55,7 +67,7 @@ export function VehicleDetailsModal({
             </div>
             {vehicle.vehicleColor && (
               <div>
-                <p className="text-indigo-600 font-medium">Color</p>
+                <p className="text-indigo-600 font-medium">Vehicle Color</p>
                 <p className="text-gray-800 font-semibold">{vehicle.vehicleColor}</p>
               </div>
             )}
@@ -102,11 +114,10 @@ export function VehicleDetailsModal({
             <div>
               <p className="text-indigo-600 font-medium">Status</p>
               <span
-                className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                  vehicle.currentStatus === "Active Job Card"
-                    ? "bg-orange-100 text-orange-700"
-                    : "bg-green-100 text-green-700"
-                }`}
+                className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${vehicle.currentStatus === "Active Job Card"
+                  ? "bg-orange-100 text-orange-700"
+                  : "bg-green-100 text-green-700"
+                  }`}
               >
                 {vehicle.currentStatus}
               </span>
@@ -207,9 +218,8 @@ export function VehicleDetailsModal({
                                     key={star}
                                     type="button"
                                     onClick={() => onUpdateFeedbackRating(service, star)}
-                                    className={`text-xl transition-all hover:scale-110 ${
-                                      star <= currentRating ? "text-yellow-400" : "text-gray-300"
-                                    }`}
+                                    className={`text-xl transition-all hover:scale-110 ${star <= currentRating ? "text-yellow-400" : "text-gray-300"
+                                      }`}
                                     title={`Rate ${star} star${star > 1 ? "s" : ""}`}
                                   >
                                     ★
@@ -233,9 +243,8 @@ export function VehicleDetailsModal({
                               {[1, 2, 3, 4, 5].map((star) => (
                                 <span
                                   key={star}
-                                  className={`text-lg ${
-                                    star <= (service.feedbackRating || 0) ? "text-yellow-400" : "text-gray-300"
-                                  }`}
+                                  className={`text-lg ${star <= (service.feedbackRating || 0) ? "text-yellow-400" : "text-gray-300"
+                                    }`}
                                 >
                                   ★
                                 </span>
