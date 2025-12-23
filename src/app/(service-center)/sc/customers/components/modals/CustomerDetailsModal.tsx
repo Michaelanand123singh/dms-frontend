@@ -8,7 +8,7 @@ import { InfoCard, CustomerInfoCard } from "../../../components/shared/InfoCompo
 import { Button } from "../../../components/shared/Button";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import { formatVehicleString } from "../../../components/shared/vehicle-utils";
-import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
+
 
 export interface CustomerDetailsModalProps {
   isOpen: boolean;
@@ -80,8 +80,8 @@ export function CustomerDetailsModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <InfoCard icon={Phone} label="Phone" value={customer.phone} />
             {customer.whatsappNumber && <InfoCard icon={Phone} label="WhatsApp" value={customer.whatsappNumber} />}
-            {customer.alternateMobile && (
-              <InfoCard icon={Phone} label="Alternate Mobile" value={customer.alternateMobile} />
+            {customer.alternateNumber && (
+              <InfoCard icon={Phone} label="Alternate Mobile" value={customer.alternateNumber} />
             )}
             {customer.email && <InfoCard icon={Mail} label="Email" value={customer.email} />}
             {customer.customerType && (
@@ -151,11 +151,10 @@ export function CustomerDetailsModal({
                           {vehicle.vehicleMake} {vehicle.vehicleModel} ({vehicle.vehicleYear})
                         </h4>
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            vehicle.currentStatus === "Active Job Card"
-                              ? "bg-orange-100 text-orange-700"
-                              : "bg-green-100 text-green-700"
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${vehicle.currentStatus === "Active Job Card"
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-green-100 text-green-700"
+                            }`}
                         >
                           {vehicle.currentStatus}
                         </span>
@@ -197,13 +196,8 @@ export function CustomerDetailsModal({
                           setShowVehicleDetails(true);
                           // Only show service history if vehicle has services (totalServices > 0)
                           if (vehicle.totalServices > 0 && vehicle.lastServiceDate) {
-                            const baseHistory = getMockServiceHistory(vehicle.id);
-                            const enrichedHistory = enrichServiceHistoryWithFeedbackRatings(
-                              baseHistory,
-                              vehicle,
-                              customer
-                            );
-                            setServiceHistory(enrichedHistory);
+                            // Mock removed
+                            setServiceHistory([]);
                           } else {
                             setServiceHistory([]);
                           }

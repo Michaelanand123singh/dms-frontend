@@ -2,7 +2,7 @@
 import type { DocumentationFiles } from '@/shared/types/documentation.types';
 
 export interface AppointmentRecord {
-  id: number;
+  id: string | number;
   customerName: string;
   vehicle: string;
   phone: string;
@@ -47,15 +47,15 @@ export interface AppointmentRecord {
   checkInDate?: string;
   checkInTime?: string;
   createdByRole?: "call_center" | "service_advisor" | "service_manager"; // Track who created the appointment
-  
+
   // Customer Contact & Address Fields
   whatsappNumber?: string;
-  alternateMobile?: string;
+  alternateNumber?: string;
   email?: string;
   address?: string;
   cityState?: string;
   pincode?: string;
-  
+
   // Vehicle Information Fields
   vehicleBrand?: string;
   vehicleModel?: string;
@@ -71,14 +71,14 @@ export interface AppointmentRecord {
   insuranceEndDate?: string;
   insuranceCompanyName?: string;
   vehicleColor?: string;
-  
+
   // Job Card Conversion Fields
   batterySerialNumber?: string;
   mcuSerialNumber?: string;
   vcuSerialNumber?: string;
   otherPartSerialNumber?: string;
   technicianObservation?: string;
-  
+
   // Documentation Files (stored as objects with files and urls)
   customerIdProof?: DocumentationFiles;
   vehicleRCCopy?: DocumentationFiles;

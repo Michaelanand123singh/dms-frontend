@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Upload, Video, Image as ImageIcon, FileText, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useCloudinaryUpload } from "@/shared/hooks/useCloudinaryUpload";
+import { optimizeCloudinaryUrl } from "@/services/cloudinary/cloudinary.service";
 import { CLOUDINARY_FOLDERS } from "@/services/cloudinary/folderStructure";
 import { saveFileMetadata } from "@/services/files/fileMetadata.service";
 import { FileCategory, RelatedEntityType } from "@/services/files/types";
@@ -62,13 +63,13 @@ export default function WarrantyDocumentationModal({
 
     const handleFileUpload = useCallback(
         async (
-        field: keyof Pick<WarrantyDocumentationData, "videoEvidence" | "vinImage" | "odoImage" | "damageImages">,
-        files: FileList | null
-    ) => {
-        if (!files) return;
+            field: keyof Pick<WarrantyDocumentationData, "videoEvidence" | "vinImage" | "odoImage" | "damageImages">,
+            files: FileList | null
+        ) => {
+            if (!files) return;
 
-        const fileArray = Array.from(files);
-            
+            const fileArray = Array.from(files);
+
             // Determine folder based on field type
             let folder: string;
             switch (field) {
@@ -102,8 +103,8 @@ export default function WarrantyDocumentationModal({
 
                 // Store Cloudinary URLs
                 const newUrls = uploadResults.map(result => result.secureUrl);
-        setFormData((prev) => ({
-            ...prev,
+                setFormData((prev) => ({
+                    ...prev,
                     [field]: [...prev[field], ...newUrls],
                 }));
 
@@ -143,14 +144,14 @@ export default function WarrantyDocumentationModal({
 
     const handleRemoveFile = useCallback(
         (
-        field: keyof Pick<WarrantyDocumentationData, "videoEvidence" | "vinImage" | "odoImage" | "damageImages">,
-        index: number
-    ) => {
-        setFormData((prev) => ({
-            ...prev,
-            [field]: prev[field].filter((_, i) => i !== index),
-        }));
-            
+            field: keyof Pick<WarrantyDocumentationData, "videoEvidence" | "vinImage" | "odoImage" | "damageImages">,
+            index: number
+        ) => {
+            setFormData((prev) => ({
+                ...prev,
+                [field]: prev[field].filter((_, i) => i !== index),
+            }));
+
             // Note: Deletion from Cloudinary should be handled by backend API
             // Frontend can request deletion via API endpoint if needed
         },
@@ -310,7 +311,7 @@ export default function WarrantyDocumentationModal({
                                                             />
                                                         ) : (
                                                             <img
-                                                                src={url}
+                                                                src={optimizeCloudinaryUrl(url, 300, 300, 'fill')}
                                                                 alt={`${section.label} ${index + 1}`}
                                                                 className="w-full h-full object-cover rounded-lg border border-gray-200"
                                                             />

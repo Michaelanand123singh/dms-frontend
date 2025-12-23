@@ -75,8 +75,8 @@ export function AddVehicleFormModal({
           <h3 className="text-sm font-semibold text-indigo-900 mb-3">Customer Information</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormInput label="Customer Type" value={customer.customerType || ""} onChange={() => {}} readOnly />
-            <FormInput label="Phone Number" value={customer.phone} onChange={() => {}} readOnly />
+            <FormInput label="Customer Type" value={customer.customerType || ""} onChange={() => { }} readOnly />
+            <FormInput label="Phone Number" value={customer.phone} onChange={() => { }} readOnly />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -84,18 +84,18 @@ export function AddVehicleFormModal({
               <FormInput
                 label="WhatsApp Number"
                 value={customer.whatsappNumber || customer.phone || ""}
-                onChange={() => {}}
+                onChange={() => { }}
                 readOnly
               />
               {customer.whatsappNumber && customer.whatsappNumber !== customer.phone && (
                 <p className="text-xs text-gray-500 mt-1">Different from phone number</p>
               )}
             </div>
-            <FormInput label="Alternate Mobile Number" value={customer.alternateMobile || ""} onChange={() => {}} readOnly />
+            <FormInput label="Alternate Mobile Number" value={customer.alternateNumber || ""} onChange={() => { }} readOnly />
           </div>
 
           {customer.address && (
-            <FormInput label="Full Address" value={customer.address} onChange={() => {}} readOnly />
+            <FormInput label="Full Address" value={customer.address} onChange={() => { }} readOnly />
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -123,11 +123,10 @@ export function AddVehicleFormModal({
                 value={vehicleFormCity || defaultCity}
                 onChange={(e) => onVehicleFormCityChange(e.target.value)}
                 disabled={!vehicleFormState && !customer.cityState}
-                className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 border ${
-                  !vehicleFormState && !customer.cityState
+                className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 border ${!vehicleFormState && !customer.cityState
                     ? "bg-gray-100 border-gray-200 cursor-not-allowed text-gray-400"
                     : "bg-white focus:ring-indigo-500/20 border-gray-200"
-                }`}
+                  }`}
               >
                 <option value="">{(vehicleFormState || customer.cityState) ? "Select City" : "Select State First"}</option>
                 {(vehicleFormState || customer.cityState) &&
@@ -138,7 +137,7 @@ export function AddVehicleFormModal({
                   ))}
               </select>
             </div>
-            <FormInput label="Pincode" value={customer.pincode || ""} onChange={() => {}} readOnly />
+            <FormInput label="Pincode" value={customer.pincode || ""} onChange={() => { }} readOnly />
           </div>
         </div>
 

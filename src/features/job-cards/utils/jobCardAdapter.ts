@@ -116,7 +116,7 @@ export const jobCardAdapter = {
             fullName: customer.name,
             mobilePrimary: customer.phone,
             whatsappNumber: customer.whatsappNumber,
-            alternateMobile: customer.alternateMobile,
+            alternateNumber: customer.alternateNumber,
             email: customer.email,
             customerType: customer.customerType || "",
             customerAddress: customer.address || "",
@@ -216,7 +216,7 @@ export const jobCardAdapter = {
 
             // Additional fields
             customerWhatsappNumber: form.whatsappNumber,
-            customerAlternateMobile: form.alternateMobile,
+            customerAlternateMobile: form.alternateNumber,
             customerEmail: form.email,
             vehicleYear: form.vehicleYear,
             motorNumber: form.motorNumber,
@@ -257,7 +257,7 @@ export const jobCardAdapter = {
             fullName: jobCard.part1?.fullName || jobCard.customerName || "",
             mobilePrimary: jobCard.part1?.mobilePrimary || "",
             whatsappNumber: jobCard.customerWhatsappNumber || "",
-            alternateMobile: jobCard.customerAlternateMobile || "",
+            alternateNumber: jobCard.customerAlternateMobile || "",
             email: jobCard.customerEmail || "",
             customerType: jobCard.part1?.customerType || jobCard.customerType || "",
             customerAddress: jobCard.part1?.customerAddress || "",

@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   PlusCircle,
@@ -34,8 +35,6 @@ import type {
   NewVehicleForm,
   CustomerType,
 } from "@/shared/types";
-import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
-import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
 import { validatePhone, validateEmail, validateVIN, cleanPhone } from "@/shared/utils/validation";
 import { customerService } from "@/features/customers/services/customer.service";
 import { formatVehicleString } from "../components/shared";
@@ -60,7 +59,6 @@ import {
   RecentCustomersTable,
   CustomerNotFound,
   CreateCustomerFormModal,
-  CustomerDetailsModal,
   AddVehicleFormModal,
   VehicleDetailsModal,
   AppointmentFormModal,
@@ -76,6 +74,7 @@ import { Button } from "../components/shared";
 
 export default function CustomerFind() {
   const { userInfo } = useRole();
+  const router = useRouter(); // Added router
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
 
   // Extracted Hooks
@@ -307,14 +306,12 @@ export default function CustomerFind() {
 
   // Handle customer selection
   const handleCustomerSelect = useCallback(async (customer: CustomerWithVehicles): Promise<void> => {
-    setSelectedCustomer(customer);
-    setSearchQuery("");
-    clearSearch();
-    setShowCreateCustomer(false);
+    // Navigate to customer details page instead of selecting for modal
+    router.push(`/sc/customers/${customer.id}`);
 
-    // Add to recent customers (this will be handled by the service/repository)
-    // The repository tracks this automatically when a customer is accessed
-  }, [clearSearch]);
+    // clearSearch(); // Optional: if we want to clear search on navigation
+    // setShowCreateCustomer(false);
+  }, [router]);
 
   // Form reset functions - using hooks
   const handleResetCustomerForm = useCallback(() => {
@@ -438,7 +435,7 @@ export default function CustomerFind() {
       rolePermissions.userRole,
       serviceCenterFilterId,
       showToast,
-      setSelectedCustomer,
+      (c) => router.push(`/sc/customers/${c.id}`), // Navigate on success
       (show: boolean) => {
         if (show) createFormModal.open();
         else createFormModal.close();
@@ -455,6 +452,7 @@ export default function CustomerFind() {
     serviceCenterFilterId,
     showToast,
     createFormModal,
+    router
   ]);
 
   // Show create customer if search returned no results
@@ -472,7 +470,7 @@ export default function CustomerFind() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                Customer Search
+                Customers
               </h1>
               <p className="text-gray-600 text-sm mt-1.5">
                 Search by phone, email, customer ID, VIN, or vehicle number
@@ -580,65 +578,8 @@ export default function CustomerFind() {
           }}
         />
 
-        {/* Customer Details Modal */}
-        {selectedCustomer && (
-          <CustomerDetailsModal
-            isOpen={!!selectedCustomer}
-            customer={selectedCustomer}
-            onClose={() => {
-              setSelectedCustomer(null);
-              setSearchQuery("");
-              clearSearch();
-            }}
-            onAddVehicle={() => {
-              resetVehicleForm();
-              // Initialize state and city from customer's cityState
-              if (selectedCustomer.cityState) {
-                const parts = selectedCustomer.cityState.split(",");
-                if (parts.length >= 2) {
-                  setVehicleFormCity(parts[0]?.trim() || "");
-                  setVehicleFormState(parts[1]?.trim() || "");
-                }
-              }
-              addVehicleModal.open();
-            }}
-            onViewComplaints={() => complaintsModal.open()}
-            onViewVehicleDetails={(vehicle: Vehicle) => {
-              setSelectedVehicle(vehicle);
-              vehicleDetailsModal.open();
-              // Load service history if vehicle has services
-              if (vehicle.totalServices > 0 && vehicle.lastServiceDate) {
-                const baseHistory = getMockServiceHistory(vehicle.id);
-                const enrichedHistory = enrichServiceHistoryWithFeedbackRatings(
-                  baseHistory,
-                  vehicle,
-                  selectedCustomer
-                );
-                setServiceHistory(enrichedHistory);
-              } else {
-                setServiceHistory([]);
-              }
-            }}
-            onScheduleAppointment={(vehicle: Vehicle) => {
-              setSelectedVehicle(vehicle);
-              vehicleDetailsModal.close();
-              appointmentModal.open();
-              initializeAppointmentForm(selectedCustomer, vehicle);
-            }}
-            enrichServiceHistoryWithFeedbackRatings={enrichServiceHistoryWithFeedbackRatings}
-            setServiceHistory={setServiceHistory}
-            setSelectedVehicle={setSelectedVehicle}
-            initializeAppointmentForm={initializeAppointmentForm}
-            setShowVehicleDetails={(show: boolean) => {
-              if (show) vehicleDetailsModal.open();
-              else vehicleDetailsModal.close();
-            }}
-            setShowScheduleAppointment={(show: boolean) => {
-              if (show) appointmentModal.open();
-              else appointmentModal.close();
-            }}
-          />
-        )}
+        {/* Customer Details Modal - REMOVED (Navigating to page instead) */}
+
 
         {/* Add Vehicle Popup Form */}
         <AddVehicleFormModal
@@ -730,7 +671,7 @@ export default function CustomerFind() {
               customerType: selectedCustomer?.customerType,
               // Customer Contact & Address Fields
               whatsappNumber: form.whatsappNumber,
-              alternateMobile: form.alternateMobile,
+              alternateNumber: form.alternateNumber,
               email: form.email,
               address: form.address,
               cityState: form.cityState,

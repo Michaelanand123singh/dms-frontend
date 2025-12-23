@@ -1,5 +1,5 @@
 /**
- * Invoice utilities for customer find page
+ * Invoice utilities for customer  page
  */
 
 import type { ServiceCenterInvoice } from "@/shared/types";

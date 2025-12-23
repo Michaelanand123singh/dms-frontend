@@ -8,7 +8,7 @@ import { STATUS_CONFIG } from "./constants";
 export const convertAppointmentToFormData = (appointment: AppointmentRecord): Partial<AppointmentFormType> => {
   // Convert time from 12-hour format (hh:mm AM/PM) to 24-hour format (HH:mm) for HTML time input
   const timeIn24Hour = parseTime12To24(appointment.time);
-  
+
   return {
     customerName: appointment.customerName,
     vehicle: appointment.vehicle,
@@ -40,7 +40,7 @@ export const convertAppointmentToFormData = (appointment: AppointmentRecord): Pa
     preferredCommunicationMode: appointment.preferredCommunicationMode,
     // Customer Contact & Address Fields
     whatsappNumber: appointment.whatsappNumber,
-    alternateMobile: appointment.alternateMobile,
+    alternateNumber: appointment.alternateNumber,
     email: appointment.email,
     address: appointment.address,
     cityState: appointment.cityState,

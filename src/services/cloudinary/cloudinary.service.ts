@@ -137,10 +137,10 @@ export async function uploadWithRetry(
       lastError = error instanceof Error ? error : new Error('Upload failed');
 
       // Don't retry validation errors
-      if (error instanceof CloudinaryUploadError && 
-          (error.type === UploadErrorType.VALIDATION_ERROR ||
-           error.type === UploadErrorType.SIZE_ERROR ||
-           error.type === UploadErrorType.TYPE_ERROR)) {
+      if (error instanceof CloudinaryUploadError &&
+        (error.type === UploadErrorType.VALIDATION_ERROR ||
+          error.type === UploadErrorType.SIZE_ERROR ||
+          error.type === UploadErrorType.TYPE_ERROR)) {
         throw error;
       }
 
@@ -181,7 +181,7 @@ export async function uploadMultipleToCloudinary(
   // Upload files in parallel (limit concurrent uploads)
   const CONCURRENT_LIMIT = 3;
   const results: CloudinaryUploadResult[] = [];
-  
+
   for (let i = 0; i < files.length; i += CONCURRENT_LIMIT) {
     const batch = files.slice(i, i + CONCURRENT_LIMIT);
     const batchResults = await Promise.all(
@@ -232,7 +232,7 @@ export function getOptimizedUrl(
 
   if (transformations) {
     const parts: string[] = [];
-    
+
     if (transformations.width) parts.push(`w_${transformations.width}`);
     if (transformations.height) parts.push(`h_${transformations.height}`);
     if (transformations.crop) parts.push(`c_${transformations.crop}`);
@@ -254,5 +254,26 @@ export function getOptimizedUrl(
 
   url += `/${publicId}`;
   return url;
+}
+
+/**
+ * Optimize an existing Cloudinary URL by injecting transformations
+ */
+export function optimizeCloudinaryUrl(
+  url: string,
+  width: number,
+  height: number,
+  fit: 'fill' | 'fit' | 'limit' | 'scale' = 'fill'
+): string {
+  if (!url || !url.includes('cloudinary.com')) return url;
+
+  // Split at /upload/
+  const parts = url.split('/upload/');
+  if (parts.length !== 2) return url;
+
+  // Construct transformation string
+  const transformation = `w_${width},h_${height},c_${fit},q_auto,f_auto`;
+
+  return `${parts[0]}/upload/${transformation}/${parts[1]}`;
 }
 

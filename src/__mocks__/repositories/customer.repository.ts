@@ -134,8 +134,8 @@ class CustomerRepository {
       .padStart(4, "0");
     const customerNumber = `CUST-${year}-${random}`;
 
-    const cleanedAlternateMobile = data.alternateMobile
-      ? data.alternateMobile.replace(/[\s-+]/g, "").replace(/^91/, "")
+    const cleanedAlternateNumber = data.alternateNumber
+      ? data.alternateNumber.replace(/[\s-+]/g, "").replace(/^91/, "")
       : undefined;
 
     const storedUserInfo = safeStorage.getItem<any>("userInfo", null);
@@ -157,7 +157,7 @@ class CustomerRepository {
       address: data.address || undefined,
       cityState: data.cityState || undefined,
       pincode: data.pincode || undefined,
-      alternateMobile: cleanedAlternateMobile,
+      alternateNumber: cleanedAlternateNumber,
       customerType: data.customerType,
       serviceType: data.serviceType,
       addressType: data.addressType,

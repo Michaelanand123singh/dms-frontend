@@ -1,12 +1,12 @@
 /**
- * Hook for role-based permissions in customer find page
+ * Hook for role-based permissions in customer  page
  */
 
 import { useRole } from "@/shared/hooks";
 import type { UserRole } from "@/shared/types";
 
 /**
- * Hook to check role-based permissions for customer find features
+ * Hook to check role-based permissions for customer  features
  * @returns Object with permission flags
  */
 export function useRolePermissions() {

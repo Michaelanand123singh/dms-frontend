@@ -1,5 +1,5 @@
 /**
- * Customer Find Page Components
+ * Customers Page Components
  */
 
 export * from "./CustomerSearchBar";

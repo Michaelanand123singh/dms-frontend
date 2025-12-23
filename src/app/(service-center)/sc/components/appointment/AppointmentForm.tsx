@@ -205,7 +205,7 @@ export const AppointmentForm = ({
         customerName: prev.customerName || customerData.customerName || "",
         phone: prev.phone || customerData.phone || "",
         whatsappNumber: prev.whatsappNumber || customerData.whatsappNumber || "",
-        alternateMobile: prev.alternateMobile || customerData.alternateMobile || "",
+        alternateNumber: prev.alternateNumber || customerData.alternateNumber || "",
         email: prev.email || customerData.email || "",
         address: prev.address || customerData.address || "",
         cityState: prev.cityState || customerData.cityState || "",
@@ -249,27 +249,13 @@ export const AppointmentForm = ({
     }
   }, [formData.vehicle, selectedCustomer, onVehicleChange]);
 
-  // Auto-populate vehicle fields from selectedVehicle (preserve user edits)
+  // Auto-populate vehicle fields from selectedVehicle
   useEffect(() => {
     if (selectedVehicle) {
       const vehicleData = mapVehicleToFormData(selectedVehicle);
       setFormData((prev) => ({
         ...prev,
-        // Only populate if field is empty (preserve user edits)
-        vehicleBrand: prev.vehicleBrand || vehicleData.vehicleBrand || "",
-        vehicleModel: prev.vehicleModel || vehicleData.vehicleModel || "",
-        vehicleYear: prev.vehicleYear || vehicleData.vehicleYear || undefined,
-        registrationNumber: prev.registrationNumber || vehicleData.registrationNumber || "",
-        vinChassisNumber: prev.vinChassisNumber || vehicleData.vinChassisNumber || "",
-        variantBatteryCapacity: prev.variantBatteryCapacity || vehicleData.variantBatteryCapacity || "",
-        motorNumber: prev.motorNumber || vehicleData.motorNumber || "",
-        chargerSerialNumber: prev.chargerSerialNumber || vehicleData.chargerSerialNumber || "",
-        vehicleColor: prev.vehicleColor || vehicleData.vehicleColor || "",
-        dateOfPurchase: prev.dateOfPurchase || vehicleData.dateOfPurchase || "",
-        warrantyStatus: prev.warrantyStatus || vehicleData.warrantyStatus || "",
-        insuranceStartDate: prev.insuranceStartDate || vehicleData.insuranceStartDate || "",
-        insuranceEndDate: prev.insuranceEndDate || vehicleData.insuranceEndDate || "",
-        insuranceCompanyName: prev.insuranceCompanyName || vehicleData.insuranceCompanyName || "",
+        ...vehicleData,
       }));
     }
   }, [selectedVehicle]);
@@ -381,13 +367,13 @@ export const AppointmentForm = ({
       if (!files || files.length === 0) return;
 
       const fileArray = Array.from(files);
-      
+
       // Determine folder based on field and entity IDs
       let folder: string;
       const customerId = formData.customerName || 'temp';
       const vehicleId = formData.vehicle || 'temp';
       const appointmentId = formData.date || 'temp'; // Use date as temporary ID if no appointment ID
-      
+
       switch (field) {
         case 'customerIdProof':
           folder = CLOUDINARY_FOLDERS.customerIdProof(customerId);
@@ -422,9 +408,9 @@ export const AppointmentForm = ({
         const existingUrls = formData[field]?.urls || [];
         const existingPublicIds = formData[field]?.publicIds || [];
 
-      updateFormData({
-        [field]: {
-          urls: [...existingUrls, ...newUrls],
+        updateFormData({
+          [field]: {
+            urls: [...existingUrls, ...newUrls],
             publicIds: [...existingPublicIds, ...newPublicIds],
             metadata: [
               ...(formData[field]?.metadata || []),
@@ -436,8 +422,8 @@ export const AppointmentForm = ({
                 uploadedAt: new Date().toISOString(),
               })),
             ],
-        },
-      });
+          },
+        });
 
         // Save file metadata to backend if appointment ID exists
         if (mode === 'edit') {
@@ -525,7 +511,7 @@ export const AppointmentForm = ({
       const customerId = formData.customerName || 'temp';
       const vehicleId = formData.vehicle || 'temp';
       const appointmentId = formData.date || 'temp';
-      
+
       switch (cameraDocumentType) {
         case 'customerIdProof':
           folder = CLOUDINARY_FOLDERS.customerIdProof(customerId);
@@ -556,11 +542,11 @@ export const AppointmentForm = ({
         });
 
         // Store in form data
-      const existingUrls = formData[cameraDocumentType]?.urls || [];
+        const existingUrls = formData[cameraDocumentType]?.urls || [];
         const existingPublicIds = formData[cameraDocumentType]?.publicIds || [];
 
-      updateFormData({
-        [cameraDocumentType]: {
+        updateFormData({
+          [cameraDocumentType]: {
             urls: [...existingUrls, result.secureUrl],
             publicIds: [...existingPublicIds, result.publicId],
             metadata: [
@@ -573,11 +559,11 @@ export const AppointmentForm = ({
                 uploadedAt: new Date().toISOString(),
               },
             ],
-        },
-      });
+          },
+        });
 
-      setCameraModalOpen(false);
-      setCameraDocumentType(null);
+        setCameraModalOpen(false);
+        setCameraDocumentType(null);
       } catch (err) {
         console.error('Camera capture upload failed:', err);
         alert(`Failed to upload: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -935,16 +921,16 @@ export const AppointmentForm = ({
                         {formData.customerIdProof.urls.map((url: string, index: number) => {
                           const metadata = formData.customerIdProof?.metadata?.[index];
                           return (
-                          <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <FileText className="text-indigo-600 shrink-0" size={18} />
-                            <div className="flex-1 min-w-0">
+                            <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                              <FileText className="text-indigo-600 shrink-0" size={18} />
+                              <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-800 truncate">
                                   {metadata?.format ? `File.${metadata.format}` : "Uploaded File"}
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   {metadata?.bytes ? (metadata.bytes / 1024).toFixed(2) : "0.00"} KB
                                 </p>
-                            </div>
+                              </div>
                               <a
                                 href={url}
                                 target="_blank"
@@ -954,14 +940,14 @@ export const AppointmentForm = ({
                               >
                                 <ImageIcon size={16} />
                               </a>
-                            <button
-                              onClick={() => handleRemoveDocument("customerIdProof", index)}
-                              className="text-red-600 hover:text-red-700 p-1 rounded transition"
-                              title="Remove file"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                              <button
+                                onClick={() => handleRemoveDocument("customerIdProof", index)}
+                                className="text-red-600 hover:text-red-700 p-1 rounded transition"
+                                title="Remove file"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -1005,16 +991,16 @@ export const AppointmentForm = ({
                         {formData.vehicleRCCopy.urls.map((url: string, index: number) => {
                           const metadata = formData.vehicleRCCopy?.metadata?.[index];
                           return (
-                          <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <FileText className="text-indigo-600 shrink-0" size={18} />
-                            <div className="flex-1 min-w-0">
+                            <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                              <FileText className="text-indigo-600 shrink-0" size={18} />
+                              <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-800 truncate">
                                   {metadata?.format ? `File.${metadata.format}` : "Uploaded File"}
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   {metadata?.bytes ? (metadata.bytes / 1024).toFixed(2) : "0.00"} KB
                                 </p>
-                            </div>
+                              </div>
                               <a
                                 href={url}
                                 target="_blank"
@@ -1024,14 +1010,14 @@ export const AppointmentForm = ({
                               >
                                 <ImageIcon size={16} />
                               </a>
-                            <button
-                              onClick={() => handleRemoveDocument("vehicleRCCopy", index)}
-                              className="text-red-600 hover:text-red-700 p-1 rounded transition"
-                              title="Remove file"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                              <button
+                                onClick={() => handleRemoveDocument("vehicleRCCopy", index)}
+                                className="text-red-600 hover:text-red-700 p-1 rounded transition"
+                                title="Remove file"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -1075,16 +1061,16 @@ export const AppointmentForm = ({
                         {formData.warrantyCardServiceBook.urls.map((url: string, index: number) => {
                           const metadata = formData.warrantyCardServiceBook?.metadata?.[index];
                           return (
-                          <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <FileText className="text-indigo-600 shrink-0" size={18} />
-                            <div className="flex-1 min-w-0">
+                            <div key={index} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                              <FileText className="text-indigo-600 shrink-0" size={18} />
+                              <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-800 truncate">
                                   {metadata?.format ? `File.${metadata.format}` : "Uploaded File"}
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   {metadata?.bytes ? (metadata.bytes / 1024).toFixed(2) : "0.00"} KB
                                 </p>
-                            </div>
+                              </div>
                               <a
                                 href={url}
                                 target="_blank"
@@ -1094,14 +1080,14 @@ export const AppointmentForm = ({
                               >
                                 <ImageIcon size={16} />
                               </a>
-                            <button
-                              onClick={() => handleRemoveDocument("warrantyCardServiceBook", index)}
-                              className="text-red-600 hover:text-red-700 p-1 rounded transition"
-                              title="Remove file"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                              <button
+                                onClick={() => handleRemoveDocument("warrantyCardServiceBook", index)}
+                                className="text-red-600 hover:text-red-700 p-1 rounded transition"
+                                title="Remove file"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -1147,22 +1133,22 @@ export const AppointmentForm = ({
                         const metadata = formData.photosVideos?.metadata?.[index];
                         const isImage = metadata?.format && ['jpg', 'jpeg', 'png', 'webp'].includes(metadata.format.toLowerCase());
                         return (
-                        <div key={index} className="relative group bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-                            {isImage ? (
-                            <Image
+                          <div key={index} className="relative group bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                            {isImage && url ? (
+                              <Image
                                 src={url}
                                 alt={`Upload ${index + 1}`}
-                              width={128}
-                              height={128}
-                              className="w-full h-32 object-cover"
-                              unoptimized
-                            />
-                          ) : (
-                            <div className="w-full h-32 flex items-center justify-center bg-gray-100">
-                              <FileText className="text-gray-400" size={32} />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                width={128}
+                                height={128}
+                                className="w-full h-32 object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              <div className="w-full h-32 flex items-center justify-center bg-gray-100">
+                                <FileText className="text-gray-400" size={32} />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <a
                                 href={url}
                                 target="_blank"
@@ -1172,23 +1158,23 @@ export const AppointmentForm = ({
                               >
                                 <ImageIcon size={20} />
                               </a>
-                            <button
-                              onClick={() => handleRemoveDocument("photosVideos", index)}
-                              className="text-white hover:text-red-300 p-2 rounded transition"
-                              title="Remove file"
-                            >
-                              <Trash2 size={20} />
-                            </button>
-                          </div>
-                          <div className="p-2 bg-white">
+                              <button
+                                onClick={() => handleRemoveDocument("photosVideos", index)}
+                                className="text-white hover:text-red-300 p-2 rounded transition"
+                                title="Remove file"
+                              >
+                                <Trash2 size={20} />
+                              </button>
+                            </div>
+                            <div className="p-2 bg-white">
                               <p className="text-xs font-medium text-gray-800 truncate">
                                 {metadata?.format ? `File.${metadata.format.toUpperCase()}` : "Uploaded File"}
                               </p>
                               <p className="text-xs text-gray-500">
                                 {metadata?.bytes ? (metadata.bytes / 1024).toFixed(2) : "0.00"} KB
                               </p>
+                            </div>
                           </div>
-                        </div>
                         );
                       })}
                     </div>

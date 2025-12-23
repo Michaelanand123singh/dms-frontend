@@ -8,7 +8,7 @@ export const ROUTES = {
   ADMIN_DASHBOARD: "/dashboard",
   SC_DASHBOARD: "/sc/dashboard",
   INVENTORY_MANAGER_DASHBOARD: "/inventory-manager/dashboard",
-  VEHICLE_SEARCH: "/sc/vehicle-search",
+
   SERVICE_REQUESTS: "/sc/service-requests",
   JOB_CARDS: "/sc/job-cards",
   WORKSHOP: "/sc/workshop",

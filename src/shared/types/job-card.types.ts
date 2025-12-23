@@ -159,7 +159,7 @@ export interface JobCard {
   // Warranty information (legacy)
   warrantyStatus?: string;
   warrantyDetails?: string;
-  sourceAppointmentId?: number;
+  sourceAppointmentId?: number | string;
   isTemporary?: boolean;
   customerArrivalTimestamp?: string;
   draftIntake?: Record<string, any>;

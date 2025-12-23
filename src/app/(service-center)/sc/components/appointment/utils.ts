@@ -20,7 +20,7 @@ import type { AppointmentForm } from "./types";
  */
 export function mapVehicleToFormData(vehicle: Vehicle | null): Partial<AppointmentForm> {
   if (!vehicle) return {};
-  
+
   return {
     vehicleBrand: vehicle.vehicleMake || "",
     vehicleModel: vehicle.vehicleModel || "",
@@ -31,10 +31,10 @@ export function mapVehicleToFormData(vehicle: Vehicle | null): Partial<Appointme
     motorNumber: vehicle.motorNumber || "",
     chargerSerialNumber: vehicle.chargerSerialNumber || "",
     vehicleColor: vehicle.vehicleColor || "",
-    dateOfPurchase: vehicle.purchaseDate || "",
+    dateOfPurchase: vehicle.purchaseDate ? vehicle.purchaseDate.split("T")[0] : "",
     warrantyStatus: vehicle.warrantyStatus || "",
-    insuranceStartDate: vehicle.insuranceStartDate || "",
-    insuranceEndDate: vehicle.insuranceEndDate || "",
+    insuranceStartDate: vehicle.insuranceStartDate ? vehicle.insuranceStartDate.split("T")[0] : "",
+    insuranceEndDate: vehicle.insuranceEndDate ? vehicle.insuranceEndDate.split("T")[0] : "",
     insuranceCompanyName: vehicle.insuranceCompanyName || "",
   };
 }
@@ -47,12 +47,12 @@ export function mapVehicleToFormData(vehicle: Vehicle | null): Partial<Appointme
  */
 export function mapCustomerToFormData(customer: CustomerWithVehicles | null): Partial<AppointmentForm> {
   if (!customer) return {};
-  
+
   return {
     customerName: customer.name || "",
     phone: customer.phone || "",
     whatsappNumber: customer.whatsappNumber || "",
-    alternateMobile: customer.alternateMobile || "",
+    alternateNumber: customer.alternateNumber || "",
     email: customer.email || "",
     address: customer.address || "",
     cityState: customer.cityState || "",

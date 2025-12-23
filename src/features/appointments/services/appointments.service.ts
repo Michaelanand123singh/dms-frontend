@@ -34,6 +34,47 @@ class AppointmentsService {
     });
   }
 
+  async getAll(params?: any): Promise<any[]> {
+    if (this.useMock) {
+      // Return mock data logic if needed, or empty array
+      return [];
+    }
+    const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
+    const response = await apiClient.get(`${API_ENDPOINTS.APPOINTMENTS}${queryString}`);
+    return response.data;
+  }
+
+  async getById(id: string): Promise<any> {
+    if (this.useMock) {
+      return null;
+    }
+    const response = await apiClient.get(API_ENDPOINTS.APPOINTMENT(id));
+    return response.data;
+  }
+
+  async create(data: any): Promise<any> {
+    if (this.useMock) {
+      return { id: Date.now(), ...data };
+    }
+    const response = await apiClient.post(API_ENDPOINTS.APPOINTMENTS, data);
+    return response.data;
+  }
+
+  async update(id: string, data: any): Promise<any> {
+    if (this.useMock) {
+      return { id, ...data };
+    }
+    const response = await apiClient.patch(API_ENDPOINTS.APPOINTMENT(id), data);
+    return response.data;
+  }
+
+  async delete(id: string): Promise<void> {
+    if (this.useMock) {
+      return;
+    }
+    await apiClient.delete(API_ENDPOINTS.APPOINTMENT(id));
+  }
+
   async linkQuotation(appointmentId: string, quotationId: string): Promise<void> {
     if (this.useMock) {
       // Mock implementation - just return success

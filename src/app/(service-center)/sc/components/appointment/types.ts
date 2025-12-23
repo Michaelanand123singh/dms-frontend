@@ -81,15 +81,15 @@ export interface AppointmentForm {
   dropCity?: string;
   dropPincode?: string;
   preferredCommunicationMode?: "Phone" | "Email" | "SMS" | "WhatsApp";
-  
+
   // Customer Contact & Address Fields
   whatsappNumber?: string;
-  alternateMobile?: string;
+  alternateNumber?: string;
   email?: string;
   address?: string;
   cityState?: string;
   pincode?: string;
-  
+
   // Vehicle Information Fields
   vehicleBrand?: string;
   vehicleModel?: string;
@@ -105,14 +105,14 @@ export interface AppointmentForm {
   insuranceEndDate?: string;
   insuranceCompanyName?: string;
   vehicleColor?: string;
-  
+
   // Job Card Conversion Fields
   batterySerialNumber?: string;
   mcuSerialNumber?: string;
   vcuSerialNumber?: string;
   otherPartSerialNumber?: string;
   technicianObservation?: string;
-  
+
   // Service Intake/Check-in Fields
   arrivalMode?: "vehicle_present" | "vehicle_absent" | "check_in_only";
   checkInNotes?: string;
@@ -156,7 +156,7 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   preferredCommunicationMode: undefined,
   // Customer Contact & Address Fields
   whatsappNumber: undefined,
-  alternateMobile: undefined,
+  alternateNumber: undefined,
   email: undefined,
   address: undefined,
   cityState: undefined,

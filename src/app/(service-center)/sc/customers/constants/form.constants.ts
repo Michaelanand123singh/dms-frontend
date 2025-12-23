@@ -1,5 +1,5 @@
 /**
- * Form constants for customer find page
+ * Form constants for customers'  page
  */
 
 import type { NewCustomerForm, NewVehicleForm } from "@/shared/types";
@@ -14,7 +14,7 @@ export const initialCustomerForm: NewCustomerForm = {
   name: "",
   phone: "",
   whatsappNumber: "",
-  alternateMobile: "",
+  alternateNumber: "",
   email: "",
   address: "",
   pincode: "",

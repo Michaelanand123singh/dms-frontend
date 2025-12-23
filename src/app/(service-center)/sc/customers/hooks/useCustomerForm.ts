@@ -93,12 +93,12 @@ export function useCustomerForm(
     }
 
     // Validate alternate mobile if provided
-    if (newCustomerForm.alternateMobile) {
-      if (!validatePhone(newCustomerForm.alternateMobile)) {
-        errors.alternateMobile = "Please enter a valid 10-digit alternate mobile number";
+    if (newCustomerForm.alternateNumber) {
+      if (!validatePhone(newCustomerForm.alternateNumber)) {
+        errors.alternateNumber = "Please enter a valid 10-digit alternate mobile number";
         hasErrors = true;
-      } else if (cleanPhone(newCustomerForm.alternateMobile) === cleanPhone(newCustomerForm.phone)) {
-        errors.alternateMobile = "Alternate mobile number must be different from primary mobile number";
+      } else if (cleanPhone(newCustomerForm.alternateNumber) === cleanPhone(newCustomerForm.phone)) {
+        errors.alternateNumber = "Alternate mobile number must be different from primary mobile number";
         hasErrors = true;
       }
     }
@@ -181,7 +181,7 @@ export function useCustomerForm(
         ...newCustomerForm,
         cityState,
         phone: cleanPhone(newCustomerForm.phone),
-        alternateMobile: newCustomerForm.alternateMobile ? cleanPhone(newCustomerForm.alternateMobile) : undefined,
+        alternateNumber: newCustomerForm.alternateNumber ? cleanPhone(newCustomerForm.alternateNumber) : undefined,
         serviceCenterId: preferredServiceCenterId,
         serviceCenterName: preferredServiceCenterName,
       });

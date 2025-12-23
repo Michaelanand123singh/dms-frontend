@@ -118,19 +118,19 @@ export function CreateCustomerFormModal({
           <FormInput
             label="Alternate Mobile Number"
             type="tel"
-            value={formData.alternateMobile || ""}
+            value={formData.alternateNumber || ""}
             onChange={(e) => {
               onFormChange({
                 ...formData,
-                alternateMobile: e.target.value.replace(/\D/g, "").slice(0, 10),
+                alternateNumber: e.target.value.replace(/\D/g, "").slice(0, 10),
               });
-              if (fieldErrors.alternateMobile) {
-                onFieldErrorChange({ ...fieldErrors, alternateMobile: "" });
+              if (fieldErrors.alternateNumber) {
+                onFieldErrorChange({ ...fieldErrors, alternateNumber: "" });
               }
             }}
             placeholder="10-digit mobile number (optional)"
             maxLength={10}
-            error={fieldErrors.alternateMobile}
+            error={fieldErrors.alternateNumber}
           />
         </div>
 
@@ -163,11 +163,10 @@ export function CreateCustomerFormModal({
             }}
             rows={3}
             placeholder="House / Flat, Street, Area, City, State, Pincode"
-            className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 resize-none ${
-              fieldErrors.address
+            className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 resize-none ${fieldErrors.address
                 ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500"
                 : "bg-gray-50/50 focus:ring-indigo-500/20 border border-gray-200"
-            }`}
+              }`}
           />
           {fieldErrors.address && (
             <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
@@ -191,11 +190,10 @@ export function CreateCustomerFormModal({
                   onFieldErrorChange({ ...fieldErrors, state: "" });
                 }
               }}
-              className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 ${
-                fieldErrors.state
+              className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 ${fieldErrors.state
                   ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500"
                   : "bg-gray-50/50 focus:ring-indigo-500/20 border border-gray-200"
-              }`}
+                }`}
             >
               <option value="">Select State</option>
               {INDIAN_STATES.map((state) => (
@@ -224,13 +222,12 @@ export function CreateCustomerFormModal({
                 }
               }}
               disabled={!selectedState}
-              className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 ${
-                !selectedState
+              className={`w-full px-4 py-2.5 rounded-lg focus:bg-white focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 ${!selectedState
                   ? "bg-gray-100 border border-gray-200 cursor-not-allowed text-gray-400"
                   : fieldErrors.city
-                  ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500"
-                  : "bg-gray-50/50 focus:ring-indigo-500/20 border border-gray-200"
-              }`}
+                    ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500"
+                    : "bg-gray-50/50 focus:ring-indigo-500/20 border border-gray-200"
+                }`}
             >
               <option value="">{selectedState ? "Select City" : "Select State First"}</option>
               {selectedState &&

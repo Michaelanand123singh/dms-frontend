@@ -1,5 +1,6 @@
 import { CloudinaryUploadResult } from '../cloudinary/types';
 import { FileCategory, RelatedEntityType } from './types';
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 
 export interface FileMetadata {
   url: string;
@@ -55,10 +56,17 @@ export async function saveFileMetadata(
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    const authToken = safeStorage.getItem<string>('authToken', "");
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/files/bulk`, {
+    const url = API_BASE_URL.endsWith("/api")
+      ? `${API_BASE_URL}/files/bulk`
+      : `${API_BASE_URL}/api/files/bulk`;
+
+    const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(fileMetadata),
@@ -115,10 +123,17 @@ export async function saveFileMetadataFromArray(
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    const authToken = safeStorage.getItem<string>('authToken', "");
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/files/bulk`, {
+    const url = API_BASE_URL.endsWith("/api")
+      ? `${API_BASE_URL}/files/bulk`
+      : `${API_BASE_URL}/api/files/bulk`;
+
+    const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(fileMetadata),
@@ -144,10 +159,17 @@ export async function deleteFileMetadata(
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    const authToken = safeStorage.getItem<string>('authToken', "");
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
+    const url = API_BASE_URL.endsWith("/api")
+      ? `${API_BASE_URL}/files/${fileId}`
+      : `${API_BASE_URL}/api/files/${fileId}`;
+
+    const response = await fetch(url, {
       method: 'DELETE',
       headers,
     });
@@ -174,9 +196,16 @@ export async function getFilesForEntity(
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    const authToken = safeStorage.getItem<string>('authToken', "");
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
   }
 
-  let url = `${API_BASE_URL}/api/files?entityType=${entityType}&entityId=${entityId}`;
+  const baseUrl = API_BASE_URL.endsWith("/api")
+    ? API_BASE_URL
+    : `${API_BASE_URL}/api`;
+
+  let url = `${baseUrl}/files?entityType=${entityType}&entityId=${entityId}`;
   if (category) {
     url += `&category=${category}`;
   }

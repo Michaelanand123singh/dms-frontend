@@ -218,12 +218,7 @@ export default function SCDashboard() {
             bg: "bg-gradient-to-r from-green-500 to-green-700",
             link: "/sc/job-cards?action=create",
           },
-          {
-            label: "Search Vehicle",
-            icon: Package,
-            bg: "bg-gradient-to-r from-blue-500 to-indigo-500",
-            link: "/sc/vehicle-search",
-          },
+
           {
             label: "Generate Invoice",
             icon: FileText,
@@ -330,12 +325,7 @@ export default function SCDashboard() {
             bg: "bg-gradient-to-r from-green-500 to-green-700",
             link: "/sc/leads?action=create",
           },
-          {
-            label: "Search Vehicle",
-            icon: Package,
-            bg: "bg-gradient-to-r from-blue-500 to-indigo-500",
-            link: "/sc/vehicle-search",
-          },
+
           {
             label: "Create Quotation",
             icon: FileText,

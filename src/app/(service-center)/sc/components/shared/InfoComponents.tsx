@@ -56,10 +56,10 @@ export const CustomerInfoCard = ({
           <p className="text-gray-800 font-semibold">{customer.whatsappNumber}</p>
         </div>
       )}
-      {customer.alternateMobile && (
+      {customer.alternateNumber && (
         <div>
-          <p className="text-indigo-600 font-medium">Alternate Mobile</p>
-          <p className="text-gray-800 font-semibold">{customer.alternateMobile}</p>
+          <p className="text-indigo-600 font-medium">Alternate Number</p>
+          <p className="text-gray-800 font-semibold">{customer.alternateNumber}</p>
         </div>
       )}
       {customer.email && (

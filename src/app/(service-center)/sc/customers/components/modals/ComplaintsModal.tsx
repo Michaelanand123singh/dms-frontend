@@ -5,7 +5,7 @@
 import { AlertTriangle, CheckCircle } from "lucide-react";
 import { Modal } from "../../../components/shared/FormElements";
 import type { CustomerWithVehicles } from "@/shared/types";
-import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
+
 
 export interface ComplaintsModalProps {
   isOpen: boolean;
@@ -21,7 +21,8 @@ export function ComplaintsModal({ isOpen, customer, selectedVehicleName, onClose
     ? `${customer.vehicles[0].vehicleMake} ${customer.vehicles[0].vehicleModel}`
     : "Vehicle");
 
-  const mockComplaints = getMockComplaints(customer.name, customer.phone, vehicleName);
+  // Placeholder for real complaints data
+  const mockComplaints: any[] = [];
 
   return (
     <Modal title="Customer Complaints" subtitle={`Complaints for ${customer.name}`} onClose={onClose} maxWidth="max-w-3xl">
@@ -48,13 +49,12 @@ export function ComplaintsModal({ isOpen, customer, selectedVehicleName, onClose
                         <div className="flex items-center gap-4 text-xs text-gray-600">
                           <span>Vehicle: {complaint.vehicle}</span>
                           <span>Status: {complaint.status}</span>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            complaint.severity === "High" || complaint.severity === "Critical"
-                              ? "bg-red-50 text-red-700"
-                              : complaint.severity === "Medium"
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${complaint.severity === "High" || complaint.severity === "Critical"
+                            ? "bg-red-50 text-red-700"
+                            : complaint.severity === "Medium"
                               ? "bg-amber-50 text-amber-700"
                               : "bg-blue-50 text-blue-700"
-                          }`}>
+                            }`}>
                             {complaint.severity}
                           </span>
                         </div>

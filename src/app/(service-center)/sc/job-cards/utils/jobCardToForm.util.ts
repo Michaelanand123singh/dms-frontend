@@ -141,7 +141,7 @@ export function jobCardToFormInitialValues(jobCard: JobCard): Partial<CreateJobC
 
     // Additional Customer Contact Fields - direct from JobCard
     whatsappNumber: jobCard.customerWhatsappNumber || "",
-    alternateMobile: jobCard.customerAlternateMobile || "",
+    alternateNumber: jobCard.customerAlternateMobile || "",
     email: jobCard.customerEmail || "",
 
     // Additional Vehicle Details - direct from JobCard

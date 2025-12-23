@@ -229,7 +229,7 @@ export type CreateJobCardForm = {
 
   // Additional Customer Contact Fields
   whatsappNumber?: string;
-  alternateMobile?: string;
+  alternateNumber?: string;
   email?: string;
 
   // Customer Address Components

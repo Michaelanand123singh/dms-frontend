@@ -1,5 +1,5 @@
 /**
- * Customer Find Page Hooks
+ * Customers Page Hooks
  */
 
 export * from "./useModalState";

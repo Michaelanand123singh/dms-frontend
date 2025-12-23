@@ -1,5 +1,5 @@
 /**
- * Search utilities for customer find page
+ * Search utilities for customer page
  */
 
 import type { CustomerSearchType } from "@/shared/types";

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@/test/utils/render';
 import userEvent from '@testing-library/user-event';
-import CustomerFindPage from '@/app/(service-center)/sc/customer-find/page';
+import CustomerFindPage from '@/app/(service-center)/sc/customers/page';
 import { localStorage as safeStorage } from '@/shared/lib/localStorage';
 import { createMockCustomer } from '@/test/utils/mocks';
 
@@ -46,7 +46,7 @@ describe('CustomerFindPage', () => {
     vi.mocked(safeStorage.getItem).mockReturnValue(mockCustomers as any);
   });
 
-  it('renders customer find page', () => {
+  it('renders customer  page', () => {
     render(<CustomerFindPage />);
     
     expect(screen.getByText(/Customer|Find|Search/i)).toBeInTheDocument();

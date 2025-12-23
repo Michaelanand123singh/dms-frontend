@@ -179,7 +179,7 @@
 - ⬜ `job-cards/[id]/page.test.tsx` - Job card details
 - ⬜ `job-cards/create/page.test.tsx` - Create job card
 - ⬜ `appointments/page.test.tsx` - Appointments
-- ⬜ `customer-find/page.test.tsx` - Customer find
+- ⬜ `customers/page.test.tsx` - Customers
 - ⬜ `quotations/page.test.tsx` - Quotations
 - ⬜ `invoices/page.test.tsx` - Invoices
 - ⬜ `inventory/page.test.tsx` - Inventory

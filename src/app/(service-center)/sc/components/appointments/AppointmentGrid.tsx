@@ -6,9 +6,9 @@ import { StatusBadge } from "./StatusBadge";
 interface AppointmentGridProps {
   appointments: AppointmentRecord[];
   onAppointmentClick: (appointment: AppointmentRecord) => void;
-  onDeleteAppointment: (id: number) => void;
-  onOpenJobCard?: (appointmentId: number) => void;
-  getJobCardId?: (appointmentId: number) => string | null;
+  onDeleteAppointment: (id: number | string) => void;
+  onOpenJobCard?: (appointmentId: number | string) => void;
+  getJobCardId?: (appointmentId: number | string) => string | null;
   isCallCenter: boolean;
 }
 

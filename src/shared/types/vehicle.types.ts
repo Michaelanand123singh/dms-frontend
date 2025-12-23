@@ -20,7 +20,7 @@ export interface Customer {
   address?: string;
   cityState?: string;
   pincode?: string;
-  alternateMobile?: string;
+  alternateNumber?: string;
   customerType?: CustomerType;
   serviceType?: ServiceType;
   addressType?: "home" | "work";
@@ -123,7 +123,7 @@ export interface NewCustomerForm {
   phone: string;
   // Dedicated WhatsApp number field captured at creation time
   whatsappNumber?: string;
-  alternateMobile?: string;
+  alternateNumber?: string;
   email?: string;
   address?: string;
   cityState?: string;

@@ -91,7 +91,7 @@ function AppointmentsContent() {
   const canEditCustomerInformation = canEditCustomerInfo(userRole);
   const canEditVehicleInformation = canEditVehicleInfo(userRole);
 
-  const getJobCardId = useCallback((appointmentId: number): string | null => {
+  const getJobCardId = useCallback((appointmentId: number | string): string | null => {
     if (typeof window === "undefined") return null;
     try {
       const jobCards = migrateAllJobCards();
@@ -274,15 +274,7 @@ function AppointmentsContent() {
             onAppointmentClick={handleAppointmentClick}
             onDeleteAppointment={handleDeleteAppointment}
             onOpenJobCard={handleOpenJobCard}
-            getJobCardId={(id) => {
-              // getJobCardId logic was in page.tsx, likely needed for grid.
-              // Ideally hook should provide it or grid uses logic.
-              // "migrateAllJobCards" approach.
-              // I'll skip it for now or implement dummy.
-              // Actually AppointmentGrid props require it.
-              // I'll inline the logic if needed or just pass null for now to get it building.
-              return null;
-            }}
+            getJobCardId={getJobCardId}
             isCallCenter={isCallCenter}
           />
         </div>
@@ -315,7 +307,7 @@ function AppointmentsContent() {
         <CheckInSlip data={checkInSlipData} onClose={() => setShowCheckInSlipModal(false)} />
       )}
 
-      {showAppointmentFormModal && (
+      {showAppointmentFormModal && (selectedAppointmentCustomer || selectedAppointment) && (
         <AppointmentFormModal
           isOpen={showAppointmentFormModal}
           customer={selectedAppointmentCustomer}

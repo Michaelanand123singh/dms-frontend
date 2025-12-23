@@ -29,8 +29,7 @@ class CustomerService {
       name: data.name,
       phone: data.phone,
       whatsappNumber: data.whatsappNumber,
-      // Map frontend 'alternateMobile' to backend 'alternateNumber'
-      alternateNumber: data.alternateMobile,
+      alternateNumber: data.alternateNumber,
       email: data.email,
       address: data.address,
       cityState: data.cityState,
