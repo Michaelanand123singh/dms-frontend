@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   PlusCircle,
   Clock,
@@ -36,8 +36,8 @@ import type {
 } from "@/shared/types";
 import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
 import { getMockComplaints } from "@/__mocks__/data/complaints.mock";
-import { mockCustomers } from "@/__mocks__/data/customers.mock";
 import { validatePhone, validateEmail, validateVIN, cleanPhone } from "@/shared/utils/validation";
+import { customerService } from "@/features/customers/services/customer.service";
 import { formatVehicleString } from "../components/shared";
 import type { Appointment } from "@/app/(service-center)/sc/components/appointment/types";
 import type { AppointmentForm as AppointmentFormType } from "@/app/(service-center)/sc/components/appointment/types";
@@ -89,7 +89,7 @@ export default function CustomerFind() {
   const canCreateNewCustomer = canCreateCustomer(userRole);
 
   const { toast, showToast, ToastComponent } = useToast();
-  
+
   // Modal states using extracted hook
   const createFormModal = useModalState(false);
   const addVehicleModal = useModalState(false);
@@ -171,6 +171,10 @@ export default function CustomerFind() {
   const [dropSameAsPickup, setDropSameAsPickup] = useState<boolean>(false);
   const [appointmentFieldErrors, setAppointmentFieldErrors] = useState<Record<string, string>>({});
 
+  // Recent Customers State
+  const [recentCustomers, setRecentCustomers] = useState<CustomerWithVehicles[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState<boolean>(true);
+
   const filteredServiceCenters = useMemo(() => {
     const query = serviceCenterSearch.trim().toLowerCase();
     if (!query) return staticServiceCenters;
@@ -221,25 +225,36 @@ export default function CustomerFind() {
       (customer: CustomerWithVehicles) => Number(customer.serviceCenterId) === Number(serviceCenterFilterId)
     );
   }, [searchResults, shouldFilterByServiceCenter, serviceCenterFilterId]);
-  
-  // Use mock customers directly for recent customers list (show first 10)
-  const filteredMockCustomers = useMemo(() => {
-    if (isCallCenter || !serviceCenterFilterId) {
-      return mockCustomers;
+
+  // Fetch recent customers
+  const fetchRecentCustomers = useCallback(async () => {
+    try {
+      setLoadingRecent(true);
+      const filters: Record<string, any> = {};
+      if (!isCallCenter && serviceCenterFilterId) {
+        filters.serviceCenterId = serviceCenterFilterId;
+      }
+      // Assuming getRecent supports filters as implemented in step 1 using standard getAll
+      const data = await customerService.getRecent(10, filters);
+      setRecentCustomers(data);
+    } catch (error) {
+      console.error("Failed to fetch recent customers", error);
+    } finally {
+      setLoadingRecent(false);
     }
-    return mockCustomers.filter(
-      (customer) => Number(customer.serviceCenterId) === Number(serviceCenterFilterId)
-    );
   }, [isCallCenter, serviceCenterFilterId]);
 
-  const recentCustomers = filteredMockCustomers.slice(0, 10);
+  // Initial fetch
+  useEffect(() => {
+    fetchRecentCustomers();
+  }, [fetchRecentCustomers]);
 
   const handleAssignNearestCenter = useCallback(() => {
     const nearest = getNearestServiceCenter();
     if (nearest) {
       const nearestCenter = staticServiceCenters.find((c) => c.name === nearest);
-      setAppointmentForm((prev) => ({ 
-        ...prev, 
+      setAppointmentForm((prev) => ({
+        ...prev,
         assignedServiceCenter: nearest,
         // Note: serviceCenterId will be resolved when saving the appointment
       }));
@@ -252,7 +267,7 @@ export default function CustomerFind() {
   const handleSearchInputChange = useCallback((value: string): void => {
     // Prevent search when creating customer
     if (createFormModal.isOpen) return;
-    
+
     setSearchQuery(value);
     setValidationError("");
     setSelectedCustomer(null);
@@ -280,7 +295,7 @@ export default function CustomerFind() {
   const handleSearch = useCallback((): void => {
     // Prevent search when creating customer
     if (createFormModal.isOpen) return;
-    
+
     if (!searchQuery.trim()) {
       setValidationError("Please enter a search query");
       return;
@@ -296,7 +311,7 @@ export default function CustomerFind() {
     setSearchQuery("");
     clearSearch();
     setShowCreateCustomer(false);
-    
+
     // Add to recent customers (this will be handled by the service/repository)
     // The repository tracks this automatically when a customer is accessed
   }, [clearSearch]);
@@ -325,12 +340,12 @@ export default function CustomerFind() {
 
   // Helper to initialize appointment form with customer and optional vehicle data
   const initializeAppointmentForm = useCallback((customer: CustomerWithVehicles, vehicle?: Vehicle | null) => {
-    const vehicleString = vehicle 
+    const vehicleString = vehicle
       ? `${vehicle.vehicleMake} ${vehicle.vehicleModel} (${vehicle.vehicleYear})`
       : (customer.vehicles && customer.vehicles.length > 0
-          ? formatVehicleString(customer.vehicles[0])
-          : "");
-    
+        ? formatVehicleString(customer.vehicles[0])
+        : "");
+
     setAppointmentForm({
       ...getInitialAppointmentForm(),
       customerName: customer.name,
@@ -338,7 +353,7 @@ export default function CustomerFind() {
       vehicle: vehicleString,
       serviceType: "",
     });
-    
+
     // Set selected vehicle if provided, otherwise set first vehicle if available
     if (vehicle) {
       setSelectedVehicle(vehicle);
@@ -404,7 +419,7 @@ export default function CustomerFind() {
       showToast("You do not have permission to create new customers.", "error");
       return;
     }
-    
+
     // Clear search when opening create form
     setSearchQuery("");
     clearSearch();
@@ -412,7 +427,7 @@ export default function CustomerFind() {
     setShowCreateCustomer(false);
     setDetectedSearchType(null);
     setValidationError("");
-    
+
     createFormModal.open();
     resetCustomerForm();
   }, [canCreateNewCustomer, resetCustomerForm, clearSearch, showToast, createFormModal]);
@@ -450,7 +465,7 @@ export default function CustomerFind() {
     <div className="bg-gray-50 min-h-screen pt-20 px-4 sm:px-6 lg:px-8 pb-10">
       {/* Toast Notification */}
       <ToastComponent />
-      
+
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -497,11 +512,11 @@ export default function CustomerFind() {
               initializeAppointmentForm(customer);
               vehicleDetailsModal.close();
               appointmentModal.open();
-              
+
               const availableVehicles = customer.vehicles?.filter(
                 (v) => v.currentStatus !== "Active Job Card"
               ) || [];
-              
+
               if (availableVehicles.length === 0) {
                 resetVehicleForm();
                 if (customer.cityState) {
@@ -755,8 +770,8 @@ export default function CustomerFind() {
 
             // Create new appointment
             const newAppointment = {
-              id: existingAppointments.length > 0 
-                ? Math.max(...existingAppointments.map((a: any) => a.id)) + 1 
+              id: existingAppointments.length > 0
+                ? Math.max(...existingAppointments.map((a: any) => a.id)) + 1
                 : 1,
               ...appointmentData,
             };

@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from "react";
 import { customerService } from "@/features/customers/services/customer.service";
+import { vehicleRepository } from "@/core/repositories/vehicle.repository";
 import { validateVIN } from "@/shared/utils/validation";
 import { initialVehicleForm } from "../constants/form.constants";
 import type { NewVehicleForm, Vehicle, CustomerWithVehicles } from "@/shared/types";
@@ -115,62 +116,48 @@ export function useVehicleForm(
 
       setValidationError("");
 
-      // Create a new vehicle object
-      const newVehicle: Vehicle = {
-        id: Date.now(), // Temporary ID
-        customerId: selectedCustomer.id,
-        customerNumber: selectedCustomer.customerNumber,
-        phone: selectedCustomer.phone,
-        registration: newVehicleForm.registrationNumber || "",
-        vin: newVehicleForm.vin || "",
-        customerName: selectedCustomer.name,
-        customerEmail: selectedCustomer.email || "",
-        customerAddress: selectedCustomer.address || "",
-        vehicleMake: newVehicleForm.vehicleBrand || "",
-        vehicleModel: newVehicleForm.vehicleModel || "",
-        vehicleYear: newVehicleForm.purchaseDate
-          ? new Date(newVehicleForm.purchaseDate).getFullYear()
-          : new Date().getFullYear(),
-        vehicleColor: newVehicleForm.vehicleColor || "",
-        lastServiceDate: "",
-        totalServices: 0,
-        totalSpent: "₹0",
-        currentStatus: "Available",
-        activeJobCardId: null,
-        // Additional vehicle details
-        variant: newVehicleForm.variant || undefined,
-        motorNumber: newVehicleForm.motorNumber || undefined,
-        chargerSerialNumber: newVehicleForm.chargerSerialNumber || undefined,
-        purchaseDate: newVehicleForm.purchaseDate || undefined,
-        warrantyStatus: newVehicleForm.warrantyStatus || undefined,
-        insuranceStartDate: hasInsurance ? newVehicleForm.insuranceStartDate || undefined : undefined,
-        insuranceEndDate: hasInsurance ? newVehicleForm.insuranceEndDate || undefined : undefined,
-        insuranceCompanyName: hasInsurance ? newVehicleForm.insuranceCompanyName || undefined : undefined,
-      };
-
-      // Add vehicle to customer's vehicles array
-      const updatedVehicles = [...(selectedCustomer.vehicles || []), newVehicle];
-      const updatedCustomer: CustomerWithVehicles = {
-        ...selectedCustomer,
-        vehicles: updatedVehicles,
-        totalVehicles: updatedVehicles.length,
-      };
-
       // Persist the vehicle to the repository
+      let createdVehicle: Vehicle;
       try {
-        await customerService.update(selectedCustomer.id, {
-          vehicles: updatedVehicles,
-          totalVehicles: updatedVehicles.length,
-        });
+        const payload = {
+          customerId: String(selectedCustomer.id),
+          registration: newVehicleForm.registrationNumber!,
+          vin: newVehicleForm.vin!,
+          vehicleMake: newVehicleForm.vehicleBrand!,
+          vehicleModel: newVehicleForm.vehicleModel!,
+          vehicleYear: newVehicleForm.purchaseDate
+            ? new Date(newVehicleForm.purchaseDate).getFullYear()
+            : new Date().getFullYear(),
+          vehicleColor: newVehicleForm.vehicleColor,
+          variant: newVehicleForm.variant,
+          motorNumber: newVehicleForm.motorNumber,
+          chargerSerialNumber: newVehicleForm.chargerSerialNumber,
+          warrantyStatus: newVehicleForm.warrantyStatus,
+          purchaseDate: newVehicleForm.purchaseDate ? new Date(newVehicleForm.purchaseDate).toISOString() : undefined,
+          insuranceStartDate: hasInsurance && newVehicleForm.insuranceStartDate ? new Date(newVehicleForm.insuranceStartDate).toISOString() : undefined,
+          insuranceEndDate: hasInsurance && newVehicleForm.insuranceEndDate ? new Date(newVehicleForm.insuranceEndDate).toISOString() : undefined,
+          insuranceCompanyName: hasInsurance ? newVehicleForm.insuranceCompanyName : undefined,
+        };
+
+        createdVehicle = await vehicleRepository.create(payload as any);
       } catch (error) {
         console.error("Failed to save vehicle:", error);
         setValidationError("Failed to save vehicle. Please try again.");
         return null;
       }
 
+      // Add vehicle to customer's vehicles array using the real created vehicle
+      // const newVehicle = createdVehicle; // Use the response
+      const updatedVehicles = [...(selectedCustomer.vehicles || []), createdVehicle];
+      const updatedCustomer: CustomerWithVehicles = {
+        ...selectedCustomer,
+        vehicles: updatedVehicles,
+        totalVehicles: updatedVehicles.length,
+      };
+
       // Update selected customer
       setSelectedCustomer(updatedCustomer);
-      setSelectedVehicle(newVehicle);
+      setSelectedVehicle(createdVehicle);
 
       showToast(
         `Vehicle added successfully! Brand: ${newVehicleForm.vehicleBrand} | Model: ${newVehicleForm.vehicleModel} | Registration: ${newVehicleForm.registrationNumber}`,
@@ -182,13 +169,13 @@ export function useVehicleForm(
 
       // If we should open appointment after adding vehicle, do it now
       if (shouldOpenAppointmentAfterVehicleAdd) {
-        initializeAppointmentForm(updatedCustomer, newVehicle);
+        initializeAppointmentForm(updatedCustomer, createdVehicle);
         setShowVehicleDetails(false); // Ensure vehicle details modal is closed
         setShowScheduleAppointment(true);
         setShouldOpenAppointmentAfterVehicleAdd(false);
       }
 
-      return newVehicle;
+      return createdVehicle;
     },
     [newVehicleForm, hasInsurance, validateVehicleForm]
   );

@@ -18,13 +18,27 @@ class CustomerService {
     return customerRepository.search(query, type);
   }
 
-  async getRecent(limit: number = 10): Promise<CustomerWithVehicles[]> {
-    // Note: getRecent is not standard CRUD, added it to extended repo or keep as custom logic
-    return customerRepository.getAll({ limit, sort: 'recent' }); // Simplified mapping
+  async getRecent(limit: number = 10, params?: Record<string, any>): Promise<CustomerWithVehicles[]> {
+    return customerRepository.getAll({ limit, sort: 'recent', ...params });
   }
 
   async create(data: NewCustomerForm): Promise<CustomerWithVehicles> {
-    return customerRepository.create(data);
+    // Map frontend form data to backend DTO structure
+    // This ensures we only send fields the backend expects and map mismatches
+    const backendPayload = {
+      name: data.name,
+      phone: data.phone,
+      whatsappNumber: data.whatsappNumber,
+      // Map frontend 'alternateMobile' to backend 'alternateNumber'
+      alternateNumber: data.alternateMobile,
+      email: data.email,
+      address: data.address,
+      cityState: data.cityState,
+      pincode: data.pincode,
+      customerType: data.customerType || 'B2C'
+    };
+
+    return customerRepository.create(backendPayload as any);
   }
 
   async update(id: number | string, data: Partial<CustomerWithVehicles>): Promise<CustomerWithVehicles> {
