@@ -7,8 +7,8 @@ export const API_CONFIG = {
   TIMEOUT: Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
-  // Default to mock mode if not explicitly set to "false"
-  USE_MOCK: process.env.NEXT_PUBLIC_USE_MOCK_API !== "false",
+  // Default to real API, use mock only if explicitly enabled
+  USE_MOCK: process.env.NEXT_PUBLIC_USE_MOCK_API === "true",
 } as const;
 
 export const API_ENDPOINTS = {

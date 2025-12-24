@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Search, Filter, Package, TrendingUp, PlusCircle } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
+import { centralInventoryRepository } from "@/core/repositories/central-inventory.repository";
 import type { CentralStock } from "@/shared/types/central-inventory.types";
 
 type FilterStatus = "all" | "In Stock" | "Low Stock" | "Out of Stock";

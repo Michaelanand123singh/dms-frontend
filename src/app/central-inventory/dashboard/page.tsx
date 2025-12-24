@@ -18,7 +18,7 @@ import {
 import { StatsCard } from "@/components/data-display/StatsCard";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
+import { centralInventoryRepository } from "@/core/repositories/central-inventory.repository";
 import type {
   CentralInventoryStats,
   PurchaseOrder,

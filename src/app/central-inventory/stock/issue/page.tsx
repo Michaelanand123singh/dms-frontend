@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Building, Search, ArrowRight } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
+import { centralInventoryRepository } from "@/core/repositories/central-inventory.repository";
 import type { ServiceCenterInfo } from "@/shared/types/central-inventory.types";
 
 export default function IssuePartsPage() {

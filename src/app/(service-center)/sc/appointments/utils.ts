@@ -17,7 +17,7 @@ export const convertAppointmentToFormData = (appointment: AppointmentRecord): Pa
     date: appointment.date,
     time: timeIn24Hour || appointment.time, // Fallback to original if conversion fails
     duration: appointment.duration.replace(" hours", "").replace(" hour", ""),
-    serviceCenterId: appointment.serviceCenterId ? Number(appointment.serviceCenterId) : undefined,
+    serviceCenterId: appointment.serviceCenterId ? appointment.serviceCenterId.toString() : undefined,
     serviceCenterName: appointment.serviceCenterName || undefined,
     customerType: appointment.customerType,
     customerComplaintIssue: appointment.customerComplaintIssue,

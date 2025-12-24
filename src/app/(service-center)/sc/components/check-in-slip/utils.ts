@@ -2,7 +2,7 @@ import type { CheckInSlipFormData } from "@/shared/types/check-in-slip.types";
 import type { EnhancedCheckInSlipData } from "@/shared/types/check-in-slip.types";
 import type { CustomerWithVehicles, Vehicle } from "@/shared/types";
 import { generateCheckInSlipNumber } from "@/components/check-in-slip/CheckInSlip";
-import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
+
 import { SERVICE_CENTER_CODE_MAP } from "../../appointments/constants";
 
 /**

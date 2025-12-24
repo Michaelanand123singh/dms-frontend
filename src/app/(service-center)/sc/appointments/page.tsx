@@ -280,28 +280,30 @@ function AppointmentsContent() {
         </div>
       </div>
 
-      <AppointmentDetailModal
-        isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
-        appointment={selectedAppointment}
-        detailCustomer={detailCustomer}
-        isCallCenter={isCallCenter}
-        isServiceAdvisor={isServiceAdvisor}
-        customerArrivalStatus={customerArrivalStatus}
-        currentJobCard={currentJobCard}
-        availableServiceCenters={availableServiceCenters}
-        onCustomerArrived={() => setCustomerArrivalStatus("arrived")}
-        onCustomerNotArrived={() => setCustomerArrivalStatus("not_arrived")}
-        setCurrentJobCard={setCurrentJobCard}
-        setCheckInSlipData={setCheckInSlipData}
-        setShowCheckInSlipModal={setShowCheckInSlipModal}
-        setAppointments={setAppointments} // Internal setter
-        setSelectedAppointment={setSelectedAppointment}
-        showToast={showToast}
-        appointments={appointments}
-        onGenerateCheckInSlip={handleGenerateCheckInSlip}
-        currentJobCardId={currentJobCardId}
-      />
+      {showDetailModal && selectedAppointment && (
+        <AppointmentDetailModal
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          appointment={selectedAppointment}
+          detailCustomer={detailCustomer}
+          isCallCenter={isCallCenter}
+          isServiceAdvisor={isServiceAdvisor}
+          customerArrivalStatus={customerArrivalStatus}
+          currentJobCard={currentJobCard}
+          availableServiceCenters={availableServiceCenters}
+          onCustomerArrived={() => setCustomerArrivalStatus("arrived")}
+          onCustomerNotArrived={() => setCustomerArrivalStatus("not_arrived")}
+          setCurrentJobCard={setCurrentJobCard}
+          setCheckInSlipData={setCheckInSlipData}
+          setShowCheckInSlipModal={setShowCheckInSlipModal}
+          setAppointments={setAppointments} // Internal setter
+          setSelectedAppointment={setSelectedAppointment}
+          showToast={showToast}
+          appointments={appointments}
+          onGenerateCheckInSlip={handleGenerateCheckInSlip}
+          currentJobCardId={currentJobCardId}
+        />
+      )}
 
       {showCheckInSlipModal && checkInSlipData && (
         <CheckInSlip data={checkInSlipData} onClose={() => setShowCheckInSlipModal(false)} />

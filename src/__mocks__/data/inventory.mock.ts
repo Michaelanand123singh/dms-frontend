@@ -25,12 +25,12 @@ export function convertPartToInventoryItem(part: Part, index: number): Inventory
   };
 
   // Calculate cost price from purchasePrice or estimate as 80% of price
-  const costPriceValue = part.purchasePrice 
-    ? parseFloat(part.purchasePrice) 
+  const costPriceValue = part.purchasePrice
+    ? parseFloat(part.purchasePrice)
     : part.price * 0.8;
 
   // Parse ID from part.id (e.g., "part-1" -> 1) or use index + 1
-  const id = part.id && part.id.includes("-") 
+  const id = part.id && part.id.includes("-")
     ? parseInt(part.id.split("-")[1]) || index + 1
     : index + 1;
 
@@ -505,3 +505,5 @@ export function initializeInventoryMockData() {
     safeStorage.setItem("jobCardPartsRequests", mockJobCardPartsRequests);
   }
 }
+
+export const defaultInventory = getDefaultServiceCenterInventory();

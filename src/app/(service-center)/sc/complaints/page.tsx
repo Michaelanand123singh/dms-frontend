@@ -20,15 +20,31 @@ import {
   Clock,
   Building2,
 } from "lucide-react";
-import { defaultComplaints, type Complaint } from "@/__mocks__/data/complaints.mock";
 import { useCustomerSearch } from "../../../../hooks/api";
 import type { CustomerWithVehicles } from "@/shared/types";
-import { getMockServiceHistory } from "@/__mocks__/data/customer-service-history.mock";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
 import { useRole } from "@/shared/hooks";
 import { formatVehicleString } from "../components/shared/vehicle-utils";
-import { findNearestServiceCenter } from "../components/appointment/types";
+
+type Complaint = {
+  id: string;
+  customerName: string;
+  vehicle: string;
+  phone: string;
+  complaint: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  status: "Open" | "Resolved" | "Closed";
+  date: string;
+  serviceCenterId?: string;
+  serviceCenterName?: string;
+};
+
+type ServiceCenter = {
+  id: number;
+  name: string;
+  status: string;
+  address?: string;
+};
 
 type FilterType = "all" | "open" | "resolved" | "closed";
 
@@ -184,9 +200,8 @@ const Button = ({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${
-        disabled ? "opacity-50 cursor-not-allowed disabled:active:scale-100" : ""
-      } ${className}`}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${disabled ? "opacity-50 cursor-not-allowed disabled:active:scale-100" : ""
+        } ${className}`}
       {...props}
     >
       {Icon && <Icon size={size === "sm" ? 16 : 18} strokeWidth={2} />}
@@ -218,17 +233,19 @@ export default function Complaints() {
   const complaintCustomerDropdownRef = useRef<HTMLDivElement>(null);
 
   // Service centers for complaint assignment
-  const [availableServiceCenters] = useState(() => {
-    return defaultServiceCenters.filter((sc) => sc.status === "Active");
+  const [availableServiceCenters] = useState<ServiceCenter[]>(() => {
+    if (typeof window !== "undefined") {
+      return safeStorage.getItem<ServiceCenter[]>("serviceCenters", []);
+    }
+    return [];
   });
 
   // Load complaints from storage or use default
   const [complaints, setComplaints] = useState<Complaint[]>(() => {
     if (typeof window !== "undefined") {
-      const storedComplaints = safeStorage.getItem<Complaint[]>("complaints", []);
-      return storedComplaints.length > 0 ? storedComplaints : defaultComplaints;
+      return safeStorage.getItem<Complaint[]>("complaints", []);
     }
-    return defaultComplaints;
+    return [];
   });
 
   // Customer search hook for complaint form
@@ -319,12 +336,7 @@ export default function Complaints() {
 
       // Auto-suggest nearest service center for call center users
       let suggestedServiceCenterId: number | undefined = undefined;
-      if (isCallCenter && customer.address) {
-        const nearestId = findNearestServiceCenter(customer.address);
-        if (nearestId) {
-          suggestedServiceCenterId = nearestId;
-        }
-      }
+      // TODO: Implement service center recommendation based on customer location
 
       setComplaintForm((prev) => ({
         ...prev,
@@ -359,11 +371,11 @@ export default function Complaints() {
       : null;
 
     // Generate complaint ID
-    const maxId = complaints.length > 0 
+    const maxId = complaints.length > 0
       ? Math.max(...complaints.map((c) => {
-          const numId = parseInt(c.id.replace("COMP-", ""), 10);
-          return isNaN(numId) ? 0 : numId;
-        }))
+        const numId = parseInt(c.id.replace("COMP-", ""), 10);
+        return isNaN(numId) ? 0 : numId;
+      }))
       : 0;
     const newId = `COMP-${String(maxId + 1).padStart(3, "0")}`;
 
@@ -467,11 +479,10 @@ export default function Complaints() {
               <button
                 key={filterType}
                 onClick={() => setFilter(filterType)}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                  filter === filterType
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${filter === filterType
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
               >
                 {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
               </button>
@@ -492,21 +503,20 @@ export default function Complaints() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`p-2 rounded-lg ${
-                          complaint.severity === "High" || complaint.severity === "Critical"
-                            ? "bg-red-100"
-                            : complaint.severity === "Medium"
+                        className={`p-2 rounded-lg ${complaint.severity === "High" || complaint.severity === "Critical"
+                          ? "bg-red-100"
+                          : complaint.severity === "Medium"
                             ? "bg-amber-100"
                             : "bg-blue-100"
-                        }`}
+                          }`}
                       >
                         <AlertTriangle
                           className={
                             complaint.severity === "High" || complaint.severity === "Critical"
                               ? "text-red-600"
                               : complaint.severity === "Medium"
-                              ? "text-amber-600"
-                              : "text-blue-600"
+                                ? "text-amber-600"
+                                : "text-blue-600"
                           }
                           size={20}
                           strokeWidth={2}
@@ -516,24 +526,22 @@ export default function Complaints() {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-gray-900">{complaint.id}</span>
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              complaint.status === "Open"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : complaint.status === "Resolved"
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${complaint.status === "Open"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : complaint.status === "Resolved"
                                 ? "bg-green-100 text-green-700"
                                 : "bg-gray-100 text-gray-700"
-                            }`}
+                              }`}
                           >
                             {complaint.status}
                           </span>
                           <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
-                              complaint.severity === "High" || complaint.severity === "Critical"
-                                ? "bg-red-50 text-red-700"
-                                : complaint.severity === "Medium"
+                            className={`px-2 py-1 rounded text-xs font-medium ${complaint.severity === "High" || complaint.severity === "Critical"
+                              ? "bg-red-50 text-red-700"
+                              : complaint.severity === "Medium"
                                 ? "bg-amber-50 text-amber-700"
                                 : "bg-blue-50 text-blue-700"
-                            }`}
+                              }`}
                           >
                             {complaint.severity}
                           </span>
@@ -590,13 +598,12 @@ export default function Complaints() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-amber-800">Status:</span>
                     <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        selectedComplaint.status === "Open"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : selectedComplaint.status === "Resolved"
+                      className={`px-2 py-1 rounded text-xs font-medium ${selectedComplaint.status === "Open"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : selectedComplaint.status === "Resolved"
                           ? "bg-green-100 text-green-700"
                           : "bg-gray-100 text-gray-700"
-                      }`}
+                        }`}
                     >
                       {selectedComplaint.status}
                     </span>
@@ -604,13 +611,12 @@ export default function Complaints() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-amber-800">Severity:</span>
                     <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        selectedComplaint.severity === "High" || selectedComplaint.severity === "Critical"
-                          ? "bg-red-50 text-red-700"
-                          : selectedComplaint.severity === "Medium"
+                      className={`px-2 py-1 rounded text-xs font-medium ${selectedComplaint.severity === "High" || selectedComplaint.severity === "Critical"
+                        ? "bg-red-50 text-red-700"
+                        : selectedComplaint.severity === "Medium"
                           ? "bg-amber-50 text-amber-700"
                           : "bg-blue-50 text-blue-700"
-                      }`}
+                        }`}
                     >
                       {selectedComplaint.severity}
                     </span>
@@ -731,11 +737,10 @@ export default function Complaints() {
                                     {vehicle.vehicleMake} {vehicle.vehicleModel} ({vehicle.vehicleYear})
                                   </h4>
                                   <span
-                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      vehicle.currentStatus === "Active Job Card"
-                                        ? "bg-orange-100 text-orange-700"
-                                        : "bg-green-100 text-green-700"
-                                    }`}
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${vehicle.currentStatus === "Active Job Card"
+                                      ? "bg-orange-100 text-orange-700"
+                                      : "bg-green-100 text-green-700"
+                                      }`}
                                   >
                                     {vehicle.currentStatus}
                                   </span>
@@ -896,11 +901,10 @@ export default function Complaints() {
                   <div>
                     <p className="text-indigo-600 font-medium">Status</p>
                     <span
-                      className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                        selectedVehicle.currentStatus === "Active Job Card"
-                          ? "bg-orange-100 text-orange-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
+                      className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${selectedVehicle.currentStatus === "Active Job Card"
+                        ? "bg-orange-100 text-orange-700"
+                        : "bg-green-100 text-green-700"
+                        }`}
                     >
                       {selectedVehicle.currentStatus}
                     </span>

@@ -16,7 +16,6 @@ import {
 import { useRole } from "@/shared/hooks";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import type { JobCard } from "@/shared/types";
-import { defaultJobCards, serviceEngineerJobCards } from "@/__mocks__/data/job-cards.mock";
 import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
 import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import type { JobCardPart2Item } from "@/shared/types/job-card.types";
@@ -467,8 +466,8 @@ export default function PartsRequest() {
                           key={job.id}
                           onClick={() => handleSelectJobCard(job)}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${isSelected
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
                             }`}
                         >
                           <div className="flex items-start justify-between mb-2">
@@ -496,17 +495,17 @@ export default function PartsRequest() {
 
                           <div className="mt-2 flex items-center gap-2">
                             <span className={`px-2 py-1 rounded text-xs font-medium ${job.status === "Assigned"
-                                ? "bg-blue-100 text-blue-700"
-                                : job.status === "In Progress"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-orange-100 text-orange-700"
+                              ? "bg-blue-100 text-blue-700"
+                              : job.status === "In Progress"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-orange-100 text-orange-700"
                               }`}>
                               {job.status}
                             </span>
                             {request && (
                               <span className={`px-2 py-1 rounded text-xs font-medium ${request.status === "approved"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-gray-100 text-gray-700"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-700"
                                 }`}>
                                 {request.status === "approved" ? "Parts Approved" : "Request Pending"}
                               </span>
@@ -829,8 +828,8 @@ export default function PartsRequest() {
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-gray-700 min-w-[120px]">SC Manager:</span>
                             <span className={`px-3 py-1.5 rounded text-xs font-semibold ${request.scManagerApproved
-                                ? "bg-green-500 text-white"
-                                : "bg-red-500 text-white"
+                              ? "bg-green-500 text-white"
+                              : "bg-red-500 text-white"
                               }`}>
                               {request.scManagerApproved ? "✓ Approved" : "Pending"}
                             </span>
@@ -844,10 +843,10 @@ export default function PartsRequest() {
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-gray-700 min-w-[120px]">Inventory Manager:</span>
                             <span className={`px-3 py-1.5 rounded text-xs font-semibold ${request.inventoryManagerAssigned
-                                ? "bg-green-500 text-white"
-                                : request.scManagerApproved
-                                  ? "bg-yellow-500 text-white"
-                                  : "bg-gray-400 text-white"
+                              ? "bg-green-500 text-white"
+                              : request.scManagerApproved
+                                ? "bg-yellow-500 text-white"
+                                : "bg-gray-400 text-white"
                               }`}>
                               {request.inventoryManagerAssigned
                                 ? "✓ Parts Assigned"

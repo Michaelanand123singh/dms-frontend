@@ -18,6 +18,8 @@ import {
 import { useRole } from "@/shared/hooks";
 import { useCloudinaryUpload } from "@/shared/hooks/useCloudinaryUpload";
 import { defaultServiceCenters } from "../service-center";
+import { apiClient } from "@/core/api";
+import { API_ENDPOINTS } from "@/config/api.config";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 import { INDIAN_STATES, getCitiesByState } from "@/shared/constants/indian-states-cities";
 import { FormInput, FormSelect, formatVehicleString, CameraModal } from "../shared";
@@ -105,20 +107,51 @@ export const AppointmentForm = ({
   );
 
   // Local state for UI
-  const [pickupAddressDifferent, setPickupAddressDifferent] = useState(false);
-  const [pickupState, setPickupState] = useState("");
-  const [pickupCity, setPickupCity] = useState("");
-  const [dropState, setDropState] = useState("");
-  const [dropCity, setDropCity] = useState("");
+  const [pickupAddressDifferent, setPickupAddressDifferent] = useState(() =>
+    !!(initialData?.pickupAddress || initialData?.pickupState || initialData?.pickupCity)
+  );
+  const [pickupState, setPickupState] = useState(initialData?.pickupState || "");
+  const [pickupCity, setPickupCity] = useState(initialData?.pickupCity || "");
+  const [dropState, setDropState] = useState(initialData?.dropState || "");
+  const [dropCity, setDropCity] = useState(initialData?.dropCity || "");
   const [dropSameAsPickup, setDropSameAsPickup] = useState(false);
   const [showServiceCenterSelector, setShowServiceCenterSelector] = useState(false);
   const [serviceCenterSearch, setServiceCenterSearch] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [validationError, setValidationError] = useState("");
 
+  const [realServiceCenters, setRealServiceCenters] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchSCs = async () => {
+      try {
+        const res = await apiClient.get(API_ENDPOINTS.SERVICE_CENTERS) as any;
+        const data = Array.isArray(res) ? res : res.data || [];
+        if (Array.isArray(data)) {
+          const mapped = data.map((sc: any) => ({
+            ...sc,
+            id: sc.id, // UUID
+            serviceCenterId: sc.id, // For compatibility
+            name: sc.name,
+            location: `${sc.address || ''}, ${sc.city || ''}`,
+            status: "Active" // Assume active if returned
+          }));
+          setRealServiceCenters(mapped);
+        }
+      } catch (e) {
+        console.error("Error fetching SCs", e);
+      }
+    };
+    fetchSCs();
+  }, []);
+
   const availableServiceCenters = useMemo(
-    () => defaultServiceCenters.filter((sc) => sc.status === "Active"),
-    []
+    () => {
+      if (realServiceCenters.length > 0) return realServiceCenters;
+      const mocks = (defaultServiceCenters && Array.isArray(defaultServiceCenters)) ? defaultServiceCenters : [];
+      return mocks.filter((sc) => sc.status === "Active");
+    },
+    [realServiceCenters]
   );
 
   const selectedCustomer = customerInfo;
@@ -426,6 +459,7 @@ export const AppointmentForm = ({
         });
 
         // Save file metadata to backend if appointment ID exists
+        /* 
         if (mode === 'edit') {
           const categoryMap: Record<string, FileCategory> = {
             customerIdProof: FileCategory.CUSTOMER_ID_PROOF,
@@ -455,6 +489,7 @@ export const AppointmentForm = ({
             // Don't block user - metadata can be saved later
           });
         }
+        */
       } catch (err) {
         console.error('Upload failed:', err);
         alert(`Failed to upload files: ${err instanceof Error ? err.message : 'Unknown error'}`);

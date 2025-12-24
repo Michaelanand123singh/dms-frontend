@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useRole } from "@/shared/hooks";
 import { useDebounce } from "@/shared/hooks";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { staticServiceCenters, defaultUsers, defaultInventory } from "@/__mocks__/data";
 
 interface SearchResult {
   type: string;
@@ -82,16 +81,10 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
     const lowerQuery = query.toLowerCase();
 
     if (typeof window !== "undefined") {
-      const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>("serviceCenters", {});
-      const allCenters = [...staticServiceCenters];
+      // Search service centers from localStorage cache
+      const storedCenters = safeStorage.getItem<ServiceCenter[]>("serviceCenters", []);
 
-      Object.values(storedCenters).forEach((center) => {
-        if (!allCenters.find((c) => c.id === center.id)) {
-          allCenters.push({ id: center.id, name: center.name, location: center.location || "" });
-        }
-      });
-
-      allCenters.forEach((center) => {
+      storedCenters.forEach((center) => {
         if (
           center.name.toLowerCase().includes(lowerQuery) ||
           (center.location && center.location.toLowerCase().includes(lowerQuery))
@@ -108,10 +101,10 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
         }
       });
 
+      // Search users from localStorage cache
       const users = safeStorage.getItem<User[]>("users", []);
-      const allUsers = [...defaultUsers, ...users];
 
-      allUsers.forEach((user) => {
+      users.forEach((user) => {
         if (
           user.name.toLowerCase().includes(lowerQuery) ||
           user.email.toLowerCase().includes(lowerQuery) ||
@@ -129,10 +122,10 @@ export function Navbar({ open, setOpen, isLoggedIn = true }: NavbarProps) {
         }
       });
 
+      // Search inventory from localStorage cache
       const inventory = safeStorage.getItem<InventoryItem[]>("inventoryData", []);
-      const allInventory = [...defaultInventory, ...inventory];
 
-      allInventory.forEach((item) => {
+      inventory.forEach((item) => {
         if (
           item.partName.toLowerCase().includes(lowerQuery) ||
           (item.hsnCode && item.hsnCode.toLowerCase().includes(lowerQuery)) ||

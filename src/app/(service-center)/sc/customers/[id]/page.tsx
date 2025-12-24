@@ -46,6 +46,7 @@ import {
 
 import { getInitialAppointmentForm, formatTime } from "@/app/(service-center)/sc/components/appointment/utils";
 import type { AppointmentForm as AppointmentFormType } from "@/app/(service-center)/sc/components/appointment/types";
+import { appointmentsService } from "@/features/appointments/services/appointments.service";
 
 export default function CustomerDetailsPage() {
     const params = useParams();
@@ -528,78 +529,151 @@ export default function CustomerDetailsPage() {
                 canAccessCustomerType={true}
                 canAccessVehicleInfo={true}
                 existingAppointments={[]} // can fetch if needed
-                onSubmit={(form) => {
-                    // Replicate submit logic from page.tsx or consider calling a shared function.
-                    // For now, I'll allow the Appointment Form component to handle submission internally?
-                    // Actually the Form just calls onSubmit.
-                    // I need to implement handleSubmitAppointmentForm logic here or better yet, move it to a hook.
-                    // But for this task scope, I will implement a basic version that saves to localStorage as in page.tsx
+                onSubmit={async (form) => {
+                    try {
+                        const selectedServiceCenter = form.serviceCenterName
+                            ? staticServiceCenters.find((center) => center.name === form.serviceCenterName)
+                            : null;
 
-                    const selectedServiceCenter = form.serviceCenterName
-                        ? staticServiceCenters.find((center) => center.name === form.serviceCenterName)
-                        : null;
-                    const serviceCenterId = (selectedServiceCenter as any)?.serviceCenterId || selectedServiceCenter?.id?.toString() || null;
-                    const serviceCenterName = form.serviceCenterName || null;
-                    const assignedServiceCenter = form.serviceCenterName || null;
+                        // Ensure we have a valid Service Center ID (UUID)
+                        // Priority 1: User selection from form
+                        // Priority 2: Service Center Context (from login/global state)
+                        const contextDetails = getServiceCenterContext();
+                        const FALLBACK_DEV_SC_ID = "466c9ba4-e706-4714-92a9-daeaae25ffd2";
 
-                    const appointmentData: any = {
-                        customerName: form.customerName,
-                        vehicle: form.vehicle,
-                        phone: form.phone,
-                        serviceType: form.serviceType,
-                        date: form.date,
-                        time: formatTime(form.time),
-                        duration: `${form.duration} hours`,
-                        status: "Confirmed",
-                        customerType: customer?.customerType,
-                        whatsappNumber: form.whatsappNumber,
-                        alternateNumber: form.alternateNumber,
-                        email: form.email,
-                        address: form.address,
-                        cityState: form.cityState,
-                        pincode: form.pincode,
-                        customerComplaintIssue: form.customerComplaintIssue,
-                        previousServiceHistory: form.previousServiceHistory,
-                        estimatedServiceTime: form.estimatedServiceTime,
-                        estimatedCost: form.estimatedCost,
-                        estimationCost: (form as any).estimationCost,
-                        odometerReading: form.odometerReading,
-                        estimatedDeliveryDate: form.estimatedDeliveryDate,
-                        assignedServiceAdvisor: form.assignedServiceAdvisor,
-                        assignedTechnician: form.assignedTechnician,
-                        assignedServiceCenter: assignedServiceCenter,
-                        serviceCenterId: serviceCenterId,
-                        serviceCenterName: serviceCenterName,
-                        pickupDropRequired: form.pickupDropRequired,
-                        pickupAddress: form.pickupAddress,
-                        pickupState: (form as any).pickupState,
-                        pickupCity: (form as any).pickupCity,
-                        pickupPincode: (form as any).pickupPincode,
-                        dropAddress: form.dropAddress,
-                        dropState: (form as any).dropState,
-                        dropCity: (form as any).dropCity,
-                        dropPincode: (form as any).dropPincode,
-                        preferredCommunicationMode: form.preferredCommunicationMode,
-                        documentationFiles: {
-                            customerIdProof: form.customerIdProof?.urls?.length || 0,
-                            vehicleRCCopy: form.vehicleRCCopy?.urls?.length || 0,
-                            warrantyCardServiceBook: form.warrantyCardServiceBook?.urls?.length || 0,
-                            photosVideos: form.photosVideos?.urls?.length || 0,
-                        },
-                    };
+                        // Helper to check if string is a valid UUID
+                        const isUUID = (str: string | undefined | null) => {
+                            if (!str) return false;
+                            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                            return uuidRegex.test(str);
+                        };
 
-                    const existingAppointments = safeStorage.getItem<Array<any>>("appointments", []);
-                    const newAppointment = {
-                        id: existingAppointments.length > 0
-                            ? Math.max(...existingAppointments.map((a: any) => a.id)) + 1
-                            : 1,
-                        ...appointmentData,
-                    };
-                    const updatedAppointments = [...existingAppointments, newAppointment];
-                    safeStorage.setItem("appointments", updatedAppointments);
+                        // Gather potential IDs
+                        const potentialIds = [
+                            form.serviceCenterId,
+                            (selectedServiceCenter as any)?.serviceCenterId,
+                            (contextDetails as any)?.id?.toString(),
+                            (contextDetails as any)?.serviceCenterId?.toString(),
+                            FALLBACK_DEV_SC_ID
+                        ];
 
-                    closeAppointmentForm();
-                    showToast("Appointment scheduled successfully!", "success");
+                        // Use the first valid UUID found
+                        const serviceCenterId = potentialIds.find(id => isUUID(id));
+
+                        if (!serviceCenterId) {
+                            showToast("Configuration Error: No valid Service Center UUID found.", "error");
+                            return;
+                        }
+
+                        if (!serviceCenterId) {
+                            showToast("Please select a Service Center to proceed.", "error");
+                            return;
+                        }
+
+                        // Map file metadata for backend DTO
+                        // The backend expects arrays of file metadata objects, not counts
+                        const documentationFiles = {
+                            customerIdProof: form.customerIdProof?.metadata?.map((m: any) => ({
+                                url: m.url,
+                                publicId: m.publicId,
+                                filename: `file_${m.publicId}`, // Fallback filename
+                                format: m.format,
+                                bytes: m.bytes,
+                                width: 0, // Optional
+                                height: 0 // Optional
+                            })) || [],
+                            vehicleRCCopy: form.vehicleRCCopy?.metadata?.map((m: any) => ({
+                                url: m.url,
+                                publicId: m.publicId,
+                                filename: `file_${m.publicId}`,
+                                format: m.format,
+                                bytes: m.bytes
+                            })) || [],
+                            warrantyCardServiceBook: form.warrantyCardServiceBook?.metadata?.map((m: any) => ({
+                                url: m.url,
+                                publicId: m.publicId,
+                                filename: `file_${m.publicId}`,
+                                format: m.format,
+                                bytes: m.bytes
+                            })) || [],
+                            photosVideos: form.photosVideos?.metadata?.map((m: any) => ({
+                                url: m.url,
+                                publicId: m.publicId,
+                                filename: `file_${m.publicId}`,
+                                format: m.format,
+                                bytes: m.bytes
+                            })) || [],
+                        };
+
+                        // Address Resolution Logic
+                        // If pickup is required but no specific address provided, default to customer address
+                        let pickupAddress = form.pickupAddress;
+                        let pickupState = (form as any).pickupState;
+                        let pickupCity = (form as any).pickupCity;
+                        let pickupPincode = (form as any).pickupPincode;
+
+                        if (form.pickupDropRequired && !pickupAddress && form.address) {
+                            pickupAddress = form.address;
+                            pickupPincode = form.pincode;
+                            if (form.cityState) {
+                                const parts = form.cityState.split(',').map((s: string) => s.trim());
+                                pickupCity = parts[0] || '';
+                                pickupState = parts[1] || '';
+                            }
+                        }
+
+                        // If drop is undefined but "same as pickup" logic is desired, usually the Form handles it.
+                        // But we ensure that if dropAddress is empty and it's assumed same, we can fallback if needed.
+                        // However, based on user request, if "different" it saves new, if "same" (implied by emptiness?), save same.
+                        // We will trust form.dropAddress if present, else if drop is meant to be same, the form should have populated it.
+
+                        const appointmentData = {
+                            customerId: customer.id,
+                            vehicleId: selectedVehicle?.id,
+                            serviceCenterId: serviceCenterId,
+
+                            serviceType: form.serviceType,
+                            appointmentDate: form.date,
+                            appointmentTime: form.time, // Ensure HH:mm format
+                            duration: form.duration?.toString(),
+
+                            // Operational Details
+                            customerComplaint: form.customerComplaintIssue,
+                            previousServiceHistory: form.previousServiceHistory,
+                            estimatedServiceTime: form.estimatedServiceTime,
+                            estimatedCost: form.estimatedCost ? parseFloat(form.estimatedCost.toString()) : undefined,
+                            odometerReading: form.odometerReading,
+                            estimatedDeliveryDate: form.estimatedDeliveryDate,
+                            assignedServiceAdvisor: form.assignedServiceAdvisor,
+                            assignedTechnician: form.assignedTechnician,
+                            preferredCommunicationMode: form.preferredCommunicationMode,
+
+                            // Pickup/Drop
+                            pickupDropRequired: form.pickupDropRequired,
+                            pickupAddress: pickupAddress,
+                            pickupState: pickupState,
+                            pickupCity: pickupCity,
+                            pickupPincode: pickupPincode,
+                            dropAddress: form.dropAddress,
+                            dropState: (form as any).dropState,
+                            dropCity: (form as any).dropCity,
+                            dropPincode: (form as any).dropPincode,
+
+                            // Files
+                            documentationFiles: documentationFiles,
+                            uploadedBy: userInfo?.id
+                        };
+
+                        await appointmentsService.create(appointmentData);
+                        closeAppointmentForm();
+                        showToast("Appointment scheduled successfully!", "success");
+
+                        // Optional: Refresh data if needed
+                        // fetchCustomer(); 
+                    } catch (error: any) {
+                        console.error("Failed to schedule appointment", error);
+                        showToast(error.message || "Failed to schedule appointment", "error");
+                    }
                 }}
             />
 

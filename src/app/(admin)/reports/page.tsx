@@ -1,9 +1,17 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import { ArrowLeft, FileText, Download, Calendar, TrendingUp, Users, DollarSign, Building } from "lucide-react";
+import { Search, Download, Filter, Calendar, ArrowLeft, FileText, TrendingUp } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { staticServiceCenters } from "@/__mocks__/data";
-import { defaultReports, type Report } from "@/__mocks__/data/reports.mock";
+
+
+export type Report = {
+  id: string;
+  title: string;
+  reportType: string;
+  status: string;
+  serviceCenterId: string;
+  date: string;
+};
 
 interface ServiceCenter {
   id: number;
@@ -13,26 +21,25 @@ interface ServiceCenter {
 
 export default function ReportsPage() {
   const [selectedServiceCenter, setSelectedServiceCenter] = useState<ServiceCenter | null>(null);
-  const [reports, setReports] = useState<Report[]>(defaultReports);
+  const [reports, setReports] = useState<Report[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  // Load service centers
-  const [centers, setCenters] = useState<ServiceCenter[]>(staticServiceCenters);
+  // Load service centers and reports from localStorage
+  const [centers, setCenters] = useState<ServiceCenter[]>(() => {
+    if (typeof window !== 'undefined') {
+      return safeStorage.getItem<ServiceCenter[]>('serviceCenters', []);
+    }
+    return [];
+  });
 
   useEffect(() => {
-    const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>('serviceCenters', {});
-    const allCenters = [...staticServiceCenters];
-    Object.values(storedCenters).forEach((center) => {
-      if (!allCenters.find(c => c.id === center.id)) {
-        allCenters.push({ id: center.id, name: center.name, location: center.location || "" });
-      }
-    });
-    if (allCenters.length > staticServiceCenters.length) {
-      setCenters(allCenters);
-    }
+    // Load reports from localStorage
+    const storedReports = safeStorage.getItem<Report[]>('reports', []);
+    setReports(storedReports);
   }, []);
+
 
   // Get reports for selected service center
   const getReportsForServiceCenter = (serviceCenterId: string): Report[] => {
@@ -53,9 +60,9 @@ export default function ReportsPage() {
   // Filtered reports for selected service center
   const filteredReportsForCenter = useMemo(() => {
     if (!selectedServiceCenter) return [];
-    
+
     let centerReports = getReportsForServiceCenter(selectedServiceCenter.id.toString());
-    
+
     if (searchTerm.trim() !== "") {
       centerReports = centerReports.filter(
         (r) =>
@@ -121,8 +128,8 @@ export default function ReportsPage() {
       </div>
 
       <p className="text-gray-500 mb-6">
-        {selectedServiceCenter 
-          ? `View and manage reports for ${selectedServiceCenter.name}` 
+        {selectedServiceCenter
+          ? `View and manage reports for ${selectedServiceCenter.name}`
           : "Select a service center to view its reports"}
       </p>
 
@@ -288,11 +295,10 @@ export default function ReportsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                            report.status === "Generated"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
+                          className={`text - xs font - semibold px - 2 py - 1 rounded - full ${report.status === "Generated"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                            } `}
                         >
                           {report.status}
                         </span>

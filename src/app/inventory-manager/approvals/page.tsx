@@ -28,15 +28,7 @@ export default function ApprovalsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    // Initialize mock data if needed
-    if (typeof window !== "undefined") {
-      import("@/__mocks__/data/inventory.mock").then(({ initializeInventoryMockData }) => {
-        initializeInventoryMockData();
-        fetchRequests();
-      });
-    } else {
-      fetchRequests();
-    }
+    fetchRequests();
   }, []);
 
   const fetchRequests = async () => {
@@ -171,10 +163,10 @@ export default function ApprovalsPage() {
       <Card
         key={request.id}
         className={`border-l-4 ${imApproved
-            ? "border-l-green-500"
-            : scApproved
-              ? "border-l-blue-500"
-              : "border-l-orange-500"
+          ? "border-l-green-500"
+          : scApproved
+            ? "border-l-blue-500"
+            : "border-l-orange-500"
           }`}
       >
         <CardHeader>
@@ -208,8 +200,8 @@ export default function ApprovalsPage() {
             <button
               disabled
               className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 ${scApproved
-                  ? "bg-green-500 text-white"
-                  : "bg-red-500 text-white"
+                ? "bg-green-500 text-white"
+                : "bg-red-500 text-white"
                 }`}
             >
               <CheckCircle size={16} />
@@ -218,8 +210,8 @@ export default function ApprovalsPage() {
             <button
               disabled
               className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 ${imApproved
-                  ? "bg-green-500 text-white"
-                  : "bg-red-500 text-white"
+                ? "bg-green-500 text-white"
+                : "bg-red-500 text-white"
                 }`}
             >
               <CheckCircle size={16} />

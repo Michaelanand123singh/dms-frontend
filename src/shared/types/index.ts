@@ -6,6 +6,10 @@ export * from './documentation.types';
 // Auth types
 export * from './auth.types';
 
+// User types
+export * from './user.types';
+
+
 // API types
 export * from './api.types';
 

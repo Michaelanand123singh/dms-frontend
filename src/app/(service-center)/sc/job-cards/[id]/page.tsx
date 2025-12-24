@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ClipboardList, ArrowLeft } from "lucide-react";
 import type { JobCard } from "@/shared/types";
-import { defaultJobCards } from "@/__mocks__/data/job-cards.mock";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import JobCardFormModal from "../../components/job-cards/JobCardFormModal";
 import { jobCardToFormInitialValues } from "../utils/jobCardToForm.util";
@@ -25,14 +24,14 @@ const fetchJobCard = (id: string): JobCard | undefined => {
       const { migrateAllJobCards } = require("../utils/migrateJobCards.util");
       const stored = migrateAllJobCards();
       const merged = [...stored, ...defaultJobCards];
-      
+
       // Debug logging (remove in production)
       if (process.env.NODE_ENV === "development") {
         console.log("Looking for job card with ID:", id);
         console.log("Stored job cards:", stored.length);
         console.log("Available IDs:", merged.map(c => ({ id: c.id, jobCardNumber: c.jobCardNumber })));
       }
-      
+
       // Try multiple lookup strategies
       const found = merged.find((card) => {
         // Exact match on id
@@ -41,11 +40,11 @@ const fetchJobCard = (id: string): JobCard | undefined => {
         if (card.jobCardNumber === id) return true;
         return false;
       });
-      
+
       if (found && process.env.NODE_ENV === "development") {
         console.log("Found job card:", found);
       }
-      
+
       return found;
     } catch (error) {
       console.error("Error fetching job card:", error);
@@ -60,7 +59,7 @@ export default function AdvisorJobCardDetailPage({ params, searchParams }: Advis
   const router = useRouter();
   const resolvedParams = use(params);
   const resolvedSearchParams = use(searchParams || Promise.resolve({ temp: undefined }));
-  
+
   const [jobCard, setJobCard] = useState<JobCard | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
@@ -69,7 +68,7 @@ export default function AdvisorJobCardDetailPage({ params, searchParams }: Advis
       const found = fetchJobCard(resolvedParams.id);
       setJobCard(found);
       setLoading(false);
-      
+
       // Also listen for storage changes in case job card is updated in another tab
       const handleStorageChange = (e: StorageEvent) => {
         if (e.key === "jobCards") {
@@ -77,7 +76,7 @@ export default function AdvisorJobCardDetailPage({ params, searchParams }: Advis
           setJobCard(updated);
         }
       };
-      
+
       window.addEventListener("storage", handleStorageChange);
       return () => {
         window.removeEventListener("storage", handleStorageChange);
@@ -121,7 +120,7 @@ export default function AdvisorJobCardDetailPage({ params, searchParams }: Advis
       jobCardId={jobCard.id}
       initialValues={jobCardToFormInitialValues(jobCard)}
       onClose={() => router.push("/sc/job-cards")}
-      onCreated={() => {}} // Not used in edit mode
+      onCreated={() => { }} // Not used in edit mode
       onUpdated={(updatedJobCard) => {
         // Update local state
         setJobCard(updatedJobCard);

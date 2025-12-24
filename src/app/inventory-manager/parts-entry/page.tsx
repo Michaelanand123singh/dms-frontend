@@ -8,7 +8,6 @@ import { PlusCircle, Trash2, FileText, Calendar, Building2 } from "lucide-react"
 import { partsEntryService, type PartsEntry } from "@/features/inventory/services/partsEntry.service";
 import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import type { Part } from "@/shared/types/inventory.types";
-import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import { PartsEntryForm } from "./PartsEntryForm";
 import { getInitialFormData, getInitialItemFormData, type PartsEntryFormData, type PartsEntryItemFormData } from "./form.schema";
 
@@ -28,7 +27,7 @@ export default function PartsEntryPage() {
   const [currentPart, setCurrentPart] = useState<PartsEntryItemFormData>(getInitialItemFormData());
 
   useEffect(() => {
-    initializeInventoryMockData();
+
     fetchAvailableParts();
     fetchRecentEntries();
   }, []);
@@ -110,7 +109,7 @@ export default function PartsEntryPage() {
         parts,
         "Inventory Manager"
       );
-      
+
       alert("Parts entry saved successfully! Stock has been updated.");
       setFormData(getInitialFormData());
       setParts([]);
@@ -187,8 +186,8 @@ export default function PartsEntryPage() {
                     min="0"
                     step="0.01"
                   />
-                  <Button 
-                    onClick={addPart} 
+                  <Button
+                    onClick={addPart}
                     className="bg-green-600 hover:bg-green-700 text-white"
                     disabled={!currentPart.partId || !currentPart.quantity || !currentPart.unitPrice}
                   >

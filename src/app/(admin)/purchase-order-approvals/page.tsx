@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
+import { centralInventoryRepository } from "@/core/repositories/central-inventory.repository";
 import { useRole } from "@/shared/hooks";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

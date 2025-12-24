@@ -22,7 +22,6 @@ import { Badge } from "@/components/ui/Badge";
 import { usePartsApproval } from "@/shared/hooks/usePartsApproval";
 import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
-import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import type { InventoryStats, Part } from "@/shared/types/inventory.types";
 import type { JobCardPartsRequest } from "@/shared/types/jobcard-inventory.types";
 
@@ -47,9 +46,6 @@ export default function InventoryManagerDashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Initialize mock data on mount
-    initializeInventoryMockData();
-    
     const fetchDashboardData = async () => {
       try {
         // Fetch parts and calculate stats
@@ -240,13 +236,12 @@ export default function InventoryManagerDashboard() {
                 {recentRequests.map((request) => (
                   <div
                     key={request.id}
-                    className={`p-4 rounded-lg border ${
-                      request.status === "pending"
-                        ? "bg-orange-50 border-orange-200"
-                        : request.status === "approved"
+                    className={`p-4 rounded-lg border ${request.status === "pending"
+                      ? "bg-orange-50 border-orange-200"
+                      : request.status === "approved"
                         ? "bg-green-50 border-green-200"
                         : "bg-red-50 border-red-200"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
@@ -259,8 +254,8 @@ export default function InventoryManagerDashboard() {
                               request.status === "pending"
                                 ? "warning"
                                 : request.status === "approved"
-                                ? "success"
-                                : "danger"
+                                  ? "success"
+                                  : "danger"
                             }
                           >
                             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}

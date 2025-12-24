@@ -1,4 +1,4 @@
-import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
+
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 
 export type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
@@ -13,7 +13,7 @@ export interface Appointment {
   time: string;
   duration: string;
   status: string;
-  serviceCenterId?: number;
+  serviceCenterId?: string | number;
   serviceCenterName?: string;
   customerType?: "B2C" | "B2B";
   customerComplaintIssue?: string;
@@ -56,7 +56,7 @@ export interface AppointmentForm {
   date: string;
   time: string;
   duration: string;
-  serviceCenterId?: number;
+  serviceCenterId?: string | number;
   serviceCenterName?: string;
   customerType?: "B2C" | "B2B";
   customerComplaintIssue?: string;

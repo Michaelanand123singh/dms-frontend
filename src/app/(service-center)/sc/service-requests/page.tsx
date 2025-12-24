@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import type { ServiceRequest, RequestStatus, Urgency, ServiceLocation } from "@/shared/types";
 import { API_CONFIG, API_ENDPOINTS } from "@/config/api.config";
-import { defaultServiceRequests } from "@/__mocks__/data/service-requests.mock";
+
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
 
 type FilterType = "all" | "pending" | "approved" | "rejected";
@@ -94,15 +94,12 @@ export default function ServiceRequests() {
     urgency: "Normal",
   });
 
-  // Use mock data from __mocks__ folder
+  // Load service requests from localStorage
   const [requests, setRequests] = useState<ServiceRequest[]>(() => {
     if (typeof window !== "undefined") {
-      const storedRequests = safeStorage.getItem<ServiceRequest[]>("serviceRequests", []);
-      if (storedRequests.length > 0) {
-        return storedRequests;
-      }
+      return safeStorage.getItem<ServiceRequest[]>("serviceRequests", []);
     }
-    return defaultServiceRequests;
+    return [];
   });
 
   // Filter and search requests
@@ -156,7 +153,7 @@ export default function ServiceRequests() {
       //   body: JSON.stringify(formData),
       // });
       // const newRequest = await response.json();
-      
+
       // For now, add to local state
       const newRequest: ServiceRequest = {
         id: `SR-2025-${String(requests.length + 1).padStart(3, "0")}`,
@@ -175,7 +172,7 @@ export default function ServiceRequests() {
         createdAt: new Date().toLocaleString(),
         createdBy: "Current User", // TODO: Get from auth context
       };
-      
+
       setRequests([newRequest, ...requests]);
       setShowCreateModal(false);
       resetCreateForm();
@@ -203,7 +200,7 @@ export default function ServiceRequests() {
       // );
       // const data = await response.json();
       // The backend should automatically create a job card on approval
-      
+
       // For now, create job card manually in local state
       // In production, this should be done by the backend
       const jobCardData = {
@@ -214,9 +211,9 @@ export default function ServiceRequests() {
         serviceType: request.serviceType,
         description: request.description,
         status: "Created" as const,
-        priority: request.urgency === "Critical" ? "Critical" as const : 
-                 request.urgency === "High" ? "High" as const :
-                 request.urgency === "Medium" ? "Normal" as const : "Normal" as const,
+        priority: request.urgency === "Critical" ? "Critical" as const :
+          request.urgency === "High" ? "High" as const :
+            request.urgency === "Medium" ? "Normal" as const : "Normal" as const,
         assignedEngineer: null,
         estimatedCost: request.estimatedCost,
         estimatedTime: "To be determined",
@@ -230,7 +227,7 @@ export default function ServiceRequests() {
       const existingJobCards = safeStorage.getItem<unknown[]>("jobCards", []);
       existingJobCards.push(jobCardData);
       safeStorage.setItem("jobCards", existingJobCards);
-      
+
       // Update local state
       setRequests(
         requests.map((req) =>
@@ -239,7 +236,7 @@ export default function ServiceRequests() {
       );
       setShowDetails(false);
       alert(`Appointment approved! Job card ${jobCardData.id} has been created.`);
-      
+
       // Optionally redirect to job cards page
       // window.location.href = "/sc/job-cards";
     } catch (error) {
@@ -264,17 +261,17 @@ export default function ServiceRequests() {
       //     body: JSON.stringify({ reason, comments }),
       //   }
       // );
-      
+
       // Update local state
       const reasonLabel = REJECTION_REASONS.find((r) => r.id === reason)?.label || reason;
       setRequests(
         requests.map((req) =>
           req.id === id
             ? {
-                ...req,
-                status: "Rejected" as RequestStatus,
-                rejectionReason: `${reasonLabel}${comments ? `: ${comments}` : ""}`,
-              }
+              ...req,
+              status: "Rejected" as RequestStatus,
+              rejectionReason: `${reasonLabel}${comments ? `: ${comments}` : ""}`,
+            }
             : req
         )
       );
@@ -305,7 +302,7 @@ export default function ServiceRequests() {
       //     body: JSON.stringify({ estimatedCost: parseFloat(amount.replace(/[₹,]/g, "")) }),
       //   }
       // );
-      
+
       // Update local state
       setRequests(
         requests.map((req) =>
@@ -439,11 +436,10 @@ export default function ServiceRequests() {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    filter === f
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === f
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
                 >
                   {f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>

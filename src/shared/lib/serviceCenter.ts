@@ -1,5 +1,9 @@
+/**
+ * Service Center Context Utilities
+ * Migrated from mock data to use backend + localStorage caching
+ */
+
 import { safeStorage } from "@/shared/lib/localStorage";
-import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
 
 export interface ServiceCenterContext {
   serviceCenterId: string | number | null;
@@ -17,16 +21,30 @@ export const getServiceCenterContext = (): ServiceCenterContext => {
   const storedUserInfo = safeStorage.getItem<any>("userInfo", null);
   const storedUserRole = safeStorage.getItem<any>("userRole", null);
   const userRole = typeof storedUserRole === "string" ? storedUserRole : null;
+
+  // Try to get serviceCenterId from user info
   const explicitCenterId =
     typeof storedUserInfo?.serviceCenterId === "number"
       ? String(storedUserInfo.serviceCenterId)
       : typeof storedUserInfo?.serviceCenter === "number"
         ? String(storedUserInfo.serviceCenter)
-        : defaultServiceCenters.find((center) => center.name === storedUserInfo?.serviceCenter)?.id
-          ? String(
-            defaultServiceCenters.find((center) => center.name === storedUserInfo?.serviceCenter)?.id
-          )
-          : null;
+        : null;
+
+  // Check cached service centers if we have a string service center name
+  if (!explicitCenterId && storedUserInfo?.serviceCenter) {
+    const cachedCenters = safeStorage.getItem<any[]>("serviceCenters", []);
+    const matchedCenter = cachedCenters.find(
+      (center) => center.name === storedUserInfo.serviceCenter
+    );
+    if (matchedCenter) {
+      return {
+        serviceCenterId: String(matchedCenter.id),
+        serviceCenterName: matchedCenter.name,
+        userRole,
+      };
+    }
+  }
+
   const fallbackCenter =
     explicitCenterId || (userRole ? DEFAULT_CENTER_MAP[userRole] ?? null : null);
 
@@ -76,4 +94,5 @@ export const filterByServiceCenter = <T extends { serviceCenterId?: number | str
     return false;
   });
 };
+
 

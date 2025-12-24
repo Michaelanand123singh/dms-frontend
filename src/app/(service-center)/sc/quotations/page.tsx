@@ -43,8 +43,7 @@ import type {
   Vehicle,
 } from "@/shared/types";
 import { useCustomerSearch } from "../../../../hooks/api";
-import { defaultQuotations, defaultInsurers, defaultNoteTemplates } from "@/__mocks__/data/quotations.mock";
-import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
+
 import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
 import type { CheckInSlipFormData } from "@/shared/types/check-in-slip.types";
 import { CheckInSlipForm } from "../components/check-in-slip/CheckInSlipForm";

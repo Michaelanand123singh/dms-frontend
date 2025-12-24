@@ -7,7 +7,7 @@ import { useState, useCallback } from "react";
 import { useCreateCustomer } from "../../../../../hooks/api";
 import { canCreateCustomer } from "@/shared/constants/roles";
 import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
-import { staticServiceCenters } from "@/__mocks__/data/service-centers.mock";
+
 import { validatePhone, validateEmail, cleanPhone } from "@/shared/utils/validation";
 import { initialCustomerForm } from "../constants/form.constants";
 import type { NewCustomerForm, CustomerWithVehicles, UserRole } from "@/shared/types";

@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { FileText, CheckCircle, Clock, XCircle, Package, TrendingUp } from "lucide-react";
 import { partsOrderService, type PartsOrder } from "@/features/inventory/services/partsOrder.service";
-import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 
 export default function PartsOrderViewPage() {
   const [orders, setOrders] = useState<PartsOrder[]>([]);
@@ -13,7 +12,7 @@ export default function PartsOrderViewPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    initializeInventoryMockData();
+
     fetchOrders();
   }, []);
 
@@ -29,8 +28,8 @@ export default function PartsOrderViewPage() {
     }
   };
 
-  const filteredOrders = statusFilter === "all" 
-    ? orders 
+  const filteredOrders = statusFilter === "all"
+    ? orders
     : orders.filter((o) => o.status === statusFilter);
 
   const getStatusBadge = (status: string) => {

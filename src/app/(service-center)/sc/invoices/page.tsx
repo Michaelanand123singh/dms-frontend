@@ -21,7 +21,6 @@ import {
   Trash2,
 } from "lucide-react";
 import type { ServiceCenterInvoice, PaymentStatus, InvoiceStats, ServiceCenterInvoiceItem, EnhancedServiceCenterInvoiceItem } from "@/shared/types";
-import { defaultInvoices } from "@/__mocks__/data/invoices.mock";
 import { filterByServiceCenter, getServiceCenterContext } from "@/shared/lib/serviceCenter";
 import { generateInvoiceNumber, calculateGST, convertNumberToWords, populateInvoiceFromJobCard, validateInvoiceData } from "@/shared/utils/invoice.utils";
 import { generateInvoiceHTML } from "@/shared/utils/invoicePDF.utils";
@@ -148,12 +147,12 @@ function InvoicesContent() {
         invoices.map((inv) =>
           inv.id === invoiceId
             ? {
-                ...inv,
-                status: "Paid" as PaymentStatus,
-                paidAmount: inv.amount,
-                balance: "₹0",
-                paymentMethod: method as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | null,
-              }
+              ...inv,
+              status: "Paid" as PaymentStatus,
+              paidAmount: inv.amount,
+              balance: "₹0",
+              paymentMethod: method as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | null,
+            }
             : inv
         )
       );
@@ -167,26 +166,26 @@ function InvoicesContent() {
     const invoiceNumber = invoice.invoiceNumber || invoice.id;
     const invoiceDate = new Date(invoice.date).toLocaleDateString("en-IN");
     const dueDate = new Date(invoice.dueDate).toLocaleDateString("en-IN");
-    
+
     // Format items summary
     const itemsSummary = invoice.enhancedItems && invoice.enhancedItems.length > 0
-      ? invoice.enhancedItems.slice(0, 5).map((item, idx) => 
-          `${idx + 1}. ${item.name} (Qty: ${item.quantity}) - ₹${item.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
-        ).join("\n")
-      : invoice.items.slice(0, 5).map((item, idx) => 
-          `${idx + 1}. ${item.name} (Qty: ${item.qty}) - ${item.price}`
-        ).join("\n");
-    
-    const remainingCount = invoice.enhancedItems 
+      ? invoice.enhancedItems.slice(0, 5).map((item, idx) =>
+        `${idx + 1}. ${item.name} (Qty: ${item.quantity}) - ₹${item.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+      ).join("\n")
+      : invoice.items.slice(0, 5).map((item, idx) =>
+        `${idx + 1}. ${item.name} (Qty: ${item.qty}) - ${item.price}`
+      ).join("\n");
+
+    const remainingCount = invoice.enhancedItems
       ? Math.max(0, invoice.enhancedItems.length - 5)
       : Math.max(0, invoice.items.length - 5);
-    
+
     const grandTotal = invoice.grandTotal ?? (parseFloat(invoice.amount.replace("₹", "").replace(/,/g, "")) || 0);
     const subtotal = invoice.subtotal ?? 0;
     const totalTax = invoice.totalTax ?? 0;
-    
+
     const serviceCenter = invoice.serviceCenterDetails;
-    
+
     return `Hello ${customerName}! 👋
 
 📄 *Invoice ${invoiceNumber}*
@@ -215,7 +214,7 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
     try {
       // Generate invoice HTML for PDF
       const invoiceHTML = generateInvoiceHTML(invoice);
-      
+
       // Print invoice (opens print dialog for PDF generation)
       const printInvoice = () => {
         try {
@@ -254,24 +253,24 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
 
       // Format WhatsApp message
       const message = formatInvoiceWhatsAppMessage(invoice);
-      
+
       // Get customer phone number (would need to fetch from customer data)
       // For now, prompt user
       const customerPhone = prompt("Enter customer WhatsApp number (with country code, e.g., 919876543210):");
       if (!customerPhone) {
         return;
       }
-      
+
       const cleanPhone = customerPhone.replace(/\D/g, "");
       if (cleanPhone.length < 10) {
         alert("Invalid phone number. Please enter a valid WhatsApp number.");
         return;
       }
-      
+
       // Open WhatsApp
       const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, "_blank");
-      
+
       alert("Invoice sent to customer via WhatsApp!");
     } catch (error) {
       console.error("Error sending invoice:", error);
@@ -316,7 +315,7 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
     // Get service center details
     const contextServiceCenterId = String(serviceCenterContext.serviceCenterId ?? "1");
     const contextServiceCenterName = serviceCenterContext.serviceCenterName ?? "Service Center";
-    
+
     // Determine service center code and state (default values for now)
     let serviceCenterCode = "SC001";
     let serviceCenterState = "Delhi";
@@ -339,9 +338,9 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
       const quantity = item.qty || 1;
       const taxableAmount = unitPrice * quantity;
       const gstRate = item.gstRate || 18;
-      
+
       const gst = calculateGST(taxableAmount, gstRate, placeOfSupply, serviceCenterState);
-      
+
       return {
         name: item.name,
         hsnSacCode: item.hsnSacCode || "",
@@ -505,104 +504,103 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
 
         {!isServiceAdvisor && (
           <>
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white rounded-2xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-3 rounded-xl bg-blue-100 text-blue-600">
-                <FileText size={24} />
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              <div className="bg-white rounded-2xl shadow-md p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-3 rounded-xl bg-blue-100 text-blue-600">
+                    <FileText size={24} />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">{stats.total}</h2>
+                <p className="text-sm text-gray-600">Total Invoices</p>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-md p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-3 rounded-xl bg-green-100 text-green-600">
+                    <CheckCircle size={24} />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">{stats.paid}</h2>
+                <p className="text-sm text-gray-600">Paid</p>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-md p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-3 rounded-xl bg-yellow-100 text-yellow-600">
+                    <Clock size={24} />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">{stats.unpaid}</h2>
+                <p className="text-sm text-gray-600">Unpaid</p>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-md p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-3 rounded-xl bg-red-100 text-red-600">
+                    <XCircle size={24} />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">{stats.overdue}</h2>
+                <p className="text-sm text-gray-600">Overdue</p>
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">{stats.total}</h2>
-            <p className="text-sm text-gray-600">Total Invoices</p>
-          </div>
 
-          <div className="bg-white rounded-2xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-3 rounded-xl bg-green-100 text-green-600">
-                <CheckCircle size={24} />
+            {/* Financial Summary */}
+            <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Financial Summary</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-xl">
+                  <p className="text-sm text-gray-600 mb-1">Total Invoice Amount</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    ₹{stats.totalAmount.toLocaleString("en-IN")}
+                  </p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-xl">
+                  <p className="text-sm text-gray-600 mb-1">Total Paid</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    ₹{stats.paidAmount.toLocaleString("en-IN")}
+                  </p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-xl">
+                  <p className="text-sm text-gray-600 mb-1">Outstanding</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    ₹{(stats.totalAmount - stats.paidAmount).toLocaleString("en-IN")}
+                  </p>
+                </div>
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">{stats.paid}</h2>
-            <p className="text-sm text-gray-600">Paid</p>
-          </div>
 
-          <div className="bg-white rounded-2xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-3 rounded-xl bg-yellow-100 text-yellow-600">
-                <Clock size={24} />
+            {/* Filters */}
+            <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <input
+                    type="text"
+                    placeholder="Search by invoice number, customer, vehicle..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  {(["all", "paid", "unpaid", "overdue"] as FilterType[]).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === f
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                    >
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">{stats.unpaid}</h2>
-            <p className="text-sm text-gray-600">Unpaid</p>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-3 rounded-xl bg-red-100 text-red-600">
-                <XCircle size={24} />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">{stats.overdue}</h2>
-            <p className="text-sm text-gray-600">Overdue</p>
-          </div>
-        </div>
-
-        {/* Financial Summary */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Financial Summary</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 p-4 rounded-xl">
-              <p className="text-sm text-gray-600 mb-1">Total Invoice Amount</p>
-              <p className="text-2xl font-bold text-blue-600">
-                ₹{stats.totalAmount.toLocaleString("en-IN")}
-              </p>
-            </div>
-            <div className="bg-green-50 p-4 rounded-xl">
-              <p className="text-sm text-gray-600 mb-1">Total Paid</p>
-              <p className="text-2xl font-bold text-green-600">
-                ₹{stats.paidAmount.toLocaleString("en-IN")}
-              </p>
-            </div>
-            <div className="bg-orange-50 p-4 rounded-xl">
-              <p className="text-sm text-gray-600 mb-1">Outstanding</p>
-              <p className="text-2xl font-bold text-orange-600">
-                ₹{(stats.totalAmount - stats.paidAmount).toLocaleString("en-IN")}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Search by invoice number, customer, vehicle..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-            <div className="flex gap-2">
-              {(["all", "paid", "unpaid", "overdue"] as FilterType[]).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    filter === f
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
           </>
         )}
 
@@ -624,11 +622,10 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
                   <button
                     key={status}
                     onClick={() => setFilter(status)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                      filter === status
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${filter === status
                         ? "bg-indigo-600 text-white"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     {status.charAt(0).toUpperCase() + status.slice(1)}
                   </button>
@@ -706,107 +703,107 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
           </>
         ) : (
           <>
-        <div className="space-y-4">
-          {filteredInvoices.map((invoice) => (
-            <div
-              key={invoice.id}
-              className="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition"
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
-                      {invoice.invoiceNumber || invoice.id}
-                    </span>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                        invoice.status
-                      )}`}
-                    >
-                      {invoice.status}
-                    </span>
-                    {invoice.jobCardId && (
-                      <span className="text-xs text-gray-500">
-                        Job Card: {invoice.jobCardId}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                    <div>
-                      <p className="text-sm text-gray-600">Customer</p>
-                      <p className="font-medium text-gray-800">{invoice.customerName}</p>
-                      <p className="text-xs text-gray-500">{invoice.vehicle}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Dates</p>
-                      <p className="font-medium text-gray-800">
-                        {invoice.date} (Due: {invoice.dueDate})
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-6 text-sm">
-                    <div>
-                      <span className="text-gray-600">Amount: </span>
-                      <span className="font-semibold text-gray-800">{invoice.amount}</span>
-                    </div>
-                    {invoice.status !== "Paid" && (
-                      <div>
-                        <span className="text-gray-600">Balance: </span>
-                        <span className="font-semibold text-red-600">{invoice.balance}</span>
+            <div className="space-y-4">
+              {filteredInvoices.map((invoice) => (
+                <div
+                  key={invoice.id}
+                  className="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition"
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
+                          {invoice.invoiceNumber || invoice.id}
+                        </span>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                            invoice.status
+                          )}`}
+                        >
+                          {invoice.status}
+                        </span>
+                        {invoice.jobCardId && (
+                          <span className="text-xs text-gray-500">
+                            Job Card: {invoice.jobCardId}
+                          </span>
+                        )}
                       </div>
-                    )}
-                    {invoice.paymentMethod && (
-                      <div>
-                        <span className="text-gray-600">Payment: </span>
-                        <span className="font-medium text-gray-800">{invoice.paymentMethod}</span>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                        <div>
+                          <p className="text-sm text-gray-600">Customer</p>
+                          <p className="font-medium text-gray-800">{invoice.customerName}</p>
+                          <p className="text-xs text-gray-500">{invoice.vehicle}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Dates</p>
+                          <p className="font-medium text-gray-800">
+                            {invoice.date} (Due: {invoice.dueDate})
+                          </p>
+                        </div>
                       </div>
-                    )}
+
+                      <div className="flex items-center gap-6 text-sm">
+                        <div>
+                          <span className="text-gray-600">Amount: </span>
+                          <span className="font-semibold text-gray-800">{invoice.amount}</span>
+                        </div>
+                        {invoice.status !== "Paid" && (
+                          <div>
+                            <span className="text-gray-600">Balance: </span>
+                            <span className="font-semibold text-red-600">{invoice.balance}</span>
+                          </div>
+                        )}
+                        {invoice.paymentMethod && (
+                          <div>
+                            <span className="text-gray-600">Payment: </span>
+                            <span className="font-medium text-gray-800">{invoice.paymentMethod}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 lg:items-end">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedInvoice(invoice);
+                            setShowDetails(true);
+                          }}
+                          className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition inline-flex items-center gap-2"
+                        >
+                          <Eye size={16} />
+                          View
+                        </button>
+                        <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition inline-flex items-center gap-2">
+                          <Download size={16} />
+                          Download
+                        </button>
+                        <button className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition inline-flex items-center gap-2">
+                          <Mail size={16} />
+                          Email
+                        </button>
+                      </div>
+                      {invoice.status !== "Paid" && (
+                        <button
+                          onClick={() => handleRecordPayment(invoice.id)}
+                          className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition"
+                        >
+                          Record Payment
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <div className="flex flex-col gap-2 lg:items-end">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedInvoice(invoice);
-                        setShowDetails(true);
-                      }}
-                      className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition inline-flex items-center gap-2"
-                    >
-                      <Eye size={16} />
-                      View
-                    </button>
-                    <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition inline-flex items-center gap-2">
-                      <Download size={16} />
-                      Download
-                    </button>
-                    <button className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition inline-flex items-center gap-2">
-                      <Mail size={16} />
-                      Email
-                    </button>
-                  </div>
-                  {invoice.status !== "Paid" && (
-                    <button
-                      onClick={() => handleRecordPayment(invoice.id)}
-                      className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition"
-                    >
-                      Record Payment
-                    </button>
-                  )}
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {filteredInvoices.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-md p-12 text-center">
-            <FileText className="mx-auto text-gray-400 mb-4" size={64} />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Invoices Found</h3>
-            <p className="text-gray-500">No invoices match the current filter criteria.</p>
-          </div>
+            {filteredInvoices.length === 0 && (
+              <div className="bg-white rounded-2xl shadow-md p-12 text-center">
+                <FileText className="mx-auto text-gray-400 mb-4" size={64} />
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">No Invoices Found</h3>
+                <p className="text-gray-500">No invoices match the current filter criteria.</p>
+              </div>
             )}
           </>
         )}
@@ -980,8 +977,8 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
                         value={invoiceForm.customerState}
                         onChange={(e) => {
                           const state = e.target.value;
-                          setInvoiceForm({ 
-                            ...invoiceForm, 
+                          setInvoiceForm({
+                            ...invoiceForm,
                             customerState: state,
                             placeOfSupply: state || invoiceForm.placeOfSupply,
                           });

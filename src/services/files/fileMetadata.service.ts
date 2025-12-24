@@ -17,7 +17,10 @@ export interface FileMetadata {
   uploadedBy?: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { apiClient } from '@/core/api/client';
+import { API_CONFIG } from '@/config/api.config';
+
+const API_BASE_URL = API_CONFIG.BASE_URL;
 
 /**
  * Save file metadata to backend after Cloudinary upload
@@ -50,32 +53,13 @@ export async function saveFileMetadata(
     uploadedBy: options.uploadedBy,
   }));
 
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  } else {
-    const authToken = safeStorage.getItem<string>('authToken', "");
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-  }
-
   try {
-    const url = API_BASE_URL.endsWith("/api")
-      ? `${API_BASE_URL}/files/bulk`
-      : `${API_BASE_URL}/api/files/bulk`;
+    // Rely on apiClient's interceptors for auth from Cookies/Storage
+    // If explicit token provided, we could pass it, but interceptors currently handle auth globally
+    // which is safer and includes Cookie support which was missing here.
+    const config = token ? { headers: { 'Authorization': `Bearer ${token}` } } : undefined;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(fileMetadata),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to save file metadata: ${error}`);
-    }
+    await apiClient.post('/files/bulk', fileMetadata, config);
   } catch (error) {
     console.error('Error saving file metadata:', error);
     // Don't throw - allow upload to succeed even if metadata save fails
@@ -117,32 +101,9 @@ export async function saveFileMetadataFromArray(
     uploadedBy: options.uploadedBy,
   }));
 
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  } else {
-    const authToken = safeStorage.getItem<string>('authToken', "");
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-  }
-
   try {
-    const url = API_BASE_URL.endsWith("/api")
-      ? `${API_BASE_URL}/files/bulk`
-      : `${API_BASE_URL}/api/files/bulk`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(fileMetadata),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to save file metadata: ${error}`);
-    }
+    const config = token ? { headers: { 'Authorization': `Bearer ${token}` } } : undefined;
+    await apiClient.post('/files/bulk', fileMetadata, config);
   } catch (error) {
     console.error('Error saving file metadata:', error);
   }
@@ -155,29 +116,9 @@ export async function deleteFileMetadata(
   fileId: string,
   token?: string
 ): Promise<void> {
-  const headers: HeadersInit = {};
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  } else {
-    const authToken = safeStorage.getItem<string>('authToken', "");
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-  }
-
   try {
-    const url = API_BASE_URL.endsWith("/api")
-      ? `${API_BASE_URL}/files/${fileId}`
-      : `${API_BASE_URL}/api/files/${fileId}`;
-
-    const response = await fetch(url, {
-      method: 'DELETE',
-      headers,
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to delete file metadata: ${error}`);
-    }
+    const config = token ? { headers: { 'Authorization': `Bearer ${token}` } } : undefined;
+    await apiClient.delete(`/files/${fileId}`, config);
   } catch (error) {
     console.error('Error deleting file metadata:', error);
   }
@@ -192,36 +133,16 @@ export async function getFilesForEntity(
   category?: FileCategory,
   token?: string
 ): Promise<FileMetadata[]> {
-  const headers: HeadersInit = {};
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  } else {
-    const authToken = safeStorage.getItem<string>('authToken', "");
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-  }
-
-  const baseUrl = API_BASE_URL.endsWith("/api")
-    ? API_BASE_URL
-    : `${API_BASE_URL}/api`;
-
-  let url = `${baseUrl}/files?entityType=${entityType}&entityId=${entityId}`;
-  if (category) {
-    url += `&category=${category}`;
-  }
-
   try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-    });
+    const config = token ? {
+      headers: { 'Authorization': `Bearer ${token}` },
+      params: { entityType, entityId, category }
+    } : {
+      params: { entityType, entityId, category }
+    };
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get files: ${error}`);
-    }
-
-    return await response.json();
+    const response = await apiClient.get<FileMetadata[]>('/files', config);
+    return response.data;
   } catch (error) {
     console.error('Error getting files:', error);
     return [];

@@ -2,23 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Star, X, Edit } from "lucide-react";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { defaultServiceCenters, availableServiceTypes } from "@/__mocks__/data/service-centers.mock";
+import { Star, X, Edit, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
+import { serviceCenterService } from "@/features/service-centers/services/service-center.service";
+import type { ServiceCenter, CreateServiceCenterDTO } from "@/shared/types/service-center.types";
 
-// Types
-interface ServiceCenter {
-  id: number;
-  name: string;
-  location: string;
-  pinCode?: string;
-  staff: number;
-  jobs: number;
-  revenue: string;
-  status: "Active" | "Inactive";
-  rating: number;
-}
+// Service Types Constant
+const SERVICE_TYPES_LIST = [
+  "Periodic Maintenance Service",
+  "Running Repairs",
+  "Accidental Repairs",
+  "Car Spa & Cleaning",
+  "Wheel Care",
+  "Denting & Painting",
+  "Insurance Claims",
+  "EV Service"
+];
 
+// Form Interface matches our DTO structure partially but flatten for UI
 interface ServiceCenterForm {
   // Basic Details
   name: string;
@@ -48,177 +50,176 @@ interface ServiceCenterForm {
   status: "Active" | "Inactive";
 }
 
+const INITIAL_FORM_STATE: ServiceCenterForm = {
+  name: "",
+  code: "",
+  address: "",
+  city: "",
+  state: "",
+  pinCode: "",
+  phone: "",
+  email: "",
+  capacity: "",
+  technicianCount: "",
+  serviceRadius: "",
+  homeServiceEnabled: false,
+  maxAppointmentsPerDay: "",
+  invoicePrefix: "",
+  bankName: "",
+  bankAccount: "",
+  bankIFSC: "",
+  gstNumber: "",
+  panNumber: "",
+  serviceTypes: [],
+  status: "Active",
+};
+
 export default function ServiceCentersPage() {
   const router = useRouter();
-  // Initialize with mock data, but allow updates from localStorage
-  const [centers, setCenters] = useState<ServiceCenter[]>(() => {
-    if (typeof window !== "undefined") {
-      const storedCenters = safeStorage.getItem<ServiceCenter[]>("serviceCentersList", []);
-      if (storedCenters.length > 0) {
-        return storedCenters;
-      }
-    }
-    // Convert mock data to ServiceCenter format
-    return defaultServiceCenters.map((center) => ({
-      id: center.id,
-      name: center.name,
-      location: center.location,
-      staff: center.staff,
-      jobs: center.jobs,
-      revenue: center.revenue,
-      status: center.status,
-      rating: center.rating,
-    }));
-  });
+  const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
   const [editingCenter, setEditingCenter] = useState<ServiceCenter | null>(null);
   const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
-  const [form, setForm] = useState<ServiceCenterForm>({
-    // Basic Details
-    name: "",
-    code: "",
-    address: "",
-    city: "",
-    state: "",
-    pinCode: "",
-    phone: "",
-    email: "",
-    // Operational Config
-    capacity: "",
-    technicianCount: "",
-    serviceRadius: "",
-    homeServiceEnabled: false,
-    maxAppointmentsPerDay: "",
-    // Financial Setup
-    invoicePrefix: "",
-    bankName: "",
-    bankAccount: "",
-    bankIFSC: "",
-    gstNumber: "",
-    panNumber: "",
-    // Service Capabilities
-    serviceTypes: [],
-    // Status
-    status: "Active",
+  const [form, setForm] = useState<ServiceCenterForm>(INITIAL_FORM_STATE);
+
+  // Fetch Service Centers
+  const { data: centers = [], isLoading, isError } = useQuery({
+    queryKey: ['serviceCenters'],
+    queryFn: () => serviceCenterService.getAll(),
   });
 
-  // Use service types from mock data
-  const serviceTypesList = availableServiceTypes;
+  // Create Mutation
+  const createMutation = useMutation({
+    mutationFn: (data: CreateServiceCenterDTO) => serviceCenterService.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['serviceCenters'] });
+      toast.success("Service center created successfully!");
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Failed to create service center");
+    }
+  });
+
+  // Update Mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateServiceCenterDTO> }) =>
+      serviceCenterService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['serviceCenters'] });
+      toast.success("Service center updated successfully!");
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Failed to update service center");
+    }
+  });
+
+  const resetForm = () => {
+    setForm(INITIAL_FORM_STATE);
+    setEditingCenter(null);
+    setShowForm(false);
+    setActiveStep(1);
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // Validation
     if (!form.name.trim() || !form.code.trim() || !form.address.trim() || !form.city.trim() || !form.state.trim() || !form.pinCode.trim()) {
-      alert("Please fill all required fields!");
+      toast.error("Please fill all required fields!");
       return;
     }
 
-    // Construct location string from address, city, state
-    const location = `${form.address}, ${form.city}, ${form.state}`;
+    // Transform form data to DTO
+    const payload: CreateServiceCenterDTO = {
+      name: form.name,
+      code: form.code,
+      address: form.address,
+      city: form.city,
+      state: form.state,
+      pinCode: form.pinCode,
+      phone: form.phone,
+      email: form.email,
+      capacity: form.capacity ? Number(form.capacity) : undefined,
+      technicianCount: form.technicianCount ? Number(form.technicianCount) : undefined,
+      serviceRadius: form.serviceRadius ? Number(form.serviceRadius) : undefined,
+      homeServiceEnabled: form.homeServiceEnabled,
+      maxAppointmentsPerDay: form.maxAppointmentsPerDay ? Number(form.maxAppointmentsPerDay) : undefined,
+      invoicePrefix: form.invoicePrefix,
+      bankName: form.bankName,
+      bankAccount: form.bankAccount,
+      bankIFSC: form.bankIFSC,
+      gstNumber: form.gstNumber,
+      panNumber: form.panNumber,
+      serviceTypes: form.serviceTypes,
+      status: form.status,
+    };
 
     if (editingCenter) {
-      // Update existing center
-      const updatedCenters = centers.map(center =>
-        center.id === editingCenter.id
-          ? {
-              ...center,
-              name: form.name,
-              location: location,
-              pinCode: form.pinCode,
-              staff: Number(form.technicianCount) || 0,
-              jobs: center.jobs, // Keep existing jobs count
-              status: form.status,
-            }
-          : center
-      );
-      setCenters(updatedCenters);
-      
-      // Update in localStorage
-      const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>('serviceCenters', {});
-      const updatedCenter = updatedCenters.find(c => c.id === editingCenter.id);
-      if (updatedCenter && storedCenters[editingCenter.id]) {
-        storedCenters[editingCenter.id] = {
-          ...storedCenters[editingCenter.id],
-          // Store full form data
-          ...form,
-          location: location,
-          pinCode: updatedCenter.pinCode,
-          staff: updatedCenter.staff,
-          jobs: updatedCenter.jobs,
-        };
-        safeStorage.setItem('serviceCenters', storedCenters);
-      }
-      
-      alert("Service center updated successfully!");
+      updateMutation.mutate({ id: editingCenter.id, data: payload });
     } else {
-      // Create new center
-      const newCenter: ServiceCenter = {
-        id: centers.length > 0 ? Math.max(...centers.map(c => c.id)) + 1 : 1,
-        name: form.name,
-        location: location,
-        pinCode: form.pinCode || undefined,
-        staff: Number(form.technicianCount) || 0,
-        jobs: 0,
-        revenue: "₹0.0L",
-        status: form.status,
-        rating: 4.5,
-      };
-
-      setCenters([...centers, newCenter]);
-      
-      // Store in localStorage for detail page access
-      const centerDetailData = {
-        id: newCenter.id,
-        location: location,
-        staff: newCenter.staff,
-        jobs: newCenter.jobs,
-        revenue: newCenter.revenue,
-        rating: newCenter.rating,
-        staffMembers: [], // Empty staff members for new center
-        // Store full form data (includes name, status, pinCode, and other form fields)
-        ...form,
-      };
-      
-      const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>('serviceCenters', {});
-      storedCenters[newCenter.id] = centerDetailData;
-      safeStorage.setItem('serviceCenters', storedCenters);
-      
-      alert("Service center created successfully!");
+      createMutation.mutate(payload);
     }
-
-    // Reset form
-    setForm({
-      name: "",
-      code: "",
-      address: "",
-      city: "",
-      state: "",
-      pinCode: "",
-      phone: "",
-      email: "",
-      capacity: "",
-      technicianCount: "",
-      serviceRadius: "",
-      homeServiceEnabled: false,
-      maxAppointmentsPerDay: "",
-      invoicePrefix: "",
-      bankName: "",
-      bankAccount: "",
-      bankIFSC: "",
-      gstNumber: "",
-      panNumber: "",
-      serviceTypes: [],
-      status: "Active",
-    });
-    setActiveStep(1);
-    setEditingCenter(null);
-    setShowForm(false);
   };
+
+  const handleEdit = (center: ServiceCenter) => {
+    setEditingCenter(center);
+    setForm({
+      name: center.name,
+      code: center.code,
+      address: center.address || "",
+      city: center.city || "",
+      state: center.state || "",
+      pinCode: center.pinCode || "",
+      phone: center.phone || "",
+      email: center.email || "",
+      capacity: center.capacity?.toString() || "",
+      technicianCount: center.technicianCount?.toString() || "",
+      serviceRadius: center.serviceRadius?.toString() || "",
+      homeServiceEnabled: center.homeServiceEnabled || false,
+      maxAppointmentsPerDay: center.maxAppointmentsPerDay?.toString() || "",
+      invoicePrefix: center.invoicePrefix || "",
+      bankName: center.bankName || "",
+      bankAccount: center.bankAccount || "",
+      bankIFSC: center.bankIFSC || "",
+      gstNumber: center.gstNumber || "",
+      panNumber: center.panNumber || "",
+      serviceTypes: center.serviceTypes || [],
+      status: (center.status as "Active" | "Inactive") || "Active",
+    });
+    setShowForm(true);
+  };
+
+  // Loading State
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  // Error State
+  if (isError) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50 flex-col">
+        <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Service Centers</h2>
+        <button
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['serviceCenters'] })}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="mb-4 sm:mb-6 lg:mb-8">
+      <div className="mb-4 sm:mb-6 lg:mb-8 flex justify-between items-center">
         <h1 className="text-2xl sm:text-3xl font-semibold text-gray-800">Service Centers</h1>
       </div>
 
@@ -232,7 +233,7 @@ export default function ServiceCentersPage() {
           >
             <div>
               <div className="flex items-start justify-between mb-2">
-                <h2 
+                <h2
                   className="text-base sm:text-lg font-semibold text-gray-800 break-words hover:text-blue-600 flex-1"
                 >
                   {center.name}
@@ -240,65 +241,7 @@ export default function ServiceCentersPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setEditingCenter(center);
-                    // Try to load full form data from localStorage
-                    const storedCenters = safeStorage.getItem<Record<string, ServiceCenter & Partial<ServiceCenterForm>>>('serviceCenters', {});
-                    const storedCenter = storedCenters[center.id];
-                    
-                    if (storedCenter && storedCenter.address) {
-                      // Use stored full data
-                      setForm({
-                        name: storedCenter.name || center.name,
-                        code: storedCenter.code || "",
-                        address: storedCenter.address || center.location,
-                        city: storedCenter.city || "",
-                        state: storedCenter.state || "",
-                        pinCode: storedCenter.pinCode || center.pinCode || "",
-                        phone: storedCenter.phone || "",
-                        email: storedCenter.email || "",
-                        capacity: storedCenter.capacity?.toString() || "",
-                        technicianCount: storedCenter.technicianCount?.toString() || center.staff.toString(),
-                        serviceRadius: storedCenter.serviceRadius?.toString() || "",
-                        homeServiceEnabled: storedCenter.homeServiceEnabled || false,
-                        maxAppointmentsPerDay: storedCenter.maxAppointmentsPerDay?.toString() || "",
-                        invoicePrefix: storedCenter.invoicePrefix || "",
-                        bankName: storedCenter.bankName || "",
-                        bankAccount: storedCenter.bankAccount || "",
-                        bankIFSC: storedCenter.bankIFSC || "",
-                        gstNumber: storedCenter.gstNumber || "",
-                        panNumber: storedCenter.panNumber || "",
-                        serviceTypes: storedCenter.serviceTypes || [],
-                        status: storedCenter.status || center.status,
-                      });
-                    } else {
-                      // Fallback to basic data
-                      const locationParts = center.location.split(', ');
-                      setForm({
-                        name: center.name,
-                        code: "",
-                        address: locationParts[0] || center.location,
-                        city: locationParts[1] || "",
-                        state: locationParts[2] || "",
-                        pinCode: center.pinCode || "",
-                        phone: "",
-                        email: "",
-                        capacity: "",
-                        technicianCount: center.staff.toString(),
-                        serviceRadius: "",
-                        homeServiceEnabled: false,
-                        maxAppointmentsPerDay: "",
-                        invoicePrefix: "",
-                        bankName: "",
-                        bankAccount: "",
-                        bankIFSC: "",
-                        gstNumber: "",
-                        panNumber: "",
-                        serviceTypes: [],
-                        status: center.status,
-                      });
-                    }
-                    setActiveStep(1);
-                    setShowForm(true);
+                    handleEdit(center);
                   }}
                   className="ml-2 p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                   title="Edit Service Center"
@@ -306,7 +249,9 @@ export default function ServiceCentersPage() {
                   <Edit size={16} />
                 </button>
               </div>
-              <p className="text-gray-500 text-xs sm:text-sm mb-2 sm:mb-3 break-words">{center.location}</p>
+              <p className="text-gray-500 text-xs sm:text-sm mb-2 sm:mb-3 break-words">
+                {center.address}, {center.city}
+              </p>
               {center.pinCode && (
                 <p className="text-gray-500 text-xs sm:text-sm mb-2 sm:mb-3">
                   Pin Code: <span className="font-medium text-gray-700">{center.pinCode}</span>
@@ -316,33 +261,36 @@ export default function ServiceCentersPage() {
               <div className="text-xs sm:text-sm text-gray-700 space-y-1">
                 <p className="flex justify-between">
                   <span>Staff</span>
-                  <span className="font-medium ml-2">{center.staff}</span>
+                  <span className="font-medium ml-2">{center._count?.users || 0}</span>
                 </p>
                 <p className="flex justify-between">
                   <span>Active Jobs</span>
-                  <span className="font-medium ml-2">{center.jobs}</span>
+                  <span className="font-medium ml-2">{center._count?.jobCards || 0}</span>
                 </p>
+                {/* Revenue not in backend yet, keeping placeholder or remove */}
+                {/* 
                 <p className="flex justify-between">
                   <span>Revenue</span>
-                  <span className="font-semibold ml-2">{center.revenue}</span>
-                </p>
+                  <span className="font-semibold ml-2">₹0.0L</span>
+                </p> 
+                */}
               </div>
             </div>
 
             <div className="mt-3 sm:mt-4 flex items-center justify-between">
               <span
-                className={`text-xs font-medium px-2 sm:px-3 py-1 rounded-full ${
-                  center.status === "Active"
+                className={`text-xs font-medium px-2 sm:px-3 py-1 rounded-full ${center.status === "Active"
                     ? "bg-green-100 text-green-700"
                     : "bg-orange-100 text-orange-700"
-                }`}
+                  }`}
               >
                 {center.status}
               </span>
 
+              {/* Rating placeholder */}
               <div className="flex items-center text-yellow-500 text-xs sm:text-sm">
                 <Star size={12} className="sm:w-3.5 sm:h-3.5" fill="gold" stroke="gold" />
-                <span className="ml-1">{center.rating}</span>
+                <span className="ml-1">4.5</span>
               </div>
             </div>
           </div>
@@ -369,34 +317,7 @@ export default function ServiceCentersPage() {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-4 sm:p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 z-10"
-              onClick={() => {
-                setShowForm(false);
-                setEditingCenter(null);
-                setActiveStep(1);
-                setForm({
-                  name: "",
-                  code: "",
-                  address: "",
-                  city: "",
-                  state: "",
-                  pinCode: "",
-                  phone: "",
-                  email: "",
-                  capacity: "",
-                  technicianCount: "",
-                  serviceRadius: "",
-                  homeServiceEnabled: false,
-                  maxAppointmentsPerDay: "",
-                  invoicePrefix: "",
-                  bankName: "",
-                  bankAccount: "",
-                  bankIFSC: "",
-                  gstNumber: "",
-                  panNumber: "",
-                  serviceTypes: [],
-                  status: "Active",
-                });
-              }}
+              onClick={resetForm}
             >
               <X size={18} />
             </button>
@@ -410,21 +331,19 @@ export default function ServiceCentersPage() {
               {[1, 2, 3, 4].map((step) => (
                 <div key={step} className="flex items-center flex-1">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                      activeStep === step
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${activeStep === step
                         ? "bg-indigo-600 text-white"
                         : activeStep > step
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200 text-gray-600"
-                    }`}
+                          ? "bg-green-500 text-white"
+                          : "bg-gray-200 text-gray-600"
+                      }`}
                   >
                     {activeStep > step ? "✓" : step}
                   </div>
                   {step < 4 && (
                     <div
-                      className={`flex-1 h-1 mx-2 ${
-                        activeStep > step ? "bg-green-500" : "bg-gray-200"
-                      }`}
+                      className={`flex-1 h-1 mx-2 ${activeStep > step ? "bg-green-500" : "bg-gray-200"
+                        }`}
                     />
                   )}
                 </div>
@@ -465,6 +384,7 @@ export default function ServiceCentersPage() {
                       placeholder="e.g., SC001"
                       className="w-full border text-black border-gray-300 rounded-lg px-3 py-2 mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                       required
+                      disabled={!!editingCenter}
                     />
                   </div>
 
@@ -598,7 +518,6 @@ export default function ServiceCentersPage() {
                       min="1"
                       className="w-full border text-black border-gray-300 rounded-lg px-3 py-2 mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Maximum number of appointments that can be scheduled per day</p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -694,7 +613,7 @@ export default function ServiceCentersPage() {
                   <div>
                     <label className="text-sm font-medium text-gray-600 mb-2 block">Service Types</label>
                     <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-3">
-                      {serviceTypesList.map((type) => (
+                      {SERVICE_TYPES_LIST.map((type) => (
                         <label key={type} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -736,35 +655,11 @@ export default function ServiceCentersPage() {
                     if (activeStep > 1) {
                       setActiveStep((activeStep - 1) as 1 | 2 | 3 | 4);
                     } else {
-                      setShowForm(false);
-                      setEditingCenter(null);
-                      setForm({
-                        name: "",
-                        code: "",
-                        address: "",
-                        city: "",
-                        state: "",
-                        pinCode: "",
-                        phone: "",
-                        email: "",
-                        capacity: "",
-                        technicianCount: "",
-                        serviceRadius: "",
-                        homeServiceEnabled: false,
-                        maxAppointmentsPerDay: "",
-                        invoicePrefix: "",
-                        bankName: "",
-                        bankAccount: "",
-                        bankIFSC: "",
-                        gstNumber: "",
-                        panNumber: "",
-                        serviceTypes: [],
-                        status: "Active",
-                      });
-                      setActiveStep(1);
+                      resetForm();
                     }
                   }}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-200 transition"
+                  disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   {activeStep === 1 ? "Cancel" : "Previous"}
                 </button>
@@ -772,9 +667,8 @@ export default function ServiceCentersPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      // Basic validation
                       if (activeStep === 1 && (!form.name || !form.code || !form.address || !form.city || !form.state || !form.pinCode)) {
-                        alert("Please fill all required fields in Basic Details");
+                        toast.error("Please fill all required fields in Basic Details");
                         return;
                       }
                       setActiveStep((activeStep + 1) as 1 | 2 | 3 | 4);
@@ -786,9 +680,14 @@ export default function ServiceCentersPage() {
                 ) : (
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition flex items-center justify-center min-w-[120px]"
                   >
-                    {editingCenter ? "Update Center" : "Create Center"}
+                    {(createMutation.isPending || updateMutation.isPending) ? (
+                      <Loader2 size={18} className="animate-spin text-white" />
+                    ) : (
+                      editingCenter ? "Update Center" : "Create Center"
+                    )}
                   </button>
                 )}
               </div>
@@ -799,4 +698,3 @@ export default function ServiceCentersPage() {
     </div>
   );
 }
-

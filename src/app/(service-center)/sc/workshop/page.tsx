@@ -6,25 +6,30 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle,
+  Search,
+  Filter,
+  Eye,
+  UserPlus,
+  AlertTriangle,
+  User,
+  Package,
+  X,
   Calendar,
   BarChart3,
-  UserPlus,
-  Filter,
-  X,
-  Search,
-  User,
-  Car,
-  Package,
 } from "lucide-react";
 import type { Engineer, WorkshopStats, EngineerStatus, Workload, Priority, JobCard, JobCardStatus } from "@/shared/types";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { defaultJobCards } from "@/__mocks__/data/job-cards.mock";
-import { defaultEngineers } from "@/__mocks__/data/workshop.mock";
+import { staffService } from "@/features/workshop/services/staff.service";
 import {
   filterByServiceCenter,
   getServiceCenterContext,
   shouldFilterByServiceCenter,
 } from "@/shared/lib/serviceCenter";
+
+// Load default data
+const defaultJobCards: JobCard[] = [];
+const defaultEngineers: Engineer[] = [];
+
 
 export default function Workshop() {
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
@@ -78,9 +83,9 @@ export default function Workshop() {
 
   // Filter to show only active job cards (Assigned, In Progress, Parts Pending)
   const activeJobCards = useMemo(() => {
-    return visibleJobCards.filter((job) => 
-      job.status === "Assigned" || 
-      job.status === "In Progress" || 
+    return visibleJobCards.filter((job) =>
+      job.status === "Assigned" ||
+      job.status === "In Progress" ||
       job.status === "Parts Pending"
     );
   }, [visibleJobCards]);
@@ -93,7 +98,7 @@ export default function Workshop() {
     return activeJobCards.filter((job) => {
       const matchesStatus = filterStatus === "all" || job.status.toLowerCase() === filterStatus.toLowerCase();
       const matchesPriority = filterPriority === "all" || job.priority.toLowerCase() === filterPriority.toLowerCase();
-      const matchesSearch = searchQuery === "" || 
+      const matchesSearch = searchQuery === "" ||
         job.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.jobCardNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -110,11 +115,11 @@ export default function Workshop() {
     const activeCount = activeJobCards.length;
     const occupiedBays = Math.min(activeCount, totalBays);
     const completedToday = visibleJobCards.filter(
-      (job) => job.status === "Completed" && 
-      job.completedAt && 
-      new Date(job.completedAt).toDateString() === new Date().toDateString()
+      (job) => job.status === "Completed" &&
+        job.completedAt &&
+        new Date(job.completedAt).toDateString() === new Date().toDateString()
     ).length;
-    
+
     return {
       totalBays,
       occupiedBays,
@@ -157,18 +162,18 @@ export default function Workshop() {
     );
     setJobCards(updatedJobs);
     safeStorage.setItem("jobCards", updatedJobs);
-    
+
     // Update lead status to converted when service is completed
     if (selectedJobForAction.id) {
       const existingLeads = safeStorage.getItem<any[]>("leads", []);
       const leadIndex = existingLeads.findIndex((l) => l.jobCardId === selectedJobForAction.id);
-      
+
       if (leadIndex !== -1) {
         const lead = existingLeads[leadIndex];
-        const updatedNotes = lead.notes 
+        const updatedNotes = lead.notes
           ? `${lead.notes}\nService completed on ${new Date().toLocaleString()}`
           : `Service completed on ${new Date().toLocaleString()}`;
-        
+
         existingLeads[leadIndex] = {
           ...lead,
           status: "converted" as const,
@@ -178,7 +183,7 @@ export default function Workshop() {
         safeStorage.setItem("leads", existingLeads);
       }
     }
-    
+
     setShowCompleteModal(false);
     setSelectedJobForAction(null);
     alert("Job marked as completed!");
@@ -307,7 +312,7 @@ export default function Workshop() {
                   {filteredActiveJobs.length} {filteredActiveJobs.length === 1 ? "job" : "jobs"}
                 </span>
               </div>
-              
+
               {/* Search Bar */}
               <div className="mb-4">
                 <div className="relative">
@@ -487,11 +492,10 @@ export default function Workshop() {
                     {Array.from({ length: workshopStats.totalBays }).map((_, idx) => (
                       <div
                         key={idx}
-                        className={`flex-1 h-8 rounded ${
-                          idx < workshopStats.occupiedBays
-                            ? "bg-red-500"
-                            : "bg-green-500"
-                        }`}
+                        className={`flex-1 h-8 rounded ${idx < workshopStats.occupiedBays
+                          ? "bg-red-500"
+                          : "bg-green-500"
+                          }`}
                         title={
                           idx < workshopStats.occupiedBays ? "Occupied" : "Available"
                         }

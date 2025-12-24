@@ -6,7 +6,7 @@ import { apiClient } from "@/core/api";
 import { API_ENDPOINTS } from "@/config/api.config";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 // import { defaultAppointments } from "@/__mocks__/data/appointments.mock"; // Removed mock
-import { defaultServiceCenters } from "@/__mocks__/data/service-centers.mock";
+
 import { customerService } from "@/features/customers/services/customer.service";
 import { jobCardService } from "@/features/job-cards/services/jobCard.service";
 import { appointmentsService } from "@/features/appointments/services/appointments.service"; // Added
@@ -261,6 +261,15 @@ export const useAppointmentLogic = () => {
 
             const formData = convertAppointmentToFormData(enrichedAppointment);
             setSelectedAppointment(appointment);
+
+            // Set Customer and Vehicle for form display
+            if (fullDetails.customer) {
+                setSelectedAppointmentCustomer(fullDetails.customer);
+            }
+            if (fullDetails.vehicle) {
+                setSelectedAppointmentVehicle(fullDetails.vehicle);
+            }
+
             setAppointmentFormData(formData);
             setShowAppointmentFormModal(true);
         } catch (error) {
@@ -352,6 +361,22 @@ export const useAppointmentLogic = () => {
                 return;
             }
 
+            // Resolve Pickup Address (Default to customer address if not provided)
+            let pickupAddress = form.pickupAddress;
+            let pickupCity = (form as any).pickupCity;
+            let pickupState = (form as any).pickupState;
+            let pickupPincode = (form as any).pickupPincode;
+
+            if (form.pickupDropRequired && !pickupAddress && selectedAppointmentCustomer) {
+                pickupAddress = selectedAppointmentCustomer.address;
+                pickupPincode = selectedAppointmentCustomer.pincode;
+                if (selectedAppointmentCustomer.cityState) {
+                    const parts = selectedAppointmentCustomer.cityState.split(',').map(s => s.trim());
+                    if (parts.length >= 1) pickupCity = parts[0];
+                    if (parts.length >= 2) pickupState = parts[1];
+                }
+            }
+
             const basePayload = {
                 customerId: selectedAppointmentCustomer.id.toString(),
                 vehicleId: selectedAppointmentVehicle.id.toString(),
@@ -369,6 +394,25 @@ export const useAppointmentLogic = () => {
                     photosVideos: form.photosVideos?.metadata,
                 },
                 uploadedBy: userInfo?.id,
+
+                // Add missing operational details
+                estimatedDeliveryDate: form.estimatedDeliveryDate,
+                assignedServiceAdvisor: form.assignedServiceAdvisor,
+                assignedTechnician: form.assignedTechnician,
+                pickupDropRequired: form.pickupDropRequired,
+                pickupAddress: pickupAddress,
+                pickupState: pickupState,
+                pickupCity: pickupCity,
+                pickupPincode: pickupPincode,
+                dropAddress: form.dropAddress,
+                dropState: (form as any).dropState,
+                dropCity: (form as any).dropCity,
+                dropPincode: (form as any).dropPincode,
+                preferredCommunicationMode: form.preferredCommunicationMode,
+                previousServiceHistory: form.previousServiceHistory,
+                estimatedServiceTime: form.estimatedServiceTime,
+                odometerReading: form.odometerReading,
+                duration: form.duration?.toString(),
             };
 
             if (selectedAppointment) {
@@ -397,40 +441,35 @@ export const useAppointmentLogic = () => {
         }
     }, [selectedAppointment, selectedAppointmentCustomer, selectedAppointmentVehicle, serviceCenterContext, userInfo, showToast, handleCloseAppointmentForm, loadAppointments]);
 
-    const handleCustomerArrivedFromForm = useCallback((form: AppointmentFormType) => {
+    const handleCustomerArrivedFromForm = useCallback(async (form: AppointmentFormType) => {
         if (!selectedAppointment) return;
 
-        const selectedServiceCenter = form.serviceCenterName
-            ? staticServiceCenters.find((center) => center.name === form.serviceCenterName)
-            : null;
-        const serviceCenterId = (selectedServiceCenter as any)?.serviceCenterId || selectedServiceCenter?.id?.toString() || null;
-        const serviceCenterName = form.serviceCenterName || null;
+        try {
+            const updatePayload: any = {
+                status: "IN_PROGRESS", // Update status to backend Enum value
+                // We could also capture Check-in details here if the form provides them
+                // For now, minimal update to status is key.
+            };
 
-        const appointmentData: any = {
-            ...form,
-            status: "In Progress",
-            serviceCenterId: serviceCenterId,
-            serviceCenterName: serviceCenterName,
-            time: formatTime(form.time),
-            duration: `${form.duration} hours`,
-            createdByRole: selectedAppointment.createdByRole,
-        };
+            await appointmentsService.update(selectedAppointment.id.toString(), updatePayload);
 
-        const existingAppointments = safeStorage.getItem<Array<any>>("appointments", []);
-        const updatedAppointments = existingAppointments.map((apt: any) =>
-            apt.id === selectedAppointment.id
-                ? { ...apt, ...appointmentData }
-                : apt
-        );
-        safeStorage.setItem("appointments", updatedAppointments);
-        setAppointments(updatedAppointments);
+            showToast("Customer arrival recorded. Appointment status updated to 'In Progress'.", "success");
 
-        const updatedAppointment = { ...selectedAppointment, ...appointmentData };
-        setSelectedAppointment(updatedAppointment);
-        setAppointmentFormData(form);
+            // Refresh list
+            loadAppointments();
 
-        showToast("Customer arrival recorded. Appointment status updated to 'In Progress'.", "success");
-    }, [selectedAppointment, showToast]);
+            // Update local state without closing immediately if workflow continues
+            setSelectedAppointment({
+                ...selectedAppointment,
+                status: "IN_PROGRESS"
+            });
+
+        } catch (error: any) {
+            console.error("Error marking customer arrived:", error);
+            const msg = error?.response?.data?.message || "Failed to update status.";
+            showToast(msg, "error");
+        }
+    }, [selectedAppointment, showToast, loadAppointments]);
 
     const handleOpenJobCard = useCallback((appointmentId: number | string) => {
         try {

@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/Badge";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/contexts/ToastContext";
 import { Package, FileText, ChevronDown, ChevronUp, Edit, CheckCircle } from "lucide-react";
-import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import type { Part } from "@/shared/types/inventory.types";
 import { PartsOrderEntryForm } from "./PartsOrderEntryForm";
 import { getInitialFormData, getInitialItemFormData, type PartsOrderEntryFormData, type PartsOrderItem } from "./form.schema";
@@ -22,7 +21,7 @@ export default function PartsOrderEntryPage() {
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
   const [currentItem, setCurrentItem] = useState<PartsOrderItem>(getInitialItemFormData());
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
-  
+
   // Confirmation modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
@@ -53,7 +52,7 @@ export default function PartsOrderEntryPage() {
   };
 
   useEffect(() => {
-    initializeInventoryMockData();
+
     startTransition(() => {
       fetchParts();
       fetchOrders();
@@ -134,7 +133,7 @@ export default function PartsOrderEntryPage() {
         "Inventory Manager",
         editingDraftId || undefined
       );
-      const message = editingDraftId 
+      const message = editingDraftId
         ? `Draft ${order.orderNumber} updated successfully with ${formData.items.length} part(s)!`
         : `Purchase order ${order.orderNumber} saved as draft with ${formData.items.length} part(s)!`;
       showSuccess(message);
@@ -298,7 +297,7 @@ export default function PartsOrderEntryPage() {
                   onRemovePart={handleRemovePart}
                 />
                 <div className="flex gap-3 mt-4">
-                  <Button 
+                  <Button
                     type="button"
                     onClick={handleSaveDraft}
                     disabled={formData.items.length === 0}
@@ -306,8 +305,8 @@ export default function PartsOrderEntryPage() {
                   >
                     {editingDraftId ? "Update Draft" : "Save as Draft"} {formData.items.length > 0 && `(${formData.items.length} part${formData.items.length !== 1 ? "s" : ""})`}
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={formData.items.length === 0}
                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >

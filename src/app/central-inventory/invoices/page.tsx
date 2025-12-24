@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { invoiceService } from "@/features/inventory/services/invoice.service";
-import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
+import { centralInventoryRepository } from "@/core/repositories/central-inventory.repository";
 import type { Invoice } from "@/shared/types/invoice.types";
 import type { ServiceCenterInfo } from "@/shared/types/central-inventory.types";
 

@@ -1,9 +1,21 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import { ArrowLeft, AlertCircle, Eye, CheckCircle, XCircle, Building, Search, Filter } from "lucide-react";
+import { Search, Filter, Eye, CheckCircle, XCircle, Clock, ArrowLeft, AlertCircle, Building } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { staticServiceCenters } from "@/__mocks__/data";
-import { defaultComplaints, type Complaint } from "@/__mocks__/data/complaints.mock";
+
+
+export type Complaint = {
+  id: number | string;
+  customerName: string;
+  phone: string;
+  vehicle: string;
+  complaint: string;
+  severity: "Critical" | "High" | "Medium" | "Low";
+  status: "Open" | "Resolved" | "Closed";
+  date: string;
+  serviceCenterId?: string;
+  serviceCenterName?: string;
+}
 
 interface ServiceCenter {
   id: number;
@@ -13,28 +25,24 @@ interface ServiceCenter {
 
 export default function ComplaintsPage() {
   const [selectedServiceCenter, setSelectedServiceCenter] = useState<ServiceCenter | null>(null);
-  const [complaints, setComplaints] = useState<Complaint[]>(defaultComplaints);
+  const [complaints, setComplaints] = useState<Complaint[]>(() => {
+    if (typeof window !== "undefined") {
+      return safeStorage.getItem<Complaint[]>("complaints", []);
+    }
+    return [];
+  });
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [severityFilter, setSeverityFilter] = useState("All");
 
-  // Load service centers
-  const [centers, setCenters] = useState<ServiceCenter[]>(staticServiceCenters);
-
-  useEffect(() => {
-    const storedCenters = safeStorage.getItem<Record<string, ServiceCenter>>('serviceCenters', {});
-    const allCenters = [...staticServiceCenters];
-    Object.values(storedCenters).forEach((center) => {
-      if (!allCenters.find(c => c.id === center.id)) {
-        allCenters.push({ id: center.id, name: center.name, location: center.location || "" });
-      }
-    });
-    if (allCenters.length > staticServiceCenters.length) {
-      setCenters(allCenters);
+  const [centers, setCenters] = useState<ServiceCenter[]>(() => {
+    if (typeof window !== "undefined") {
+      return safeStorage.getItem<ServiceCenter[]>("serviceCenters", []);
     }
-  }, []);
+    return [];
+  });
 
   // Get complaints for selected service center
   const getComplaintsForServiceCenter = (serviceCenterId: string): Complaint[] => {
@@ -57,9 +65,9 @@ export default function ComplaintsPage() {
   // Filtered complaints for selected service center
   const filteredComplaintsForCenter = useMemo(() => {
     if (!selectedServiceCenter) return [];
-    
+
     let centerComplaints = getComplaintsForServiceCenter(selectedServiceCenter.id.toString());
-    
+
     if (searchTerm.trim() !== "") {
       centerComplaints = centerComplaints.filter(
         (c) =>
@@ -154,8 +162,8 @@ export default function ComplaintsPage() {
       </div>
 
       <p className="text-gray-500 mb-6">
-        {selectedServiceCenter 
-          ? `View and manage complaints for ${selectedServiceCenter.name}` 
+        {selectedServiceCenter
+          ? `View and manage complaints for ${selectedServiceCenter.name}`
           : "Select a service center to view its complaints"}
       </p>
 
@@ -318,12 +326,12 @@ export default function ComplaintsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getSeverityColor(complaint.severity)}`}>
+                        <span className={`text - xs font - semibold px - 2 py - 1 rounded - full ${getSeverityColor(complaint.severity)} `}>
                           {complaint.severity}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getStatusColor(complaint.status)}`}>
+                        <span className={`text - xs font - semibold px - 2 py - 1 rounded - full ${getStatusColor(complaint.status)} `}>
                           {complaint.status}
                         </span>
                       </td>
@@ -393,7 +401,7 @@ export default function ComplaintsPage() {
                     <div>
                       <label className="text-sm font-medium text-gray-600">Status</label>
                       <p className="mt-1">
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getStatusColor(selectedComplaint.status)}`}>
+                        <span className={`text - xs font - semibold px - 2 py - 1 rounded - full ${getStatusColor(selectedComplaint.status)} `}>
                           {selectedComplaint.status}
                         </span>
                       </p>
@@ -401,7 +409,7 @@ export default function ComplaintsPage() {
                     <div>
                       <label className="text-sm font-medium text-gray-600">Severity</label>
                       <p className="mt-1">
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${getSeverityColor(selectedComplaint.severity)}`}>
+                        <span className={`text - xs font - semibold px - 2 py - 1 rounded - full ${getSeverityColor(selectedComplaint.severity)} `}>
                           {selectedComplaint.severity}
                         </span>
                       </p>

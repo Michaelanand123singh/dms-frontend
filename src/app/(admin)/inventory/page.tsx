@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, startTransition } from "react";
 import { Package, CheckCircle, AlertTriangle, DollarSign, Search } from "lucide-react";
-import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
+import { centralInventoryRepository } from "@/core/repositories/central-inventory.repository";
 import type { CentralStock } from "@/shared/types/central-inventory.types";
 
 export default function InventoryPage() {

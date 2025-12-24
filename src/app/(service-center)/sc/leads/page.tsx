@@ -22,7 +22,7 @@ import {
   FileText,
 } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { defaultLeads } from "@/__mocks__/data/leads.mock";
+
 
 interface Lead {
   id: string;
@@ -97,7 +97,7 @@ export default function Leads() {
 
     try {
       setLoading(true);
-      
+
       const newLead: Lead = {
         id: `lead-${Date.now()}`,
         serviceCenterId: "sc-001",
@@ -145,11 +145,11 @@ export default function Leads() {
   const handleUpdate = async (leadId: string, updates: Partial<Lead>) => {
     try {
       setLoading(true);
-      
+
       const updatedLeads = leads.map((l) =>
         l.id === leadId ? { ...l, ...updates, updatedAt: new Date().toISOString() } : l
       );
-      
+
       setLeads(updatedLeads);
       safeStorage.setItem("leads", updatedLeads);
       alert("Lead updated successfully!");
@@ -170,11 +170,11 @@ export default function Leads() {
 
     try {
       setLoading(true);
-      
+
       const updatedLeads = leads.filter((l) => l.id !== leadId);
       setLeads(updatedLeads);
       safeStorage.setItem("leads", updatedLeads);
-      
+
       alert("Lead deleted successfully!");
     } catch (error) {
       console.error("Error deleting lead:", error);
@@ -210,12 +210,12 @@ export default function Leads() {
       const updatedLeads = leads.map((l) =>
         l.id === lead.id
           ? {
-              ...l,
-              status: "converted" as const,
-              convertedTo: "appointment" as const,
-              convertedId: `appt-${Date.now()}`,
-              updatedAt: new Date().toISOString(),
-            }
+            ...l,
+            status: "converted" as const,
+            convertedTo: "appointment" as const,
+            convertedId: `appt-${Date.now()}`,
+            updatedAt: new Date().toISOString(),
+          }
           : l
       );
 
@@ -238,12 +238,12 @@ export default function Leads() {
       const updatedLeads = leads.map((l) =>
         l.id === lead.id
           ? {
-              ...l,
-              status: "converted" as const,
-              convertedTo: "quotation" as const,
-              convertedId: `qt-${Date.now()}`,
-              updatedAt: new Date().toISOString(),
-            }
+            ...l,
+            status: "converted" as const,
+            convertedTo: "quotation" as const,
+            convertedId: `qt-${Date.now()}`,
+            updatedAt: new Date().toISOString(),
+          }
           : l
       );
 
@@ -327,14 +327,13 @@ export default function Leads() {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-4 py-2 rounded-lg font-medium transition ${
-                    filter === f
+                  className={`px-4 py-2 rounded-lg font-medium transition ${filter === f
                       ? "bg-blue-600 text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
-                  {f === "all" 
-                    ? "All" 
+                  {f === "all"
+                    ? "All"
                     : f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ")}
                 </button>
               ))}
@@ -398,7 +397,7 @@ export default function Leads() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(lead.status)}`}>
-                          {lead.status === "job_card_in_progress" 
+                          {lead.status === "job_card_in_progress"
                             ? "Job Card In Progress"
                             : lead.status.charAt(0).toUpperCase() + lead.status.slice(1).replace(/_/g, " ")}
                         </span>
@@ -604,7 +603,7 @@ export default function Leads() {
         const customers = safeStorage.getItem<any[]>("customers", []);
         const mockCustomers = safeStorage.getItem<any[]>("mockCustomers", []);
         const allCustomers = [...customers, ...mockCustomers];
-        const customer = selectedLead.customerId 
+        const customer = selectedLead.customerId
           ? allCustomers.find((c: any) => c.id?.toString() === selectedLead.customerId?.toString())
           : null;
 
@@ -613,8 +612,8 @@ export default function Leads() {
             <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-[101]">
                 <h2 className="text-2xl font-bold text-gray-900">Lead & Customer Details</h2>
-                <button 
-                  onClick={() => { setShowViewModal(false); setSelectedLead(null); }} 
+                <button
+                  onClick={() => { setShowViewModal(false); setSelectedLead(null); }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <XCircle size={24} />
@@ -763,7 +762,7 @@ export default function Leads() {
                       <label className="text-sm font-medium text-gray-500 block mb-1">Status</label>
                       <div>
                         <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(selectedLead.status)}`}>
-                          {selectedLead.status === "job_card_in_progress" 
+                          {selectedLead.status === "job_card_in_progress"
                             ? "Job Card In Progress"
                             : selectedLead.status.charAt(0).toUpperCase() + selectedLead.status.slice(1).replace(/_/g, " ")}
                         </span>

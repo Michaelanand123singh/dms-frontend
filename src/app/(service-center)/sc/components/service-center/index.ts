@@ -7,4 +7,4 @@ export {
 export {
   staticServiceCenters,
   defaultServiceCenters,
-} from "@/__mocks__/data/service-centers.mock";
+} from "@/shared/types";

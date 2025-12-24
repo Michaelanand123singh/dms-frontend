@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, PlusCircle, MinusCircle, Edit, Search } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
+import { centralInventoryRepository } from "@/core/repositories/central-inventory.repository";
 import type { CentralStock, StockUpdateFormData } from "@/shared/types/central-inventory.types";
 
 export default function StockUpdatePage() {

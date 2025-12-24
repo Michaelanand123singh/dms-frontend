@@ -2,7 +2,6 @@
 import { useState, useMemo } from "react";
 import { Trash, Key, History, UserCog, Edit, Power, Eye, ArrowLeft, Users } from "lucide-react";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { defaultUsers } from "@/__mocks__/data/users.mock";
 
 // Types
 interface User {
@@ -33,15 +32,12 @@ export default function UsersAndRolesPage() {
   const [selectedServiceCenter, setSelectedServiceCenter] = useState<ServiceCenter | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  // Use mock data from __mocks__ folder
+  // Load users from localStorage only
   const [users, setUsers] = useState<User[]>(() => {
     if (typeof window !== "undefined") {
-      const storedUsers = safeStorage.getItem<User[]>("users", []);
-      if (storedUsers.length > 0) {
-        return storedUsers;
-      }
+      return safeStorage.getItem<User[]>("users", []);
     }
-    return defaultUsers;
+    return [];
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,7 +70,7 @@ export default function UsersAndRolesPage() {
         { id: 2, name: "Mumbai Metroplex" },
         { id: 3, name: "Bangalore Innovation Center" },
       ];
-      
+
       // Merge static and stored centers
       const allCenters = [...staticCenters];
       Object.values(storedCenters).forEach((center: any) => {
@@ -90,12 +86,12 @@ export default function UsersAndRolesPage() {
   // Helper function to get service center name(s) from assigned field
   const getServiceCenterName = (assigned: string): string => {
     if (!assigned) return "Not Assigned";
-    
+
     // If it's already a name (contains spaces or common words), return as is
     if (assigned.includes(" ") || assigned.includes("Hub") || assigned.includes("Center") || assigned.includes("Metroplex")) {
       return assigned;
     }
-    
+
     // If it's an ID format like "SC001" or "SC001,SC002"
     const centerIds = assigned.split(",").map(id => id.trim());
     const centerNames = centerIds.map(id => {
@@ -108,7 +104,7 @@ export default function UsersAndRolesPage() {
       }
       return id;
     });
-    
+
     return centerNames.join(", ");
   };
 
@@ -134,9 +130,9 @@ export default function UsersAndRolesPage() {
   // Filtered users for selected service center
   const filteredUsersForCenter = useMemo(() => {
     if (!selectedServiceCenter) return [];
-    
+
     let centerUsers = getUsersForServiceCenter(selectedServiceCenter.name);
-    
+
     if (searchTerm.trim() !== "") {
       centerUsers = centerUsers.filter(
         (u) =>
@@ -212,21 +208,21 @@ export default function UsersAndRolesPage() {
       .join("")
       .toUpperCase();
 
-    const assignedSC = formData.role === "Call Center" 
-      ? "All Service Centers" 
+    const assignedSC = formData.role === "Call Center"
+      ? "All Service Centers"
       : (centers.find(c => c.id === parseInt(formData.serviceCenter))?.name || selectedServiceCenter?.name || "Not Assigned");
 
-    const updatedUsers = users.map(u => 
-      u.email === editingUser.email 
+    const updatedUsers = users.map(u =>
+      u.email === editingUser.email
         ? {
-            ...u,
-            initials,
-            name: formData.fullName,
-            email: formData.email,
-            role: formData.role,
-            assigned: assignedSC,
-            status: formData.status,
-          }
+          ...u,
+          initials,
+          name: formData.fullName,
+          email: formData.email,
+          role: formData.role,
+          assigned: assignedSC,
+          status: formData.status,
+        }
         : u
     );
 
@@ -264,8 +260,8 @@ export default function UsersAndRolesPage() {
 
     // Get service center name
     // Call center doesn't need a service center assignment
-    const assignedSC = formData.role === "Call Center" 
-      ? "All Service Centers" 
+    const assignedSC = formData.role === "Call Center"
+      ? "All Service Centers"
       : (centers.find(c => c.id === parseInt(formData.serviceCenter))?.name || selectedServiceCenter?.name || "Not Assigned");
 
     const newUser: User = {
@@ -306,13 +302,13 @@ export default function UsersAndRolesPage() {
         (u) => !(u.email === userToDelete.email && u.name === userToDelete.name)
       );
       setUsers(updatedUsers);
-      
+
       // Close modals if open
       if (showUserDetails && selectedUser && selectedUser.email === userToDelete.email) {
         setShowUserDetails(false);
         setSelectedUser(null);
       }
-      
+
       setShowDeleteConfirm(false);
       setUserToDelete(null);
     }
@@ -406,8 +402,8 @@ export default function UsersAndRolesPage() {
       </div>
 
       <p className="text-gray-500 mb-6">
-        {selectedServiceCenter 
-          ? `Manage users for ${selectedServiceCenter.name}` 
+        {selectedServiceCenter
+          ? `Manage users for ${selectedServiceCenter.name}`
           : "Select a service center to view and manage its users"}
       </p>
 
@@ -550,11 +546,10 @@ export default function UsersAndRolesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`text-sm font-semibold ${
-                            user.status === "Active"
+                          className={`text-sm font-semibold ${user.status === "Active"
                               ? "text-green-600"
                               : "text-red-500"
-                          }`}
+                            }`}
                         >
                           {user.status}
                         </span>
@@ -666,8 +661,8 @@ export default function UsersAndRolesPage() {
                     required={formData.role !== "Call Center"}
                   >
                     <option value="">
-                      {formData.role === "Call Center" 
-                        ? "Not Required (Can assign to any service center)" 
+                      {formData.role === "Call Center"
+                        ? "Not Required (Can assign to any service center)"
                         : "Select Service Center"}
                     </option>
                     {centers.map((center) => (
@@ -798,11 +793,10 @@ export default function UsersAndRolesPage() {
                 <div className="flex justify-between items-center py-2 border-b">
                   <span className="text-sm font-medium text-gray-600">Status:</span>
                   <span
-                    className={`text-sm font-semibold ${
-                      selectedUser.status === "Active"
+                    className={`text-sm font-semibold ${selectedUser.status === "Active"
                         ? "text-green-600"
                         : "text-red-500"
-                    }`}
+                      }`}
                   >
                     {selectedUser.status}
                   </span>
@@ -835,11 +829,10 @@ export default function UsersAndRolesPage() {
                 </button>
                 <button
                   onClick={() => handleToggleUserStatus(selectedUser)}
-                  className={`px-4 py-2 rounded-md transition flex items-center justify-center gap-2 text-sm ${
-                    selectedUser.status === "Active"
+                  className={`px-4 py-2 rounded-md transition flex items-center justify-center gap-2 text-sm ${selectedUser.status === "Active"
                       ? "bg-orange-600 text-white hover:bg-orange-700"
                       : "bg-green-600 text-white hover:bg-green-700"
-                  }`}
+                    }`}
                 >
                   <Power size={16} />
                   {selectedUser.status === "Active" ? "Deactivate" : "Activate"}

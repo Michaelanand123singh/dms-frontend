@@ -6,20 +6,19 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { SearchBar } from "@/components/ui/SearchBar";
-import { 
-  PlusCircle, 
-  Edit, 
-  Trash2, 
-  Package, 
-  AlertTriangle, 
-  Upload, 
+import {
+  PlusCircle,
+  Edit,
+  Trash2,
+  Package,
+  AlertTriangle,
+  Upload,
   Download,
   CheckCircle,
   TrendingDown,
   FileSpreadsheet,
   X
 } from "lucide-react";
-import { initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
 import type { Part, PartFormData } from "@/shared/types/inventory.types";
 import * as XLSX from "xlsx";
 import { PartsMasterForm } from "./PartsMasterForm";
@@ -44,14 +43,13 @@ export default function PartsMasterPage() {
   const [formData, setFormData] = useState<PartsMasterFormData>(getInitialFormData());
 
   useEffect(() => {
-    initializeInventoryMockData();
     fetchParts();
   }, []);
 
   // Filter parts based on search and category
   useEffect(() => {
     let filtered = parts;
-    
+
     if (searchQuery) {
       filtered = filtered.filter(
         (p) =>
@@ -61,11 +59,11 @@ export default function PartsMasterPage() {
           (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
-    
+
     if (categoryFilter) {
       filtered = filtered.filter((p) => p.category === categoryFilter);
     }
-    
+
     setFilteredParts(filtered);
   }, [parts, searchQuery, categoryFilter]);
 
@@ -84,17 +82,17 @@ export default function PartsMasterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       // Map form data to PartFormData (only includes fields with data)
       const partData = mapFormDataToPartFormData(formData);
-      
+
       // At minimum, require partName for identification
       if (!partData.partName?.trim()) {
         alert("Please enter a Part Name to save the part.");
         return;
       }
-      
+
       if (editingPart) {
         await partsMasterService.update(editingPart.id, partData);
       } else {
@@ -158,7 +156,7 @@ export default function PartsMasterPage() {
 
     try {
       setUploadProgress({ success: 0, failed: 0, errors: [] });
-      
+
       const fileData = await uploadFile.arrayBuffer();
       const workbook = XLSX.read(fileData, { type: "array" });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -218,9 +216,9 @@ export default function PartsMasterPage() {
           totalPrice: String(getValue(["TOTAL PRICE", "Total Price", "total_price", "TotalPrice"]) || ""),
           totalGst: String(getValue(["TOTAL GST", "Total GST", "total_gst", "TotalGst"]) || ""),
           // High Value Part
-          highValuePart: getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "true" || 
-                        getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "yes" || 
-                        false,
+          highValuePart: getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "true" ||
+            getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "yes" ||
+            false,
         } as PartFormData;
       });
 
@@ -503,7 +501,7 @@ export default function PartsMasterPage() {
                     {filteredParts.map((part) => {
                       const isLowStock = part.stockQuantity < part.minStockLevel && part.stockQuantity > 0;
                       const isOutOfStock = part.stockQuantity === 0;
-                      
+
                       return (
                         <tr
                           key={part.id}
@@ -616,7 +614,7 @@ export default function PartsMasterPage() {
             isEditing={!!editingPart}
             showServiceCenter={false}
             submitButtonText={editingPart ? "Update" : "Create"}
-            submitButtonClass={editingPart 
+            submitButtonClass={editingPart
               ? "w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg text-base shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 mt-6"
               : "w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg text-base shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 mt-6"
             }

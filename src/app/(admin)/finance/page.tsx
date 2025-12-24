@@ -1,11 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { invoiceData, type LegacyInvoice } from "@/__mocks__/data/invoices.mock";
-import { serviceCentersList } from "@/__mocks__/data/service-centers.mock";
-import { Eye, FileText, BarChart3, Calendar, X, Building, DollarSign, Check, Download, Printer } from "lucide-react";
+import { Search, Filter, Download, BarChart3, Calendar, Eye, X, FileText, Building, DollarSign, Check, Printer } from "lucide-react";
+import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 
 // Types - LegacyInvoice imported from mock data
+export type LegacyInvoice = {
+  id: string;
+  invoiceId: string;
+  customerName: string;
+  scName: string;
+  dateIssued: string;
+  dueDate: string;
+  amount: string;
+  paymentStatus: "Paid" | "Pending" | "Overdue";
+};
 
 interface DetailedInvoice extends LegacyInvoice {
   location: string;
@@ -46,7 +55,7 @@ const getDetailedInvoiceData = (invoice: LegacyInvoice): DetailedInvoice => {
   const tax = totalAmount - laborCost - partsCost;
 
   // Payment date (if paid, set to a date after issue date)
-  const paymentDate = invoice.paymentStatus === "Paid" 
+  const paymentDate = invoice.paymentStatus === "Paid"
     ? new Date(new Date(invoice.dateIssued).getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
     : null;
 
@@ -70,7 +79,7 @@ export default function FinancePage() {
   const [selectedInvoice, setSelectedInvoice] = useState<LegacyInvoice | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  
+
   // Report form state
   const [reportType, setReportType] = useState("");
   const [fromDate, setFromDate] = useState("2024-10-01");
@@ -78,6 +87,10 @@ export default function FinancePage() {
   const [selectedServiceCenters, setSelectedServiceCenters] = useState<string[]>(["All Service Centers"]);
   const [paymentStatus, setPaymentStatus] = useState("All Status");
   const [exportFormat, setExportFormat] = useState("PDF");
+
+  // Load invoice data from localStorage
+  const invoiceData: LegacyInvoice[] = [];
+  const serviceCentersList = ["All Service Centers"];
 
   // Calculate summary statistics
   const totalPaid = invoiceData.filter((inv) => inv.paymentStatus === "Paid");
@@ -504,13 +517,12 @@ export default function FinancePage() {
                     Invoice {detailedInvoice.id}
                   </h2>
                   <span
-                    className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium ${
-                      detailedInvoice.paymentStatus === "Paid"
-                        ? "bg-green-100 text-black"
-                        : detailedInvoice.paymentStatus === "Pending"
+                    className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium ${detailedInvoice.paymentStatus === "Paid"
+                      ? "bg-green-100 text-black"
+                      : detailedInvoice.paymentStatus === "Pending"
                         ? "bg-orange-100 text-black"
                         : "bg-red-100 text-black"
-                    }`}
+                      }`}
                   >
                     {detailedInvoice.paymentStatus}
                   </span>
@@ -657,13 +669,12 @@ export default function FinancePage() {
                     </h3>
                   </div>
                   <div
-                    className={`rounded-lg p-4 ${
-                      detailedInvoice.paymentStatus === "Paid"
-                        ? "bg-green-100"
-                        : detailedInvoice.paymentStatus === "Pending"
+                    className={`rounded-lg p-4 ${detailedInvoice.paymentStatus === "Paid"
+                      ? "bg-green-100"
+                      : detailedInvoice.paymentStatus === "Pending"
                         ? "bg-orange-100"
                         : "bg-red-100"
-                    }`}
+                      }`}
                   >
                     <div className="space-y-2">
                       <div>

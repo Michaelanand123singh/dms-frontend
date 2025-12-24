@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import type { InventoryItem, StockStatus, FilterType, StockIndicator } from "@/shared/types/inventory.types";
-import { getDefaultServiceCenterInventory, initializeInventoryMockData } from "@/__mocks__/data/inventory.mock";
+
 
 interface RequestItem {
   partId: number;
@@ -44,16 +44,12 @@ export default function SCInventory() {
     reason: string;
   } | null>(null);
 
-  // Initialize mock data and use mockParts converted to InventoryItem format
+  // Load inventory from localStorage
   const [inventory, setInventory] = useState<InventoryItem[]>(() => {
     if (typeof window !== "undefined") {
-      initializeInventoryMockData();
-      const storedInventory = safeStorage.getItem<InventoryItem[]>("inventory", []);
-      if (storedInventory.length > 0) {
-        return storedInventory;
-      }
+      return safeStorage.getItem<InventoryItem[]>("inventory", []);
     }
-    return getDefaultServiceCenterInventory();
+    return [];
   });
 
   const filteredInventory = inventory.filter((item) => {

@@ -1,12 +1,19 @@
 /**
  * Admin Approval Service for Parts Issue Requests
+ * 
+ * NOTE: This service uses localStorage for workflow state management of pending approvals.
+ * This is intentional as it handles approval workflows that span user sessions.
+ * The actual parts issues are synced with backend via centralIssueService.
  */
 
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { centralInventoryRepository } from "@/__mocks__/repositories/central-inventory.repository";
+import { centralIssueService } from './centralIssue.service';
+import { centralInventoryRepository as _legacyRepo } from '@/core/repositories/central-inventory.repository';
+import { serviceCenterRepository } from '@/core/repositories/service-center.repository';
 import type { PartsIssue, PartsIssueFormData } from "@/shared/types/central-inventory.types";
 
 const STORAGE_KEY = "partsIssueRequests";
+
 
 class AdminApprovalService {
   /**
@@ -77,7 +84,7 @@ class AdminApprovalService {
     const requests = this.getAllRequests();
     requests.unshift(issue);
     safeStorage.setItem(STORAGE_KEY, requests);
-    
+
     // Debug: Log the saved request
     console.log("Parts issue request created and saved:", {
       id: issue.id,
@@ -103,14 +110,14 @@ class AdminApprovalService {
   async getPendingApprovals(): Promise<PartsIssue[]> {
     const all = await this.getAllIssues();
     const storageRequests = this.getAllRequests();
-    
+
     // Debug: Log what we're finding
     console.log("Fetching pending approvals:", {
       totalIssues: all.length,
       storageRequests: storageRequests.length,
       storageRequestsWithStatus: storageRequests.filter(r => r.status === "pending_admin_approval").length
     });
-    
+
     const pending = all.filter(
       (issue) =>
         issue.status === "pending_admin_approval" &&
@@ -118,9 +125,9 @@ class AdminApprovalService {
         !issue.adminApproved &&
         !issue.adminRejected
     );
-    
+
     console.log("Pending approvals found:", pending.length);
-    
+
     return pending;
   }
 
@@ -130,11 +137,11 @@ class AdminApprovalService {
   async getAllIssues(): Promise<PartsIssue[]> {
     const storageRequests = this.getAllRequests();
     const repositoryIssues = await centralInventoryRepository.getAllPartsIssues();
-    
+
     // Prioritize storage requests (pending approvals) over repository issues
     // Merge and deduplicate by ID, but storage requests take precedence
     const allIssues: PartsIssue[] = [...storageRequests];
-    
+
     // Add repository issues that aren't already in storage
     repositoryIssues.forEach((repoIssue) => {
       const exists = allIssues.find((issue) => issue.id === repoIssue.id);
@@ -142,7 +149,7 @@ class AdminApprovalService {
         allIssues.push(repoIssue);
       }
     });
-    
+
     return allIssues;
   }
 

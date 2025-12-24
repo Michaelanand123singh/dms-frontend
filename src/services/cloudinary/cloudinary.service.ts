@@ -73,7 +73,30 @@ export async function uploadToCloudinary(
     xhr.addEventListener('load', () => {
       if (xhr.status === 200) {
         try {
-          const response = JSON.parse(xhr.responseText) as CloudinaryUploadResult;
+          const rawResponse = JSON.parse(xhr.responseText);
+
+          // Transform Cloudinary's snake_case response to our camelCase interface
+          const response: CloudinaryUploadResult = {
+            publicId: rawResponse.public_id,
+            secureUrl: rawResponse.secure_url,
+            url: rawResponse.url,
+            format: rawResponse.format,
+            bytes: rawResponse.bytes,
+            width: rawResponse.width,
+            height: rawResponse.height,
+            duration: rawResponse.duration,
+            thumbnailUrl: rawResponse.thumbnail_url,
+            createdAt: rawResponse.created_at,
+            resourceType: rawResponse.resource_type,
+            version: rawResponse.version,
+            signature: rawResponse.signature,
+            eager: rawResponse.eager?.map((e: any) => ({
+              url: e.url,
+              secureUrl: e.secure_url,
+              transformation: e.transformation,
+            })),
+          };
+
           resolve(response);
         } catch (error) {
           reject(new CloudinaryUploadError(

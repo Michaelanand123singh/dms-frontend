@@ -16,7 +16,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import type { DashboardCard, Alert, QuickAction } from "@/shared/types";
-import { dashboardData, centres } from "@/__mocks__/data/dashboard.mock";
+
 import { adminApprovalService } from "@/features/inventory/services/adminApproval.service";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -26,6 +26,20 @@ export default function Dashboard() {
   const [selectedCentre, setSelectedCentre] = useState("All Centres");
   const [pendingPartsIssues, setPendingPartsIssues] = useState<PartsIssue[]>([]);
   const [isLoadingApprovals, setIsLoadingApprovals] = useState(true);
+
+  // Load centres from localStorage
+  const centres = ["All Centres"];
+  const dashboardData: Record<string, { cards: DashboardCard[]; alerts: Alert[] }> = {
+    "All Centres": {
+      cards: [
+        { title: "Revenue", value: "₹0", change: "+0%", color: "from-green-500 to-emerald-600", text: "text-green-600", icon: DollarSign },
+        { title: "Parts Sold", value: "0", change: "+0%", color: "from-blue-500 to-indigo-600", text: "text-blue-600", icon: Package },
+        { title: "Active Users", value: "0", change: "+0%", color: "from-purple-500 to-violet-600", text: "text-purple-600", icon: Users },
+        { title: "Avg Rating", value: "0.0", change: "+0%", color: "from-yellow-500 to-orange-600", text: "text-yellow-600", icon: Star },
+      ],
+      alerts: [],
+    },
+  };
 
   const data = dashboardData;
 

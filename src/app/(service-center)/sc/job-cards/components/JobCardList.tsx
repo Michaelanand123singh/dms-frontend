@@ -104,7 +104,11 @@ const JobCardList = React.memo<JobCardListProps>(({
                                 </div>
                                 <div className="flex items-center gap-2 text-gray-700">
                                     <Car size={16} className="text-gray-400 flex-shrink-0" />
-                                    <span className="text-sm md:text-base truncate">{job.vehicle}</span>
+                                    <span className="text-sm md:text-base truncate">
+                                        {typeof job.vehicle === 'object' && job.vehicle !== null
+                                            ? `${(job.vehicle as any).vehicleModel || ''} ${(job.vehicle as any).registration ? `(${(job.vehicle as any).registration})` : ''}`
+                                            : job.vehicle}
+                                    </span>
                                     <span className="text-gray-500 text-xs md:text-sm hidden sm:inline">• {job.registration}</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-gray-700">
