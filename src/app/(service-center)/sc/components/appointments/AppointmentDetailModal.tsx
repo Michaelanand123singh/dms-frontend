@@ -21,7 +21,7 @@ interface AppointmentDetailModalProps {
   isServiceAdvisor: boolean;
   customerArrivalStatus: CustomerArrivalStatus;
   currentJobCard: JobCard | null;
-  availableServiceCenters: typeof defaultServiceCenters;
+  availableServiceCenters: any[];
   onCustomerArrived: () => void;
   onCustomerNotArrived: () => void;
   setCurrentJobCard: (card: JobCard | null) => void;

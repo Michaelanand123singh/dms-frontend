@@ -1,5 +1,6 @@
 
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { staticServiceCenters } from "@/shared/types";
 
 export type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
 
@@ -239,7 +240,7 @@ export const findNearestServiceCenter = (customerAddress: string | undefined): n
     }
   }
 
-  const activeCenters = defaultServiceCenters.filter((sc) => sc.status === "Active");
-  return activeCenters.length > 0 ? activeCenters[0].id : null;
+  const activeCenters = staticServiceCenters.filter((sc) => sc.status === "Active");
+  return activeCenters.length > 0 ? Number(activeCenters[0].id) : null;
 };
 

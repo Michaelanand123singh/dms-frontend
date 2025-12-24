@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useRole } from "@/shared/hooks";
 import { useCloudinaryUpload } from "@/shared/hooks/useCloudinaryUpload";
-import { defaultServiceCenters } from "../service-center";
+import { staticServiceCenters } from "../service-center";
 import { apiClient } from "@/core/api";
 import { API_ENDPOINTS } from "@/config/api.config";
 import { SERVICE_TYPE_OPTIONS } from "@/shared/constants/service-types";
@@ -148,7 +148,7 @@ export const AppointmentForm = ({
   const availableServiceCenters = useMemo(
     () => {
       if (realServiceCenters.length > 0) return realServiceCenters;
-      const mocks = (defaultServiceCenters && Array.isArray(defaultServiceCenters)) ? defaultServiceCenters : [];
+      const mocks = (staticServiceCenters && Array.isArray(staticServiceCenters)) ? staticServiceCenters : [];
       return mocks.filter((sc) => sc.status === "Active");
     },
     [realServiceCenters]
