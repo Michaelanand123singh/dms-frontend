@@ -447,8 +447,7 @@ export const useAppointmentLogic = () => {
         try {
             const updatePayload: any = {
                 status: "IN_PROGRESS", // Update status to backend Enum value
-                // We could also capture Check-in details here if the form provides them
-                // For now, minimal update to status is key.
+                customerArrived: true, // Mark customer as arrived
             };
 
             await appointmentsService.update(selectedAppointment.id.toString(), updatePayload);
@@ -466,7 +465,7 @@ export const useAppointmentLogic = () => {
 
         } catch (error: any) {
             console.error("Error marking customer arrived:", error);
-            const msg = error?.response?.data?.message || "Failed to update status.";
+            const msg = error?.response?.data?.message || error?.message || "Failed to update status.";
             showToast(msg, "error");
         }
     }, [selectedAppointment, showToast, loadAppointments]);
