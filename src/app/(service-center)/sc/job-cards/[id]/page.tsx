@@ -116,25 +116,63 @@ export default function AdvisorJobCardDetailPage({ params, searchParams }: Advis
     );
   }
 
-  // Always show the form modal for editing job cards
+  // Render as a full page instead of modal
   return (
-    <JobCardFormModal
-      open={true}
-      mode="edit"
-      jobCardId={jobCard.id}
-      initialValues={jobCardToFormInitialValues(jobCard)}
-      onClose={() => router.push("/sc/job-cards")}
-      onCreated={() => { }} // Not used in edit mode
-      onUpdated={(updatedJobCard) => {
-        // Update local state
-        setJobCard(updatedJobCard);
-        // Redirect to updated job card
-        router.push(`/sc/job-cards/${updatedJobCard.id}`);
-      }}
-      onError={(error) => {
-        console.error("Error updating job card:", error);
-      }}
-    />
+    <div className="min-h-screen bg-gray-50">
+      {/* Header with Back Button */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/sc/job-cards")}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft size={20} />
+              <span className="font-medium">Back to Job Cards</span>
+            </button>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">
+                {jobCard.jobCardNumber || "Job Card Details"}
+              </h1>
+              <p className="text-sm text-gray-500">
+                {jobCard.customerName} • {jobCard.registration}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${jobCard.status === "Created" ? "bg-blue-100 text-blue-700" :
+              jobCard.status === "In Progress" ? "bg-yellow-100 text-yellow-700" :
+                jobCard.status === "Completed" ? "bg-green-100 text-green-700" :
+                  "bg-gray-100 text-gray-700"
+              }`}>
+              {jobCard.status}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Job Card Form Content */}
+      <div className="max-w-7xl mx-auto py-6 px-6">
+        <JobCardFormModal
+          open={true}
+          mode="edit"
+          jobCardId={jobCard.id}
+          initialValues={jobCardToFormInitialValues(jobCard)}
+          onClose={() => router.push("/sc/job-cards")}
+          onCreated={() => { }} // Not used in edit mode
+          onUpdated={(updatedJobCard) => {
+            // Update local state
+            setJobCard(updatedJobCard);
+            // Navigate back to list
+            router.push("/sc/job-cards");
+          }}
+          onError={(error) => {
+            console.error("Error updating job card:", error);
+          }}
+          isFullPage={true}
+        />
+      </div>
+    </div>
   );
 }
-

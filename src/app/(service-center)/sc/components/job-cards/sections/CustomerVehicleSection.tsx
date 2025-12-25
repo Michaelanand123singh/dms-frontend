@@ -6,13 +6,18 @@ interface CustomerVehicleSectionProps {
     form: CreateJobCardForm;
     updateField: <K extends keyof CreateJobCardForm>(field: K, value: CreateJobCardForm[K]) => void;
     previewJobCardNumber: string;
+    mode?: "create" | "edit"; // Add mode to know if we're editing
 }
 
 export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
     form,
     updateField,
     previewJobCardNumber,
+    mode = "create",
 }) => {
+    // Disable customer and vehicle fields in edit mode
+    const isEditMode = mode === "edit";
+    const disabledClass = isEditMode ? "bg-gray-100 cursor-not-allowed" : "";
     return (
         <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
             <div className="flex items-center justify-between mb-6">
@@ -41,7 +46,8 @@ export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
                                 updateField('fullName', e.target.value);
                                 updateField('customerName', e.target.value);
                             }}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            disabled={isEditMode}
+                            className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${disabledClass}`}
                             required
                             placeholder="Enter customer full name"
                         />
@@ -55,7 +61,8 @@ export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
                             type="tel"
                             value={form.mobilePrimary}
                             onChange={(e) => updateField('mobilePrimary', e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            disabled={isEditMode}
+                            className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${disabledClass}`}
                             required
                             placeholder="9876543210"
                         />
@@ -69,7 +76,8 @@ export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
                             type="tel"
                             value={form.whatsappNumber || ""}
                             onChange={(e) => updateField('whatsappNumber', e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            disabled={isEditMode}
+                            className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${disabledClass}`}
                             placeholder="9876543210"
                         />
                     </div>
@@ -126,7 +134,8 @@ export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
                                 updateField('vehicleBrand', e.target.value);
                                 updateField('vehicleMake', e.target.value);
                             }}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            disabled={isEditMode}
+                            className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${disabledClass}`}
                             required
                             placeholder="Honda"
                         />
@@ -140,7 +149,8 @@ export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
                             type="text"
                             value={form.vehicleModel}
                             onChange={(e) => updateField('vehicleModel', e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            disabled={isEditMode}
+                            className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${disabledClass}`}
                             required
                             placeholder="City"
                         />
@@ -154,7 +164,8 @@ export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
                             type="text"
                             value={form.vehicleRegistration}
                             onChange={(e) => updateField('vehicleRegistration', e.target.value.toUpperCase())}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            disabled={isEditMode}
+                            className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${disabledClass}`}
                             required
                             placeholder="PB10AB1234"
                         />
@@ -359,59 +370,92 @@ export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Battery Serial Number
-                            </label>
-                            <input
-                                type="text"
-                                value={form.batterySerialNumber}
-                                onChange={(e) => updateField('batterySerialNumber', e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="Serial number"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                MCU Serial Number
-                            </label>
-                            <input
-                                type="text"
-                                value={form.mcuSerialNumber}
-                                onChange={(e) => updateField('mcuSerialNumber', e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="Serial number"
-                            />
-                        </div>
-                    </div>
+                    {/* Conditional Serial Number Fields based on Service Type */}
+                    {(() => {
+                        const serviceType = (form.description || form.customerFeedback || "").toLowerCase();
+                        const isBatteryService = serviceType.includes('battery');
+                        const isMCUService = serviceType.includes('mcu');
+                        const isVCUService = serviceType.includes('vcu');
+                        const isOtherPartService = !isBatteryService && !isMCUService && !isVCUService && serviceType.length > 0;
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                VCU Serial Number
-                            </label>
-                            <input
-                                type="text"
-                                value={form.vcuSerialNumber}
-                                onChange={(e) => updateField('vcuSerialNumber', e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="Serial number"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Other Part Serial Number
-                            </label>
-                            <input
-                                type="text"
-                                value={form.otherPartSerialNumber}
-                                onChange={(e) => updateField('otherPartSerialNumber', e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="Serial number"
-                            />
-                        </div>
-                    </div>
+                        // Show at least one field if any service type is detected
+                        const showSerialFields = isBatteryService || isMCUService || isVCUService || isOtherPartService;
+
+                        if (!showSerialFields) return null;
+
+                        return (
+                            <>
+                                <div className="border-t border-gray-200 pt-4 mt-4">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-3">📋 Mandatory Serial Numbers</h4>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {isBatteryService && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Battery Serial Number <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={form.batterySerialNumber}
+                                                onChange={(e) => updateField('batterySerialNumber', e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                placeholder="Serial number"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+                                    {isMCUService && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                MCU Serial Number <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={form.mcuSerialNumber}
+                                                onChange={(e) => updateField('mcuSerialNumber', e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                placeholder="Serial number"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {isVCUService && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                VCU Serial Number <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={form.vcuSerialNumber}
+                                                onChange={(e) => updateField('vcuSerialNumber', e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                placeholder="Serial number"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+                                    {isOtherPartService && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Other Part Serial Number
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={form.otherPartSerialNumber}
+                                                onChange={(e) => updateField('otherPartSerialNumber', e.target.value)}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                placeholder="Serial number"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        );
+                    })()}
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -33,6 +33,7 @@ interface JobCardFormModalProps {
   onCreated: (jobCard: JobCard) => void;
   onUpdated?: (jobCard: JobCard) => void;
   onError?: (message: string) => void;
+  isFullPage?: boolean; // New prop to render as full page instead of modal
 }
 
 export default function JobCardFormModal({
@@ -44,6 +45,7 @@ export default function JobCardFormModal({
   onCreated,
   onUpdated,
   onError,
+  isFullPage = false,
 }: JobCardFormModalProps) {
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
   const serviceCenterId = String(serviceCenterContext.serviceCenterId ?? "sc-001");
@@ -234,156 +236,160 @@ export default function JobCardFormModal({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl search-container">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-              <FileText className="text-blue-600" size={28} />
-              {mode === "edit" ? "Edit Job Card" : "Create New Job Card"}
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {mode === "edit" ? "Modify existing job card details" : "Create a formal service record for the vehicle"}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-400 hover:text-gray-600">
-            <X size={24} />
-          </button>
+  // Content wrapper - different styling for modal vs full page
+  const contentClass = isFullPage
+    ? "bg-white rounded-xl w-full flex flex-col shadow-lg"
+    : "bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl search-container";
+
+  const formContent = (
+    <div className={contentClass}>
+      {/* Header */}
+      <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+            <FileText className="text-blue-600" size={28} />
+            {mode === "edit" ? "Edit Job Card" : "Create New Job Card"}
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {mode === "edit" ? "Modify existing job card details" : "Create a formal service record for the vehicle"}
+          </p>
         </div>
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition text-gray-400 hover:text-gray-600">
+          <X size={24} />
+        </button>
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <form id="jobCardForm" onSubmit={handleSubmit} className="space-y-8">
-            {/* Search Section (Only for Create Mode) */}
-            {mode === "create" && (
-              <div className="relative mb-8">
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Search className="text-gray-400 group-focus-within:text-blue-500 transition-colors" size={20} />
-                  </div>
-                  <input
-                    type="text"
-                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none text-lg shadow-sm"
-                    placeholder="Search by Customer Name, Phone, VIN, or Quotation Number..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  {searching && (
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                      <Loader2 size={24} className="animate-spin text-blue-500" />
-                    </div>
-                  )}
+      <div className="flex-1 overflow-y-auto p-6">
+        <form id="jobCardForm" onSubmit={handleSubmit} className="space-y-8">
+          {/* Search Section (Only for Create Mode) */}
+          {mode === "create" && (
+            <div className="relative mb-8">
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search className="text-gray-400 group-focus-within:text-blue-500 transition-colors" size={20} />
                 </div>
-
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-2xl shadow-2xl z-20 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
-                    {searchResults.map((result, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          if (result.type === 'quotation') {
-                            handleSelectQuotation(result.quotation, result.customer, result.vehicle);
-                          } else {
-                            handleSelectCustomer(result.customer, result.vehicle);
-                          }
-                          setSearchQuery("");
-                          setShowSearchResults(false);
-                        }}
-                        className="w-full text-left p-4 hover:bg-blue-50 border-b border-gray-50 last:border-0 transition-colors flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`p-3 rounded-xl ${result.type === 'quotation' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                            {result.type === 'quotation' ? <FileText size={20} /> : <UserPlus size={20} />}
-                          </div>
-                          <div>
-                            <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
-                              {result.customer.name} {result.type === 'quotation' && <span className="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded ml-2">Quote Approved</span>}
-                            </div>
-                            <div className="text-sm text-gray-500 flex items-center gap-3 mt-1">
-                              <span>{result.customer.phone}</span>
-                              {result.vehicle && (
-                                <span className="flex items-center gap-1"><Car size={14} /> {result.vehicle.registration}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        {result.type === 'quotation' && (
-                          <div className="text-right">
-                            <div className="text-xs font-mono text-gray-400 group-hover:text-blue-400">{result.quotation.quotationNumber}</div>
-                            <div className="text-sm font-semibold text-blue-600">Apply Approved Quotation</div>
-                          </div>
-                        )}
-                      </button>
-                    ))}
+                <input
+                  type="text"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none text-lg shadow-sm"
+                  placeholder="Search by Customer Name, Phone, VIN, or Quotation Number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searching && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <Loader2 size={24} className="animate-spin text-blue-500" />
                   </div>
                 )}
               </div>
-            )}
 
-            {/* Sections */}
-            <CustomerVehicleSection
-              form={form}
-              updateField={updateFormField}
-              previewJobCardNumber={previewJobCardNumber}
-            />
+              {showSearchResults && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-gray-100 rounded-2xl shadow-2xl z-20 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+                  {searchResults.map((result, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        if (result.type === 'quotation') {
+                          handleSelectQuotation(result.quotation, result.customer, result.vehicle);
+                        } else {
+                          handleSelectCustomer(result.customer, result.vehicle);
+                        }
+                        setSearchQuery("");
+                        setShowSearchResults(false);
+                      }}
+                      className="w-full text-left p-4 hover:bg-blue-50 border-b border-gray-50 last:border-0 transition-colors flex items-center justify-between group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-xl ${result.type === 'quotation' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {result.type === 'quotation' ? <FileText size={20} /> : <UserPlus size={20} />}
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                            {result.customer.name} {result.type === 'quotation' && <span className="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded ml-2">Quote Approved</span>}
+                          </div>
+                          <div className="text-sm text-gray-500 flex items-center gap-3 mt-1">
+                            <span>{result.customer.phone}</span>
+                            {result.vehicle && (
+                              <span className="flex items-center gap-1"><Car size={14} /> {result.vehicle.registration}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {result.type === 'quotation' && (
+                        <div className="text-right">
+                          <div className="text-xs font-mono text-gray-400 group-hover:text-blue-400">{result.quotation.quotationNumber}</div>
+                          <div className="text-sm font-semibold text-blue-600">Apply Approved Quotation</div>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-            <Part2ItemsSection
-              form={form}
-              updateField={updateFormField}
-              onError={onError}
-              jobCardId={jobCardId}
-              userId={undefined}
-            />
+          {/* Sections */}
+          <CustomerVehicleSection
+            form={form}
+            updateField={updateFormField}
+            previewJobCardNumber={previewJobCardNumber}
+            mode={mode}
+          />
 
-            <CheckInSection
-              form={form}
-              updateField={updateFormField}
-            />
-          </form>
+          <Part2ItemsSection
+            form={form}
+            updateField={updateFormField}
+            onError={onError}
+            jobCardId={jobCardId}
+            userId={undefined}
+          />
+
+          <CheckInSection
+            form={form}
+            updateField={updateFormField}
+          />
+        </form>
+      </div>
+
+      {/* Footer Actions */}
+      <div className="p-6 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleGenerateCheckInSlip}
+            className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+          >
+            <FileText size={20} className="text-blue-600" />
+            Generate Check-in Slip
+          </button>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-6 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleGenerateCheckInSlip}
-              className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
-            >
-              <FileText size={20} className="text-blue-600" />
-              Generate Check-in Slip
-            </button>
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-8 py-3 text-gray-600 font-bold hover:text-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="jobCardForm"
-              disabled={isSubmitting}
-              className="flex items-center gap-2 px-10 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-200"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" size={20} />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <CheckCircle size={20} />
-                  {mode === "edit" ? "Update Job Card" : "Create Job Card"}
-                </>
-              )}
-            </button>
-          </div>
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-8 py-3 text-gray-600 font-bold hover:text-gray-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="jobCardForm"
+            disabled={isSubmitting}
+            className="flex items-center gap-2 px-10 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-200"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                Processing...
+              </>
+            ) : (
+              <>
+                <CheckCircle size={20} />
+                {mode === "edit" ? "Update Job Card" : "Create Job Card"}
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -395,4 +401,16 @@ export default function JobCardFormModal({
       )}
     </div>
   );
+
+  // Return with or without modal wrapper based on isFullPage
+  if (isFullPage) {
+    return formContent;
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      {formContent}
+    </div>
+  );
 }
+
