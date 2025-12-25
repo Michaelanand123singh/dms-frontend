@@ -295,61 +295,6 @@ export const CustomerVehicleSection: React.FC<CustomerVehicleSectionProps> = ({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                State <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={form.customerState || ""}
-                                onChange={(e) => {
-                                    updateField('customerState', e.target.value);
-                                    updateField('customerCity', ''); // Reset city when state changes
-                                }}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                            >
-                                <option value="">Select State</option>
-                                {INDIAN_STATES.map((state) => (
-                                    <option key={state.code} value={state.name}>
-                                        {state.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                City <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={form.customerCity || ""}
-                                onChange={(e) => updateField('customerCity', e.target.value)}
-                                disabled={!form.customerState}
-                                className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${!form.customerState ? 'bg-gray-100 cursor-not-allowed text-gray-400' : ''
-                                    }`}
-                            >
-                                <option value="">{form.customerState ? 'Select City' : 'Select State First'}</option>
-                                {form.customerState && getCitiesByState(form.customerState).map((city) => (
-                                    <option key={city} value={city}>
-                                        {city}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Pincode
-                            </label>
-                            <input
-                                type="text"
-                                value={form.customerPincode || ""}
-                                onChange={(e) => updateField('customerPincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="6-digit pincode"
-                                maxLength={6}
-                            />
-                        </div>
-                    </div>
-
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Customer Feedback / Concerns

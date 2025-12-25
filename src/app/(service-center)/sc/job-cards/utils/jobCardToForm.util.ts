@@ -62,7 +62,15 @@ export function jobCardToFormInitialValues(jobCard: JobCard): Partial<CreateJobC
     whatsappNumber: getValue("", customer?.whatsappNumber),
     alternateNumber: getValue("", customer?.alternateNumber),
     email: getValue("", customer?.email),
-    customerAddress: getValue("", customer?.address),
+    // ✅ Combined full address (address + city/state + pincode)
+    customerAddress: (() => {
+      const parts = [
+        customer?.address,
+        customer?.cityState,
+        customer?.pincode
+      ].filter(Boolean); // Remove empty values
+      return parts.length > 0 ? parts.join(', ') : "";
+    })(),
     customerType: (getValue("", customer?.customerType, jobCard.customerType) as "B2C" | "B2B" | ""),
 
     // Vehicle data from vehicle relation
@@ -75,20 +83,30 @@ export function jobCardToFormInitialValues(jobCard: JobCard): Partial<CreateJobC
     variantBatteryCapacity: getValue("", vehicle?.variant),
     motorNumber: getValue("", vehicle?.motorNumber, jobCard.motorNumber),
     chargerSerialNumber: getValue("", vehicle?.chargerSerialNumber, jobCard.chargerSerialNumber),
-    dateOfPurchase: getValue("", vehicle?.purchaseDate, jobCard.dateOfPurchase),
+    // ✅ Fixed: Format vehicle dates properly
+    dateOfPurchase: vehicle?.purchaseDate
+      ? new Date(vehicle.purchaseDate).toISOString().split('T')[0]
+      : getValue("", jobCard.dateOfPurchase),
     vehicleColor: getValue("", vehicle?.vehicleColor, jobCard.vehicleColor),
     warrantyStatus: getValue("", vehicle?.warrantyStatus, jobCard.warrantyStatus),
-    insuranceStartDate: getValue("", vehicle?.insuranceStartDate),
-    insuranceEndDate: getValue("", vehicle?.insuranceEndDate),
+    insuranceStartDate: vehicle?.insuranceStartDate
+      ? new Date(vehicle.insuranceStartDate).toISOString().split('T')[0]
+      : "",
+    insuranceEndDate: vehicle?.insuranceEndDate
+      ? new Date(vehicle.insuranceEndDate).toISOString().split('T')[0]
+      : "",
     insuranceCompanyName: getValue("", vehicle?.insuranceCompanyName),
 
     // Service details from appointment relation
-    description: getValue("", appointment?.customerComplaintIssue, jobCard.description),
-    customerFeedback: getValue("", appointment?.customerComplaintIssue),
+    description: getValue("", appointment?.customerComplaint, jobCard.description), // ✅ Fixed: customerComplaint
+    customerFeedback: getValue("", appointment?.customerComplaint), // ✅ Fixed: customerComplaint
     technicianObservation: getValue("", appointment?.technicianObservation),
     previousServiceHistory: getValue("", appointment?.previousServiceHistory, jobCard.previousServiceHistory),
     odometerReading: getValue("", appointment?.odometerReading, jobCard.odometerReading),
-    estimatedDeliveryDate: getValue("", appointment?.estimatedDeliveryDate),
+    // ✅ Fixed: Format date properly
+    estimatedDeliveryDate: appointment?.estimatedDeliveryDate
+      ? new Date(appointment.estimatedDeliveryDate).toISOString().split('T')[0]
+      : "",
 
     // Pickup/Drop from appointment relation
     pickupDropRequired: appointment?.pickupDropRequired ?? jobCard.pickupDropRequired ?? false,
@@ -102,11 +120,14 @@ export function jobCardToFormInitialValues(jobCard: JobCard): Partial<CreateJobC
     dropPincode: getValue("", appointment?.dropPincode, jobCard.dropPincode),
     preferredCommunicationMode: appointment?.preferredCommunicationMode || jobCard.preferredCommunicationMode,
 
-    // Check-in from appointment relation
+    // Check-in from appointment relation  
     arrivalMode: appointment?.arrivalMode || jobCard.arrivalMode,
     checkInNotes: getValue("", appointment?.checkInNotes, jobCard.checkInNotes),
     checkInSlipNumber: getValue("", appointment?.checkInSlipNumber, jobCard.checkInSlipNumber),
-    checkInDate: getValue("", appointment?.checkInDate, jobCard.checkInDate),
+    // ✅ Fixed: Format dates properly
+    checkInDate: appointment?.checkInDate
+      ? new Date(appointment.checkInDate).toISOString().split('T')[0]
+      : getValue("", jobCard.checkInDate),
     checkInTime: getValue("", appointment?.checkInTime, jobCard.checkInTime),
 
     // Parts
