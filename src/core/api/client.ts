@@ -11,6 +11,7 @@ import {
     loggingResponseInterceptor,
     unauthorizedResponseInterceptor
 } from './interceptors';
+import { errorInterceptor, successInterceptor } from './interceptors/error.interceptor';
 import { handleApiError } from './error-handler';
 import { ApiError } from './errors';
 

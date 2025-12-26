@@ -1,4 +1,4 @@
-import { API_CONFIG, API_ENDPOINTS } from "@/config/api.config";
+import { API_ENDPOINTS } from "@/config/api.config";
 import { apiClient } from "@/core/api/client";
 import type { ServiceCenterInvoice, ServiceCenterInvoiceItem, EnhancedServiceCenterInvoiceItem, PaymentStatus } from "@/shared/types/invoice.types";
 
@@ -31,12 +31,6 @@ class InvoicesService {
      */
     async getAll(params?: InvoiceFilterParams): Promise<ServiceCenterInvoice[]> {
         try {
-            if (API_CONFIG.USE_MOCK) {
-                // Fallback to empty array if mock mode is on (should be disabled)
-                console.warn("Mock mode enabled, returning empty invoices");
-                return [];
-            }
-
             const response = await apiClient.get<any[]>(API_ENDPOINTS.INVOICES, { params: params as any });
 
             // Transform backend data to frontend ServiceCenterInvoice type

@@ -1,4 +1,4 @@
-import { API_CONFIG, API_ENDPOINTS } from "@/config/api.config";
+import { API_ENDPOINTS } from "@/config/api.config";
 import { apiClient } from "@/core/api/client";
 import type { InventoryItem, StockStatus } from "@/shared/types/inventory.types";
 
@@ -35,10 +35,6 @@ class InventoryService {
      */
     async getAll(params?: InventoryFilterParams): Promise<InventoryItem[]> {
         try {
-            if (API_CONFIG.USE_MOCK) {
-                return [];
-            }
-
             // Backend returns array of items directly based on our previous analysis of Client usage
             const response = await apiClient.get<any[]>(API_ENDPOINTS.INVENTORY, { params: params as any });
 
