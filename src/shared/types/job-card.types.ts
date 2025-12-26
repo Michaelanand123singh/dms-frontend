@@ -168,6 +168,14 @@ export interface JobCard {
   submittedToManager?: boolean;
   submittedAt?: string;
 
+  // Manager Approval Workflow
+  passedToManager?: boolean;
+  passedToManagerAt?: Date | string;
+  managerId?: string;
+  managerReviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  managerReviewNotes?: string;
+  managerReviewedAt?: Date | string;
+
   // Invoice workflow
   invoiceNumber?: string;
   invoiceCreatedAt?: string;

@@ -14,11 +14,10 @@ import {
   Loader2,
 } from "lucide-react";
 import { useRole } from "@/shared/hooks";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import type { JobCard } from "@/shared/types";
-import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
+import { partsIssueService } from "@/features/inventory/services/parts-issue.service";
+import { jobCardService } from "@/features/job-cards/services/jobCard.service";
 import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
-import type { JobCardPart2Item } from "@/shared/types/job-card.types";
+import type { JobCard, JobCardPart2Item } from "@/shared/types/job-card.types";
 import type { JobCardPartsRequest } from "@/shared/types/jobcard-inventory.types";
 import {
   filterByServiceCenter,
@@ -32,11 +31,12 @@ export default function PartsRequest() {
 
   // Job cards state
   const [jobCards, setJobCards] = useState<JobCard[]>([]);
+  const [loadingJobCards, setLoadingJobCards] = useState(false); // Added loading state
   const [selectedJobCard, setSelectedJobCard] = useState<JobCard | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Parts request state
-  const [partsRequestsData, setPartsRequestsData] = useState<Record<string, JobCardPartsRequest>>({});
+  const [partsRequestsData, setPartsRequestsData] = useState<Record<string, any>>({});
   const [part2ItemsList, setPart2ItemsList] = useState<JobCardPart2Item[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -82,57 +82,40 @@ export default function PartsRequest() {
   useEffect(() => {
     if (!isClient || !isTechnician) return;
 
-    const loadJobCards = () => {
-      const storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-
-      if (storedJobCards.length > 0) {
-        // Merge service engineer job cards with stored cards, avoiding duplicates
-        const existingIds = new Set(storedJobCards.map((j) => j.id));
-        const newEngineerCards = serviceEngineerJobCards.filter((j) => !existingIds.has(j.id));
-        // Update assignedEngineer to match current user if available
-        const engineerName = userInfo?.name || "Service Engineer";
-        const updatedEngineerCards = newEngineerCards.map((card) => ({
-          ...card,
-          assignedEngineer: engineerName,
-        }));
-        setJobCards([...storedJobCards, ...updatedEngineerCards]);
-      } else {
-        // No stored data - use service engineer mock data
-        const engineerName = userInfo?.name || "Service Engineer";
-        const updatedEngineerCards = serviceEngineerJobCards.map((card) => ({
-          ...card,
-          assignedEngineer: engineerName,
-        }));
-        setJobCards(updatedEngineerCards);
+    const loadJobCards = async () => {
+      try {
+        setLoadingJobCards(true);
+        const fetchedJobCards = await jobCardService.getAll();
+        setJobCards(fetchedJobCards);
+      } catch (error) {
+        console.error("Failed to load job cards:", error);
+      } finally {
+        setLoadingJobCards(false);
       }
     };
 
-    // Small delay to ensure role is loaded first
-    const timer = setTimeout(loadJobCards, 0);
-    return () => clearTimeout(timer);
-  }, [isClient, isTechnician, userInfo]);
+    loadJobCards();
+  }, [isClient, isTechnician]);
 
-  // Filter visible job cards for service engineer
+  // Filter visible job cards for service engineer (Using fetched job cards)
   const visibleJobCards = useMemo(() => {
     let filtered = filterByServiceCenter(jobCards, serviceCenterContext);
 
+    // Note: Backend might already filter if proper params send, but safe to filter here too
     if (isTechnician) {
-      const engineerName = userInfo?.name || "Service Engineer";
-      filtered = filtered.filter(
-        (job) => job.assignedEngineer === engineerName || job.assignedEngineer === "Service Engineer"
-      );
+      // Optional: Filter by assigned engineer if needed, but for now showing all accessible
     }
 
     return filtered;
-  }, [jobCards, serviceCenterContext, isTechnician, userInfo]);
+  }, [jobCards, serviceCenterContext, isTechnician]);
 
   // Active job cards (Assigned, In Progress, Parts Pending)
   const activeJobCards = useMemo(() => {
     return visibleJobCards.filter(
       (job) =>
-        job.status === "Assigned" ||
-        job.status === "In Progress" ||
-        job.status === "Parts Pending"
+        job.status === "ASSIGNED" ||
+        job.status === "IN_PROGRESS" ||
+        job.status === "PARTS_PENDING"
     );
   }, [visibleJobCards]);
 
@@ -153,24 +136,15 @@ export default function PartsRequest() {
 
   // Load parts requests
   useEffect(() => {
-    if (!isClient || !isTechnician || activeJobCards.length === 0) return;
+    if (!isClient || !isTechnician) return;
 
     const loadPartsRequests = async () => {
       try {
-        const allRequests = await jobCardPartsRequestService.getAll();
-        const requestsMap: Record<string, JobCardPartsRequest> = {};
+        const allRequests = await partsIssueService.getAll();
+        const requestsMap: Record<string, any> = {};
 
         allRequests.forEach((request) => {
-          const matchingJob = activeJobCards.find(
-            (job) => job.id === request.jobCardId || job.jobCardNumber === request.jobCardId
-          );
-          if (matchingJob) {
-            if (matchingJob.id) requestsMap[matchingJob.id] = request;
-            if (matchingJob.jobCardNumber) requestsMap[matchingJob.jobCardNumber] = request;
-          }
-          if (request.jobCardId) {
-            requestsMap[request.jobCardId] = request;
-          }
+          if (request.jobCardId) requestsMap[request.jobCardId] = request;
         });
 
         setPartsRequestsData(requestsMap);
@@ -180,7 +154,7 @@ export default function PartsRequest() {
     };
 
     loadPartsRequests();
-  }, [activeJobCards, isClient, isTechnician]);
+  }, [isClient, isTechnician]);
 
   // Load parts when job card is selected
   useEffect(() => {
@@ -311,9 +285,9 @@ export default function PartsRequest() {
     });
   };
 
+  // Handle item removal from list
   const handleRemoveItem = (index: number) => {
     const updated = part2ItemsList.filter((_, i) => i !== index);
-    // Re-number items
     const renumbered = updated.map((item, i) => ({ ...item, srNo: i + 1 }));
     setPart2ItemsList(renumbered);
   };
@@ -332,30 +306,26 @@ export default function PartsRequest() {
     try {
       setLoading(true);
 
-      const partsWithDetails = part2ItemsList.map((item) => ({
-        partId: item.partCode || `unknown-${item.partName.replace(/\s+/g, "-").toLowerCase()}`,
-        partName: item.partName,
+      const items = part2ItemsList.map((item) => ({
+        partId: item.partCode || item.partName, // Using code or name as ID if ID missing
         quantity: item.qty,
-        serialNumber: item.isWarranty && item.serialNumber ? item.serialNumber : undefined,
         isWarranty: item.isWarranty || false,
+        serialNumber: item.isWarranty && item.serialNumber ? item.serialNumber : undefined,
       }));
 
-      const requestedBy = userInfo?.name || "Service Engineer";
-
-      const request = await jobCardPartsRequestService.createRequestFromJobCard(
-        selectedJobCard,
-        partsWithDetails,
-        requestedBy
-      );
-
-      // Update local state
-      setPartsRequestsData((prev) => {
-        const updated = { ...prev };
-        updated[selectedJobCard.id] = request;
-        if (selectedJobCard.jobCardNumber) updated[selectedJobCard.jobCardNumber] = request;
-        if (request.jobCardId) updated[request.jobCardId] = request;
-        return updated;
+      await partsIssueService.create({
+        jobCardId: selectedJobCard.id,
+        items,
+        notes: "Requested by technician " + (userInfo?.name || ""),
       });
+
+      // Refresh requests data
+      const allRequests = await partsIssueService.getAll();
+      const requestsMap: Record<string, any> = {};
+      allRequests.forEach(req => {
+        requestsMap[req.jobCardId] = req;
+      });
+      setPartsRequestsData(requestsMap);
 
       // Reset form
       setPart2ItemsList([]);
@@ -374,7 +344,7 @@ export default function PartsRequest() {
       setShowPartDropdown(false);
       setPartSearchResults([]);
 
-      alert(`Part request submitted successfully for Job Card: ${selectedJobCard.jobCardNumber || selectedJobCard.id}\nItems: ${partsWithDetails.length}\nRequest sent to SC Manager and Inventory Manager.`);
+      alert(`Part request submitted successfully for Job Card: ${selectedJobCard.jobCardNumber || selectedJobCard.id}`);
     } catch (error) {
       console.error("Failed to submit parts request:", error);
       alert("Failed to submit parts request. Please try again.");
@@ -494,9 +464,9 @@ export default function PartsRequest() {
                           </div>
 
                           <div className="mt-2 flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${job.status === "Assigned"
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${job.status === "ASSIGNED"
                               ? "bg-blue-100 text-blue-700"
-                              : job.status === "In Progress"
+                              : job.status === "IN_PROGRESS"
                                 ? "bg-yellow-100 text-yellow-700"
                                 : "bg-orange-100 text-orange-700"
                               }`}>

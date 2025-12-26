@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Plus, Search, Filter, CheckCircle, Loader2, UserCheck, X, Clock, User,
   Wrench, AlertCircle, Package, FileText, Eye, Edit, Car, Calendar
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+
 
 // Components
 import JobCardFilters from "./components/JobCardFilters";
@@ -506,23 +506,13 @@ export default function JobCards() {
             }}
             getNextStatus={getNextStatus}
             hasQuotation={(jobId) => {
-              if (typeof window === "undefined") return false;
-              const quotations = safeStorage.getItem<any[]>("quotations", []);
-              return quotations.some((q) => q.jobCardId === jobId);
+              const job = filteredJobs.find(j => j.id === jobId);
+              return !!job?.quotationId;
             }}
             onCreateQuotation={(job) => {
-              safeStorage.setItem("pendingQuotationFromJobCard", {
-                jobCardId: job.id,
-                jobCardNumber: job.jobCardNumber,
-                customerName: job.customerName,
-                customerId: job.customerId,
-                vehicleId: job.vehicleId,
-                serviceCenterId: job.serviceCenterId,
-                serviceCenterName: job.serviceCenterName,
-                jobCardData: job,
-              });
               router.push(`/sc/quotations?fromJobCard=true&jobCardId=${job.id}`);
             }}
+            onPassToManager={handleSubmitToManager}
           />
         )}
 
@@ -550,21 +540,10 @@ export default function JobCards() {
             }}
             getNextStatus={getNextStatus}
             hasQuotation={(jobId) => {
-              if (typeof window === "undefined") return false;
-              const quotations = safeStorage.getItem<any[]>("quotations", []);
-              return quotations.some((q) => q.jobCardId === jobId);
+              const job = filteredJobs.find(j => j.id === jobId);
+              return !!job?.quotationId;
             }}
             onCreateQuotation={(job) => {
-              safeStorage.setItem("pendingQuotationFromJobCard", {
-                jobCardId: job.id,
-                jobCardNumber: job.jobCardNumber,
-                customerName: job.customerName,
-                customerId: job.customerId,
-                vehicleId: job.vehicleId,
-                serviceCenterId: job.serviceCenterId,
-                serviceCenterName: job.serviceCenterName,
-                jobCardData: job,
-              });
               router.push(`/sc/quotations?fromJobCard=true&jobCardId=${job.id}`);
             }}
           />

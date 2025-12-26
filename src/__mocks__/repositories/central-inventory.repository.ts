@@ -2,7 +2,26 @@
  * Central Inventory Repository - Simulates database operations
  */
 
-import { safeStorage } from "@/shared/lib/localStorage";
+// Local storage helper
+const safeStorage = {
+  getItem: <T>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (e) {
+      return defaultValue;
+    }
+  },
+  setItem: <T>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(e);
+    }
+  },
+};
 import {
   mockCentralStock,
   mockPurchaseOrders,
@@ -326,8 +345,8 @@ class CentralInventoryRepository {
         throw new Error(`Stock not found for item: ${item.partId}`);
       }
 
-        return {
-          id: `pii-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      return {
+        id: `pii-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         partId: item.partId,
         partName: stock.partName,
         partNumber: stock.partNumber,

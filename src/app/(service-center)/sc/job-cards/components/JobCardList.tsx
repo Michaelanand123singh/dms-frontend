@@ -23,6 +23,7 @@ interface JobCardListProps {
     onUpdateStatus?: (jobId: string, initialStatus: JobCardStatus) => void;
     getNextStatus?: (status: JobCardStatus) => JobCardStatus[];
     hasQuotation?: (jobId: string) => boolean;
+    onPassToManager?: (job: JobCard) => void;
 }
 
 const JobCardList = React.memo<JobCardListProps>(({
@@ -44,6 +45,7 @@ const JobCardList = React.memo<JobCardListProps>(({
     onUpdateStatus,
     getNextStatus,
     hasQuotation,
+    onPassToManager,
 }) => {
     if (currentJobs.length === 0) {
         return (
@@ -157,7 +159,7 @@ const JobCardList = React.memo<JobCardListProps>(({
                                         View
                                     </button>
                                 )}
-                                {isServiceAdvisor && job.status === "Awaiting Quotation Approval" && job.isTemporary && !hasQuotation?.(job.id) && onCreateQuotation && (
+                                {isServiceAdvisor && job.status === "AWAITING_QUOTATION_APPROVAL" && job.isTemporary && !hasQuotation?.(job.id) && onCreateQuotation && (
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -195,7 +197,7 @@ const JobCardList = React.memo<JobCardListProps>(({
                                 )}
                             </div>
 
-                            {isServiceManager && job.status === "Created" && onAssignEngineer && (
+                            {isServiceManager && job.status === "CREATED" && onAssignEngineer && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -219,14 +221,27 @@ const JobCardList = React.memo<JobCardListProps>(({
                                 </button>
                             )}
 
+                            {isServiceAdvisor && job.isTemporary && !job.passedToManager && onPassToManager && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPassToManager(job);
+                                    }}
+                                    className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-3 py-2 rounded-lg text-xs md:text-sm font-medium hover:opacity-90 transition w-full flex items-center justify-center gap-1"
+                                >
+                                    <Clock size={14} />
+                                    Submit for Approval
+                                </button>
+                            )}
+
                             {isTechnician && !isServiceManager && !isServiceAdvisor && onUpdateStatus && (
                                 <div className="space-y-2">
-                                    {job.status === "Assigned" && (
+                                    {job.status === "ASSIGNED" && (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (confirm(`Start work on job card ${job.jobCardNumber || job.id}?`)) {
-                                                    onUpdateStatus(job.id, "In Progress");
+                                                    onUpdateStatus(job.id, "IN_PROGRESS");
                                                 }
                                             }}
                                             className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
@@ -234,12 +249,12 @@ const JobCardList = React.memo<JobCardListProps>(({
                                             Start Work (In Progress)
                                         </button>
                                     )}
-                                    {job.status === "In Progress" && (
+                                    {job.status === "IN_PROGRESS" && (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (confirm(`Mark job card ${job.jobCardNumber || job.id} as completed?`)) {
-                                                    onUpdateStatus(job.id, "Completed");
+                                                    onUpdateStatus(job.id, "COMPLETED");
                                                 }
                                             }}
                                             className="w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"

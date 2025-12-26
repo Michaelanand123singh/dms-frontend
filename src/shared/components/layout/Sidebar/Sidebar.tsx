@@ -15,7 +15,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { useState, useEffect } from "react";
 import { useRole } from "@/shared/hooks";
-import { safeStorage } from "@/shared/lib/localStorage";
+// safeStorage import removed
 
 export interface SidebarProps {
   open: boolean;
@@ -45,9 +45,9 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
   }, []);
 
   const handleLogout = () => {
-    safeStorage.removeItem("userRole");
-    safeStorage.removeItem("userInfo");
-    safeStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("isLoggedIn");
     router.push("/");
   };
 
@@ -88,8 +88,8 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
               )}
               title={!open ? item.name : ""}
             >
-              <Icon 
-                size={18} 
+              <Icon
+                size={18}
                 className={clsx(
                   "flex-shrink-0",
                   active ? "text-white" : "text-gray-700"

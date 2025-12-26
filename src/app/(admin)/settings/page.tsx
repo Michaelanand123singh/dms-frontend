@@ -1,7 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+// Local storage helper
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (e) {
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(e);
+    }
+  },
+};
 import {
   Settings as SettingsIcon,
   Mail,
@@ -30,7 +49,7 @@ type SettingCategory = "general" | "email" | "sms" | "security" | "notifications
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState<SettingCategory>("general");
-  
+
   // Mock settings data (replace with API call)
   const defaultSettings: Record<string, Setting> = {
     "app.name": { key: "app.name", value: "DMS System", category: "general", description: "Application Name" },
@@ -57,7 +76,7 @@ export default function SettingsPage() {
     const storedSettings = safeStorage.getItem<Record<string, { key: string; value: string; category: string; description: string }> | null>("systemSettings", null);
     return storedSettings || defaultSettings;
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -127,11 +146,10 @@ export default function SettingsPage() {
           </div>
           <button
             onClick={handleToggleMaintenance}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
-              maintenanceMode
-                ? "bg-orange-600 text-white hover:bg-orange-700"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
+            className={`px-4 py-2 rounded-lg font-medium transition ${maintenanceMode
+              ? "bg-orange-600 text-white hover:bg-orange-700"
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
           >
             {maintenanceMode ? "Disable" : "Enable"}
           </button>
@@ -150,11 +168,10 @@ export default function SettingsPage() {
                   <button
                     key={category.id}
                     onClick={() => setActiveCategory(category.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                      activeCategory === category.id
-                        ? "bg-indigo-600 text-white"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${activeCategory === category.id
+                      ? "bg-indigo-600 text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                      }`}
                   >
                     <Icon size={18} />
                     <span>{category.label}</span>

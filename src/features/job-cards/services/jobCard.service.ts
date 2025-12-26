@@ -81,12 +81,35 @@ class JobCardService {
     });
   }
 
-  async getAll(): Promise<JobCard[]> {
+  async getAll(params?: any): Promise<JobCard[]> {
     if (this.useMock) {
-      return safeStorage.getItem<JobCard[]>("jobCards", []);
+      let data = safeStorage.getItem<JobCard[]>("jobCards", []);
+      // Basic mock filtering
+      if (params?.passedToManager === 'true') {
+        data = data.filter((jc: JobCard) => jc.passedToManager === true);
+      }
+      if (params?.managerReviewStatus) {
+        data = data.filter((jc: JobCard) => jc.managerReviewStatus === params.managerReviewStatus);
+      }
+      return data;
     }
-    const response = await apiClient.get<JobCard[]>(API_ENDPOINTS.JOB_CARDS);
+    const response = await apiClient.get<JobCard[]>(API_ENDPOINTS.JOB_CARDS, { params });
     return response.data;
+  }
+
+  async getById(id: string): Promise<JobCard | null> {
+    if (this.useMock) {
+      const data = safeStorage.getItem<JobCard[]>("jobCards", []);
+      const jobCard = data.find((jc: JobCard) => jc.id === id);
+      return jobCard || null;
+    }
+    try {
+      const response = await apiClient.get<JobCard>(`${API_ENDPOINTS.JOB_CARDS}/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Job card ${id} not found`, error);
+      return null;
+    }
   }
 
   async create(jobCard: Partial<JobCard>): Promise<JobCard> {
@@ -176,6 +199,17 @@ class JobCardService {
     }
     const response = await apiClient.post<JobCard>(`${API_ENDPOINTS.JOB_CARD(jobCardId)}/assign-engineer`, {
       engineerId,
+    });
+    return response.data;
+  }
+
+  async updateStatus(jobCardId: string, status: string): Promise<JobCard> {
+    if (this.useMock) {
+      // Simple mock fallback if needed, or throw error
+      throw new Error("Mock updateStatus not implemented");
+    }
+    const response = await apiClient.patch<JobCard>(`${API_ENDPOINTS.JOB_CARD(jobCardId)}/status`, {
+      status,
     });
     return response.data;
   }

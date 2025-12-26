@@ -13,7 +13,7 @@ import { getServiceCenterCode } from "@/shared/utils/service-center.utils";
 import { JobCard } from "@/shared/types/job-card.types";
 import { Quotation } from "@/shared/types/quotation.types";
 import { CustomerWithVehicles, Vehicle } from "@/shared/types/vehicle.types";
-import { quotationsService } from "@/services/quotations/quotations.service";
+import { quotationsService } from "@/features/quotations/services/quotations.service";
 
 // New Hooks, Utils and Sections
 import { useJobCardForm } from "@/features/job-cards/hooks/useJobCardForm";

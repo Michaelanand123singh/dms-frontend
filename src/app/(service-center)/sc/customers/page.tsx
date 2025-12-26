@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { useRole } from "@/shared/hooks";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { appointmentsService } from "@/features/appointments/services/appointments.service";
 import { getServiceCenterContext, staticServiceCenters } from "@/app/(service-center)/sc/components/service-center";
 import { useCustomerSearch } from "@/app/(service-center)/sc/components/customers";
 import { canCreateCustomer } from "@/shared/constants/roles";
@@ -649,7 +649,7 @@ export default function CustomerFind() {
           vehicle={selectedVehicle}
           initialFormData={appointmentForm}
           onClose={closeAppointmentForm}
-          onSubmit={(form: AppointmentFormType) => {
+          onSubmit={async (form: AppointmentFormType) => {
             // Map service center name to ID for proper filtering
             const selectedServiceCenter = form.serviceCenterName
               ? staticServiceCenters.find((center) => center.name === form.serviceCenterName)
@@ -706,43 +706,20 @@ export default function CustomerFind() {
               },
             };
 
-            // Get existing appointments from localStorage
-            const existingAppointments = safeStorage.getItem<Array<any>>("appointments", []);
+            // Create new appointment via API
+            try {
+              await appointmentsService.create(appointmentData);
+              showToast(`Appointment scheduled successfully! Customer: ${form.customerName} | Vehicle: ${form.vehicle} | Service: ${form.serviceType} | Date: ${form.date} | Time: ${formatTime(form.time)}`, "success");
 
-            // Create new appointment
-            const newAppointment = {
-              id: existingAppointments.length > 0
-                ? Math.max(...existingAppointments.map((a: any) => a.id)) + 1
-                : 1,
-              ...appointmentData,
-            };
-
-            // Save to localStorage
-            const updatedAppointments = [...existingAppointments, newAppointment];
-            safeStorage.setItem("appointments", updatedAppointments);
-
-            // Clean up file URLs
-            if (form.customerIdProof?.urls) {
-              form.customerIdProof.urls.forEach((url: string) => URL.revokeObjectURL(url));
+              // Close modal and reset form
+              closeAppointmentForm();
+            } catch (error) {
+              console.error("Failed to schedule appointment", error);
+              showToast("Failed to schedule appointment. Please try again.", "error");
             }
-            if (form.vehicleRCCopy?.urls) {
-              form.vehicleRCCopy.urls.forEach((url: string) => URL.revokeObjectURL(url));
-            }
-            if (form.warrantyCardServiceBook?.urls) {
-              form.warrantyCardServiceBook.urls.forEach((url: string) => URL.revokeObjectURL(url));
-            }
-            if (form.photosVideos?.urls) {
-              form.photosVideos.urls.forEach((url: string) => URL.revokeObjectURL(url));
-            }
-
-            showToast(`Appointment scheduled successfully! Customer: ${form.customerName} | Vehicle: ${form.vehicle} | Service: ${form.serviceType} | Date: ${form.date} | Time: ${formatTime(form.time)}`, "success");
-
-            // Close modal and reset form
-            closeAppointmentForm();
           }}
           canAccessCustomerType={canAccessCustomerType}
           canAccessVehicleInfo={canAccessVehicleInfo}
-          existingAppointments={safeStorage.getItem<Array<any>>("appointments", [])}
         />
 
         {/* Complaints Modal */}

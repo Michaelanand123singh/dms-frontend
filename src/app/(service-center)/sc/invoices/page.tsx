@@ -21,11 +21,14 @@ import {
   Trash2,
 } from "lucide-react";
 import type { ServiceCenterInvoice, PaymentStatus, InvoiceStats, ServiceCenterInvoiceItem, EnhancedServiceCenterInvoiceItem } from "@/shared/types";
-import { filterByServiceCenter, getServiceCenterContext } from "@/shared/lib/serviceCenter";
+import InvoicePDF from "../../../../components/invoice/InvoicePDF";
+import { invoicesService } from "@/features/invoices/services/invoices.service";
+import { getServiceCenterContext, filterByServiceCenter } from "@/shared/lib/serviceCenter";
 import { generateInvoiceNumber, calculateGST, convertNumberToWords, populateInvoiceFromJobCard, validateInvoiceData } from "@/shared/utils/invoice.utils";
 import { generateInvoiceHTML } from "@/shared/utils/invoicePDF.utils";
 import type { JobCard } from "@/shared/types/job-card.types";
-import InvoicePDF from "../../../../components/invoice/InvoicePDF";
+
+
 
 type FilterType = "all" | "paid" | "unpaid" | "overdue";
 
@@ -60,22 +63,26 @@ function InvoicesContent() {
   const [handledInvoiceId, setHandledInvoiceId] = useState<string | null>(null);
 
   // Use mock data from __mocks__ folder
-  const [invoices, setInvoices] = useState<ServiceCenterInvoice[]>(() => {
-    const storedInvoices = typeof window !== "undefined" ? safeStorage.getItem<ServiceCenterInvoice[]>("serviceHistoryInvoices", []) : [];
-    const base = typeof window !== "undefined" ? safeStorage.getItem<ServiceCenterInvoice[]>("invoices", []) : [];
-    if (base.length > 0 || storedInvoices.length > 0) {
-      const existingIds = new Set<string>();
-      const merged: ServiceCenterInvoice[] = [];
-      [...(defaultInvoices as unknown as ServiceCenterInvoice[]), ...base, ...storedInvoices].forEach((inv) => {
-        if (!existingIds.has(inv.id)) {
-          existingIds.add(inv.id);
-          merged.push(inv);
-        }
+  const [invoices, setInvoices] = useState<ServiceCenterInvoice[]>([]);
+  const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
+
+  // Load invoices from API
+  const loadInvoices = async () => {
+    try {
+      // Pass service center ID if available to filter on backend
+      const data = await invoicesService.getAll({
+        serviceCenterId: serviceCenterContext.serviceCenterId ? String(serviceCenterContext.serviceCenterId) : undefined
       });
-      return merged;
+      setInvoices(data);
+    } catch (error) {
+      console.error("Failed to load invoices", error);
     }
-    return [...(defaultInvoices as unknown as ServiceCenterInvoice[]), ...storedInvoices];
-  });
+  };
+
+  useEffect(() => {
+    loadInvoices();
+  }, [serviceCenterContext.serviceCenterId]);
+
 
   useEffect(() => {
     if (!invoiceIdFromParams || handledInvoiceId === invoiceIdFromParams) {
@@ -98,7 +105,8 @@ function InvoicesContent() {
 
   }, [invoiceIdFromParams, handledInvoiceId, invoices, router]);
 
-  const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
+  // const serviceCenterContext = useMemo(() => getServiceCenterContext(), []); // Removed duplicate
+
   const visibleInvoices = useMemo(
     () => filterByServiceCenter(invoices, serviceCenterContext),
     [invoices, serviceCenterContext]
@@ -125,40 +133,36 @@ function InvoicesContent() {
     return colors[status] || colors.Unpaid;
   };
 
+  /* Stats calculation - can be moved to backend or kept here if fetching all */
   const stats: InvoiceStats = {
     total: invoices.length,
     paid: invoices.filter((i) => i.status === "Paid").length,
     unpaid: invoices.filter((i) => i.status === "Unpaid").length,
     overdue: invoices.filter((i) => i.status === "Overdue").length,
     totalAmount: invoices.reduce(
-      (sum, inv) => sum + parseFloat(inv.amount.replace("₹", "").replace(",", "")),
+      (sum, inv) => sum + (typeof inv.grandTotal === 'number' ? inv.grandTotal : parseFloat(inv.amount.replace("₹", "").replace(/,/g, "") || "0")),
       0
     ),
     paidAmount: invoices.reduce(
-      (sum, inv) => sum + parseFloat(inv.paidAmount.replace("₹", "").replace(",", "")),
+      (sum, inv) => sum + (inv.status === 'Paid' ? (typeof inv.grandTotal === 'number' ? inv.grandTotal : parseFloat(inv.amount.replace("₹", "").replace(/,/g, "") || "0")) : 0),
       0
     ),
   };
 
-  const handleRecordPayment = (invoiceId: string): void => {
-    const method = prompt("Enter payment method (Cash/Card/UPI/Online):");
-    if (method) {
-      setInvoices(
-        invoices.map((inv) =>
-          inv.id === invoiceId
-            ? {
-              ...inv,
-              status: "Paid" as PaymentStatus,
-              paidAmount: inv.amount,
-              balance: "₹0",
-              paymentMethod: method as "Cash" | "Card" | "UPI" | "Online" | "Cheque" | null,
-            }
-            : inv
-        )
-      );
+
+  const handleRecordPayment = async (invoiceId: string) => {
+    if (!confirm("Are you sure you want to mark this invoice as PAID?")) return;
+
+    try {
+      await invoicesService.updateStatus(invoiceId, "PAID");
       alert("Payment recorded successfully!");
+      loadInvoices(); // Refresh list
+    } catch (error) {
+      console.error("Failed to record payment:", error);
+      alert("Failed to update status.");
     }
   };
+
 
   const formatInvoiceWhatsAppMessage = (invoice: ServiceCenterInvoice): string => {
     const customerName = invoice.customerName;
@@ -300,7 +304,7 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
     setInvoiceForm({ ...invoiceForm, items: updatedItems });
   };
 
-  const handleGenerateInvoice = () => {
+  const handleGenerateInvoice = async () => {
     // Validate form
     if (!invoiceForm.customerName || !invoiceForm.vehicle || !invoiceForm.date || !invoiceForm.dueDate) {
       alert("Please fill in all required fields.");
@@ -312,158 +316,61 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
       return;
     }
 
-    // Get service center details
-    const contextServiceCenterId = String(serviceCenterContext.serviceCenterId ?? "1");
-    const contextServiceCenterName = serviceCenterContext.serviceCenterName ?? "Service Center";
+    // Prepare payload for backend
+    // NOTE: This assumes we have customerId and vehicleId available. 
+    // Since the current form uses free text for Customer Name, we rely on a TODO to implement proper customer selection.
+    // For now, we might fail or need a fallback if creating new customers on fly is not supported by this specific endpoint.
+    // The backend DTO requires UUIDs. 
 
-    // Determine service center code and state (default values for now)
-    let serviceCenterCode = "SC001";
-    let serviceCenterState = "Delhi";
-    if (contextServiceCenterId === "2" || contextServiceCenterId === "sc-002") {
-      serviceCenterCode = "SC002";
-      serviceCenterState = "Maharashtra";
-    } else if (contextServiceCenterId === "3" || contextServiceCenterId === "sc-003") {
-      serviceCenterCode = "SC003";
-      serviceCenterState = "Karnataka";
-    }
+    // TEMPORARY MOCK IDs FOR DEMO if real selection isn't implemented in the UI form yet
+    // In a real scenario, you'd use a CustomerSearch dropdown similar to Quotations.
+    const tempCustomerId = "cust-001"; // Replace with actual selected customer ID
+    const tempVehicleId = "veh-001";   // Replace with actual selected vehicle ID
 
-    // Generate invoice number
-    const currentYear = new Date().getFullYear();
-    const invoiceNumber = generateInvoiceNumber(serviceCenterCode, currentYear, invoices);
-
-    // Process items and calculate GST
-    const placeOfSupply = invoiceForm.placeOfSupply || invoiceForm.customerState || serviceCenterState;
-    const enhancedItems: EnhancedServiceCenterInvoiceItem[] = invoiceForm.items.map((item) => {
-      const unitPrice = parseFloat(item.price.replace("₹", "").replace(",", "")) || 0;
-      const quantity = item.qty || 1;
-      const taxableAmount = unitPrice * quantity;
-      const gstRate = item.gstRate || 18;
-
-      const gst = calculateGST(taxableAmount, gstRate, placeOfSupply, serviceCenterState);
-
-      return {
-        name: item.name,
-        hsnSacCode: item.hsnSacCode || "",
-        unitPrice: unitPrice,
-        quantity: quantity,
-        taxableAmount: taxableAmount,
-        gstRate: gstRate,
-        cgstAmount: gst.cgst,
-        sgstAmount: gst.sgst,
-        igstAmount: gst.igst,
-        totalAmount: taxableAmount + gst.cgst + gst.sgst + gst.igst,
+    try {
+      const payload = {
+        serviceCenterId: String(serviceCenterContext.serviceCenterId || "sc-001"),
+        customerId: tempCustomerId, // TODO: Update form to use customer selector
+        vehicleId: tempVehicleId,   // TODO: Update form to use vehicle selector
+        jobCardId: invoiceForm.jobCardId || undefined,
+        items: invoiceForm.items.map(item => ({
+          name: item.name,
+          unitPrice: parseFloat(item.price.replace("₹", "").replace(",", "")) || 0,
+          quantity: item.qty || 1,
+          gstRate: item.gstRate || 18,
+          hsnSacCode: item.hsnSacCode
+        })),
+        placeOfSupply: invoiceForm.placeOfSupply
       };
-    });
 
-    // Calculate totals
-    const subtotal = enhancedItems.reduce((sum, item) => sum + item.taxableAmount, 0);
-    const totalCgst = enhancedItems.reduce((sum, item) => sum + item.cgstAmount, 0);
-    const totalSgst = enhancedItems.reduce((sum, item) => sum + item.sgstAmount, 0);
-    const totalIgst = enhancedItems.reduce((sum, item) => sum + item.igstAmount, 0);
-    const totalTax = totalCgst + totalSgst + totalIgst;
-    const discount = invoiceForm.discount || 0;
-    const roundOff = 0; // Can be calculated if needed
-    const grandTotal = subtotal + totalTax - discount + roundOff;
+      await invoicesService.create(payload as any); // Type assertion until form is fully updated
 
-    // Get service center details (mock data for now - should come from service center config)
-    const serviceCenterDetails = {
-      name: contextServiceCenterName,
-      address: "123 Service Center Address",
-      city: serviceCenterState === "Delhi" ? "New Delhi" : serviceCenterState === "Maharashtra" ? "Mumbai" : "Bangalore",
-      state: serviceCenterState,
-      pincode: "110001",
-      gstNumber: "29ABCDE1234F1Z5", // Mock GST - should come from service center config
-      panNumber: "ABCDE1234F", // Mock PAN - should come from service center config
-      phone: "+91-1234567890",
-      email: "info@servicecenter.com",
-    };
-
-    const customerDetails = {
-      name: invoiceForm.customerName,
-      address: invoiceForm.customerAddress || "",
-      state: invoiceForm.customerState || placeOfSupply,
-      phone: "",
-      email: "",
-      gstNumber: invoiceForm.customerGstNumber || undefined,
-      panNumber: invoiceForm.customerPanNumber || undefined,
-    };
-
-    // Create new invoice with enhanced structure
-    const newInvoice: ServiceCenterInvoice = {
-      id: invoiceNumber,
-      invoiceNumber: invoiceNumber,
-      jobCardId: invoiceForm.jobCardId || undefined,
-      customerName: invoiceForm.customerName,
-      vehicle: invoiceForm.vehicle,
-      date: invoiceForm.date,
-      dueDate: invoiceForm.dueDate,
-      amount: `₹${grandTotal.toLocaleString("en-IN")}`,
-      paidAmount: "₹0",
-      balance: `₹${grandTotal.toLocaleString("en-IN")}`,
-      status: "Unpaid" as PaymentStatus,
-      paymentMethod: invoiceForm.paymentMethod || null,
-      serviceCenterId: contextServiceCenterId,
-      serviceCenterName: contextServiceCenterName,
-      items: invoiceForm.items.map(item => ({
-        name: item.name,
-        qty: item.qty,
-        price: item.price,
-      })),
-      // Enhanced fields
-      serviceCenterDetails,
-      customerDetails,
-      placeOfSupply,
-      subtotal,
-      totalTaxableAmount: subtotal,
-      totalCgst,
-      totalSgst,
-      totalIgst,
-      totalTax,
-      discount,
-      roundOff,
-      grandTotal,
-      amountInWords: convertNumberToWords(grandTotal),
-      enhancedItems,
-      createdBy: "System", // Should come from user info
-    };
-
-    // Validate invoice
-    const validation = validateInvoiceData(newInvoice);
-    if (!validation.valid) {
-      alert(`Validation errors:\n${validation.errors.join("\n")}`);
-      return;
+      alert("Invoice generated successfully!");
+      setShowGenerateModal(false);
+      setInvoiceForm({
+        customerName: "",
+        vehicle: "",
+        jobCardId: "",
+        date: new Date().toISOString().split("T")[0],
+        dueDate: "",
+        items: [{ name: "", qty: 1, price: "", hsnSacCode: "", gstRate: 18 }],
+        paymentMethod: "",
+        gstRequirement: false,
+        businessNameForInvoice: "",
+        customerGstNumber: "",
+        customerPanNumber: "",
+        customerAddress: "",
+        customerState: "",
+        placeOfSupply: "",
+        discount: 0,
+      });
+      loadInvoices(); // Refresh
+    } catch (error) {
+      console.error("Failed to generate invoice:", error);
+      alert("Failed to generate invoice. Please ensure customer and vehicle are valid.");
     }
-
-    // Add to invoices list
-    setInvoices([...invoices, newInvoice]);
-
-    // Store in localStorage
-    const storedInvoices = safeStorage.getItem<ServiceCenterInvoice[]>("invoices", []);
-    storedInvoices.push(newInvoice);
-    safeStorage.setItem("invoices", storedInvoices);
-
-    // Reset form and close modal
-    setInvoiceForm({
-      customerName: "",
-      vehicle: "",
-      jobCardId: "",
-      date: new Date().toISOString().split("T")[0],
-      dueDate: "",
-      items: [{ name: "", qty: 1, price: "", hsnSacCode: "", gstRate: 18 }],
-      paymentMethod: "",
-      gstRequirement: false,
-      businessNameForInvoice: "",
-      customerGstNumber: "",
-      customerPanNumber: "",
-      customerAddress: "",
-      customerState: "",
-      placeOfSupply: "",
-      discount: 0,
-    });
-    setShowGenerateModal(false);
-
-    alert(`Invoice generated successfully! Invoice Number: ${invoiceNumber}`);
   };
+
 
   return (
     <div className="bg-[#f9f9fb] min-h-screen">
@@ -591,8 +498,8 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
                       key={f}
                       onClick={() => setFilter(f)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === f
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                         }`}
                     >
                       {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -623,8 +530,8 @@ ${totalTax > 0 ? `Tax: ₹${totalTax.toLocaleString("en-IN", { minimumFractionDi
                     key={status}
                     onClick={() => setFilter(status)}
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${filter === status
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                   >
                     {status.charAt(0).toUpperCase() + status.slice(1)}

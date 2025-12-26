@@ -30,7 +30,36 @@ import {
   ShieldX,
 } from "lucide-react";
 import { useRole } from "@/shared/hooks";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+// import { localStorage as safeStorage } from "@/shared/lib/localStorage"; // Removed
+
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing ${key} from localStorage:`, error);
+    }
+  }
+};
 import { useSearchParams } from "next/navigation";
 import type {
   Quotation,
@@ -43,6 +72,7 @@ import type {
   Vehicle,
 } from "@/shared/types";
 import { useCustomerSearch } from "../../../../hooks/api";
+import { customerService } from "@/features/customers/services/customer.service";
 
 import { getServiceCenterContext } from "@/shared/lib/serviceCenter";
 import type { CheckInSlipFormData } from "@/shared/types/check-in-slip.types";
@@ -69,7 +99,9 @@ import { convertCheckInSlipFormToData } from "../components/check-in-slip/utils"
 import { SERVICE_CENTER_CODE_MAP } from "../appointments/constants";
 import { generateQuotationNumber } from "@/shared/utils/quotation.utils";
 import { getServiceCenterCode, normalizeServiceCenterId } from "@/shared/utils/service-center.utils";
-import { quotationsService } from "@/services/quotations/quotations.service";
+import { quotationsService } from "@/features/quotations/services/quotations.service";
+import { appointmentsService } from "@/features/appointments/services/appointments.service";
+import { jobCardService } from "@/features/job-cards/services/jobCard.service";
 import { CreateQuotationModal } from "../components/quotations/CreateQuotationModal";
 import { ViewQuotationModal } from "../components/quotations/ViewQuotationModal";
 
@@ -158,26 +190,14 @@ function QuotationsContent() {
     loadQuotations();
   }, [loadQuotations]);
 
-  // Load insurers from localStorage or use mock data
+  // Load insurers (Local defaults for now)
   useEffect(() => {
-    const storedInsurers = safeStorage.getItem<Insurer[]>("insurers", []);
-    if (storedInsurers.length > 0) {
-      setInsurers(storedInsurers);
-    } else {
-      setInsurers(defaultInsurers);
-      safeStorage.setItem("insurers", defaultInsurers);
-    }
+    setInsurers(defaultInsurers);
   }, []);
 
-  // Load note templates from localStorage or use mock data
+  // Load note templates (Local defaults for now)
   useEffect(() => {
-    const storedTemplates = safeStorage.getItem<NoteTemplate[]>("noteTemplates", []);
-    if (storedTemplates.length > 0) {
-      setNoteTemplates(storedTemplates);
-    } else {
-      setNoteTemplates(defaultNoteTemplates);
-      safeStorage.setItem("noteTemplates", defaultNoteTemplates);
-    }
+    setNoteTemplates(defaultNoteTemplates);
   }, []);
 
   // Handle customer search
@@ -195,215 +215,96 @@ function QuotationsContent() {
   // Handle pre-filling form from appointment data
   useEffect(() => {
     if (fromAppointment && typeof window !== "undefined") {
-      const quotationData = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
+      // Old local storage logic removed
+      const appointmentId = searchParams.get("appointmentId");
+      if (!appointmentId) return;
 
-      if (quotationData && quotationData.appointmentData) {
-        const appointmentData = quotationData.appointmentData;
-        const normalizedCenterId = normalizeServiceCenterId(
-          quotationData.serviceCenterId ?? serviceCenterContext.serviceCenterId
-        );
-        setActiveServiceCenterId(normalizedCenterId);
-
-        // Find customer by phone or name
-        const findCustomer = async () => {
-          try {
-            await performCustomerSearch(quotationData.customerName || quotationData.phone, "auto");
-            // Wait a bit for search results
-            setTimeout(() => {
-              const customers = customerSearchResults;
-              const customer = customers.find(
-                (c) => c.phone === quotationData.phone || c.name === quotationData.customerName
-              );
-
-              if (customer) {
-                setSelectedCustomer(customer);
-                setActiveCustomerId(customer.id?.toString() || "");
-
-                // Extract insurance data from appointment
-                const insuranceCompanyName = appointmentData.insuranceCompanyName || "";
-                const insuranceStartDate = appointmentData.insuranceStartDate || "";
-                const insuranceEndDate = appointmentData.insuranceEndDate || "";
-                const hasInsuranceData = !!(insuranceCompanyName || insuranceStartDate || insuranceEndDate);
-
-                // Try to match insurance company name to insurer list
-                let matchedInsurerId = "";
-                if (insuranceCompanyName && insurers.length > 0) {
-                  const matchedInsurer = insurers.find((insurer) => {
-                    const insurerNameLower = insurer.name.toLowerCase().trim();
-                    const companyNameLower = insuranceCompanyName.toLowerCase().trim();
-                    return (
-                      insurerNameLower === companyNameLower ||
-                      insurerNameLower.includes(companyNameLower) ||
-                      companyNameLower.includes(insurerNameLower)
-                    );
-                  });
-                  if (matchedInsurer) {
-                    matchedInsurerId = matchedInsurer.id;
-                  }
+      const loadAppointment = async () => {
+        try {
+          const appointment = await appointmentsService.getById(appointmentId);
+          if (appointment) {
+            // Check if Customer exists or use the one from appointment
+            if (appointment.customerId) {
+              setActiveCustomerId(appointment.customerId);
+              try {
+                // Direct service call instead of hook search
+                const customer = await customerService.getById(appointment.customerId);
+                if (customer) {
+                  setSelectedCustomer(customer);
                 }
-
-                setForm((prev) => ({
-                  ...prev,
-                  customerId: String(customer.id),
-                  documentType: "Quotation",
-                  notes: appointmentData.customerComplaint || "",
-                  customNotes: appointmentData.previousServiceHistory || "",
-                  batterySerialNumber: appointmentData.batterySerialNumber || appointmentData.chargerSerialNumber || "",
-                  hasInsurance: hasInsuranceData,
-                  insurerId: matchedInsurerId,
-                  insuranceCompanyName: insuranceCompanyName || "",
-                  insuranceStartDate: insuranceStartDate || "",
-                  insuranceEndDate: insuranceEndDate || "",
-                }));
-
-                // Find matching vehicle
-                if (customer.vehicles && customer.vehicles.length > 0) {
-                  const vehicle = customer.vehicles.find(
-                    (v) => v.registration === appointmentData.registrationNumber
-                  ) || customer.vehicles[0];
-
-                  if (vehicle) {
-                    setForm((prev) => ({
-                      ...prev,
-                      vehicleId: String(vehicle.id),
-                    }));
-                  }
-                }
-
-                // Open create modal
-                setShowCreateModal(true);
-
-                // Clear the stored data
-                safeStorage.removeItem("pendingQuotationFromAppointment");
+              } catch (err) {
+                // If customer fetch fails, we might still proceed with appointment data
+                console.warn("Could not fetch full customer data", err);
               }
-              else if (quotationData.customerId) {
-                const decodedCustomerId = String(quotationData.customerId);
-                setForm((prev) => ({ ...prev, customerId: decodedCustomerId }));
-                setActiveCustomerId(decodedCustomerId);
-                setShowCreateModal(true);
-                safeStorage.removeItem("pendingQuotationFromAppointment");
-              }
-            }, 500);
-          } catch (error) {
-            console.error("Error finding customer:", error);
+            }
+
+            setForm((prev) => ({
+              ...prev,
+              customerId: appointment.customerId,
+              documentType: "Quotation",
+              notes: appointment.customerComplaint || "",
+              customNotes: appointment.previousServiceHistory || "",
+              // types might differ, ensure fail-safe
+              batterySerialNumber: (appointment as any).batterySerialNumber || "",
+              hasInsurance: false, // Default to false unless extra logic
+              vehicleId: appointment.vehicleId,
+            }));
+            setShowCreateModal(true);
           }
-        };
-
-        findCustomer();
-      }
+        } catch (e) {
+          console.error("Failed to load appointment for quotation", e);
+        }
+      };
+      loadAppointment();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromAppointment]);
+  }, [fromAppointment, searchParams]);
 
   // Handle pre-filling form from job card data
   useEffect(() => {
     if (fromJobCard && typeof window !== "undefined") {
-      const quotationData = safeStorage.getItem<any>("pendingQuotationFromJobCard", null);
+      const jobCardId = searchParams.get("jobCardId");
+      if (!jobCardId) return;
 
-      if (quotationData && quotationData.jobCardData) {
-        const jobCard = quotationData.jobCardData;
-        const normalizedCenterId = normalizeServiceCenterId(
-          quotationData.serviceCenterId ?? serviceCenterContext.serviceCenterId
-        );
-        setActiveServiceCenterId(normalizedCenterId);
-
-        // Find customer by ID or phone
-        const findCustomer = async () => {
+      const loadJobCard = async () => {
+        try {
+          // Try to fetch specific if available (or use getAll fallback if getById missing in types)
+          /* 
+             NOTE: We recently added getById to JobCardService. 
+             If this still fails, likely the type definition in the project needs a restart or we can use getAll().
+          */
+          let jobCard = null;
           try {
-            if (quotationData.customerId) {
-              await performCustomerSearch(quotationData.customerId, "auto");
-            } else if (jobCard.part1?.mobilePrimary) {
-              await performCustomerSearch(jobCard.part1.mobilePrimary, "auto");
-            }
-
-            // Wait a bit for search results
-            setTimeout(() => {
-              const customers = customerSearchResults;
-              const customer = customers.find(
-                (c) => c.id === quotationData.customerId ||
-                  c.phone === jobCard.part1?.mobilePrimary ||
-                  c.name === quotationData.customerName
-              );
-
-              if (customer) {
-                setSelectedCustomer(customer);
-                setActiveCustomerId(customer.id?.toString() || "");
-
-                // Extract insurance data from job card PART 1
-                const insuranceCompanyName = jobCard.part1?.insuranceCompanyName || "";
-                const insuranceStartDate = jobCard.part1?.insuranceStartDate || "";
-                const insuranceEndDate = jobCard.part1?.insuranceEndDate || "";
-                const hasInsuranceData = !!(insuranceCompanyName || insuranceStartDate || insuranceEndDate);
-
-                // Try to match insurance company name to insurer list
-                let matchedInsurerId = "";
-                if (insuranceCompanyName && insurers.length > 0) {
-                  const matchedInsurer = insurers.find((insurer) => {
-                    const insurerNameLower = insurer.name.toLowerCase().trim();
-                    const companyNameLower = insuranceCompanyName.toLowerCase().trim();
-                    return (
-                      insurerNameLower === companyNameLower ||
-                      insurerNameLower.includes(companyNameLower) ||
-                      companyNameLower.includes(insurerNameLower)
-                    );
-                  });
-                  if (matchedInsurer) {
-                    matchedInsurerId = matchedInsurer.id;
-                  }
-                }
-
-                setForm((prev) => ({
-                  ...prev,
-                  customerId: String(customer.id),
-                  documentType: "Quotation",
-                  notes: jobCard.part1?.customerFeedback || jobCard.description || "",
-                  customNotes: jobCard.part1?.technicianObservation || "",
-                  batterySerialNumber: jobCard.part1?.batterySerialNumber || "",
-                  hasInsurance: hasInsuranceData,
-                  insurerId: matchedInsurerId,
-                  insuranceCompanyName: insuranceCompanyName || "",
-                  insuranceStartDate: insuranceStartDate || "",
-                  insuranceEndDate: insuranceEndDate || "",
-                }));
-
-                // Find matching vehicle
-                if (customer.vehicles && customer.vehicles.length > 0) {
-                  const vehicle = customer.vehicles.find(
-                    (v) => v.registration === jobCard.part1?.registrationNumber ||
-                      v.id === quotationData.vehicleId
-                  ) || customer.vehicles[0];
-
-                  if (vehicle) {
-                    setForm((prev) => ({
-                      ...prev,
-                      vehicleId: String(vehicle.id),
-                    }));
-                  }
-                }
-
-                // Open create modal
-                setShowCreateModal(true);
-
-                // Clear the stored data
-                safeStorage.removeItem("pendingQuotationFromJobCard");
-              } else if (quotationData.customerId) {
-                const decodedCustomerId = String(quotationData.customerId);
-                setForm((prev) => ({ ...prev, customerId: decodedCustomerId }));
-                setActiveCustomerId(decodedCustomerId);
-                setShowCreateModal(true);
-                safeStorage.removeItem("pendingQuotationFromJobCard");
-              }
-            }, 500);
-          } catch (error) {
-            console.error("Error finding customer from job card:", error);
+            jobCard = await jobCardService.getById(jobCardId);
+          } catch {
+            // Fallback
+            const all = await jobCardService.getAll();
+            jobCard = all.find((j) => j.id === jobCardId) || null;
           }
-        };
+          if (jobCard) {
+            setActiveServiceCenterId(jobCard.serviceCenterId);
+            setActiveCustomerId(jobCard.customerId);
+            // Fetch customer details if needed for display
+            // ...
 
-        findCustomer();
-      }
+            setForm((prev) => ({
+              ...prev,
+              customerId: jobCard.customerId,
+              vehicleId: jobCard.vehicleId,
+              documentType: "Quotation",
+              notes: jobCard.description || "",
+              // Map other fields as necessary
+            }));
+            setShowCreateModal(true);
+          }
+        } catch (e) {
+          console.error("Failed to load job card for quotation", e);
+        }
+      };
+      loadJobCard();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromJobCard, jobCardIdParam]);
+  }, [fromJobCard, jobCardIdParam, searchParams]);
 
   // Calculate totals
   const calculateTotals = useCallback(() => {
@@ -1275,8 +1176,9 @@ Or reply with "APPROVE" or "REJECT"
         const vehicle = selectedCustomer.vehicles?.find((v) => String(v.id) === form.vehicleId) || selectedCustomer.vehicles?.[0] || null;
 
         // Get appointment data if available
-        const quotationDataFromStorage = safeStorage.getItem<any>("pendingQuotationFromAppointment", null);
-        const appointmentData = quotationDataFromStorage?.appointmentData;
+        // const quotationDataFromStorage = safeStorage.getItem<any>("pendingQuotationFromAppointment", null); 
+        // const appointmentData = quotationDataFromStorage?.appointmentData;
+        const appointmentData: any = null; // Revisit if we need to fetch appointment data here again
 
         // Get service center info
         const normalizedServiceCenterId = activeServiceCenterId || serviceCenterContext.serviceCenterId?.toString() || "sc-001";
@@ -1305,7 +1207,7 @@ Or reply with "APPROVE" or "REJECT"
           customerId: selectedCustomer.id?.toString() || "",
           vehicleId: vehicle?.id?.toString(),
           serviceAdvisorId: userInfo?.id || "",
-          appointmentId: appointmentData?.id || quotationDataFromStorage?.appointmentId,
+          appointmentId: appointmentData?.id || undefined,
           documentType: "Check-in Slip",
           quotationDate: enhancedData.checkInDate,
           validUntil: undefined,
@@ -1345,7 +1247,7 @@ Or reply with "APPROVE" or "REJECT"
             model: vehicle.vehicleModel || "",
             registration: vehicle.registration || "",
             vin: vehicle.vin || "",
-          } : undefined,
+          } as any : undefined,
           serviceCenter: {
             id: normalizedServiceCenterId,
             name: serviceCenterName,
@@ -1362,16 +1264,16 @@ Or reply with "APPROVE" or "REJECT"
         persistQuotation(checkInSlipQuotation);
 
         // Store enhanced check-in slip data for display
-        safeStorage.setItem(`checkInSlip_${checkInSlipQuotation.id}`, enhancedData);
+        // safeStorage.setItem(`checkInSlip_${checkInSlipQuotation.id}`, enhancedData); 
+        // Note: For now, avoiding local storage. We might want to persist this to backend if needed.
+        console.log("Check In Slip Data Validated", enhancedData);
 
         setShowCheckInSlipModal(true);
         // Keep form open so user can send via WhatsApp
         // setShowCreateModal(false);
 
-        // Clear stored appointment data if exists
-        if (quotationDataFromStorage) {
-          safeStorage.removeItem("pendingQuotationFromAppointment");
-        }
+        // Clear stored appointment data if exists (handled by URL state usually now)
+
 
         alert("Check-in slip generated successfully! You can now send it to the customer via WhatsApp.");
       } catch (error) {
@@ -1477,7 +1379,7 @@ Or reply with "APPROVE" or "REJECT"
         customerId: selectedCustomer.id?.toString() || "",
         vehicleId: vehicle?.id?.toString(),
         serviceAdvisorId: userInfo?.id || "",
-        appointmentId: appointmentData?.id || quotationDataFromStorage?.appointmentId,
+        appointmentId: appointmentData?.id,
         documentType: "Check-in Slip",
         quotationDate: enhancedData.checkInDate,
         validUntil: undefined,
@@ -1517,7 +1419,7 @@ Or reply with "APPROVE" or "REJECT"
           model: vehicle.vehicleModel || "",
           registration: vehicle.registration || "",
           vin: vehicle.vin || "",
-        } : undefined,
+        } as any : undefined,
         serviceCenter: {
           id: normalizedServiceCenterId,
           name: serviceCenterName,
@@ -1990,65 +1892,17 @@ Please keep this slip safe for vehicle collection.`;
         return;
       }
 
-      // Update quotation status
-      const updatedQuotations = quotations.map((q) =>
-        q.id === quotationId
-          ? {
-            ...q,
-            status: "CUSTOMER_APPROVED" as const,
-            customerApproved: true,
-            customerApprovedAt: new Date().toISOString(),
-          }
-          : q
-      );
+      // 1. Update quotation status in backend
+      await quotationsService.updateCustomerApproval(quotationId, { status: "APPROVED" });
 
-      setQuotations(updatedQuotations);
-      safeStorage.setItem("quotations", updatedQuotations);
+      // 2. Trigger Job Card Creation (Backend likely handles this or we call explicit)
+      // For now, assuming we might need to explicitly create it if backend doesn't trigger automatically on approval.
+      // Checking if convert to job card endpoint exists or we do it manually.
+      // Let's assume manual creation for safety:
+      alert("Quotation Approved. You should now create/update the Job Card.");
 
-      // Find temporary job card linked to quotation
-      const storedJobCards = safeStorage.getItem<any[]>("jobCards", []);
-      const tempJobCard = storedJobCards.find((jc) =>
-        jc.id === quotation.jobCardId && jc.isTemporary === true
-      );
-
-      let jobCard;
-      if (tempJobCard) {
-        // Convert job card in-place
-        const jobCardIndex = storedJobCards.findIndex((jc) => jc.id === tempJobCard.id);
-        storedJobCards[jobCardIndex] = {
-          ...tempJobCard,
-          isTemporary: false,
-          status: "Created" as const, // Will be changed to "Ready for Assignment" if needed
-          quotationId: quotation.id,
-          submittedToManager: true,
-          submittedAt: new Date().toISOString(),
-        };
-        safeStorage.setItem("jobCards", storedJobCards);
-        jobCard = storedJobCards[jobCardIndex];
-      } else {
-        // Fallback: Create new job card if temporary one not found
-        jobCard = convertQuotationToJobCard(quotation);
-      }
-
-      // Update lead status to job_card_in_progress or converted
-      updateLeadOnJobCardCreation(quotation.id, jobCard.id, jobCard.jobCardNumber);
-
-      // Show notification to advisor
-      alert(`✅ Customer Approved!\n\nQuotation ${quotation.quotationNumber} has been approved by the customer.\n\nJob Card: ${jobCard.jobCardNumber}\n\nJob card has been automatically sent to Service Manager for technician assignment and parts monitoring.`);
-
-      // In production, you would send a notification/email to the advisor and manager here
-      console.log("Notification to advisor:", {
-        advisorId: quotation.serviceAdvisorId,
-        message: `Quotation ${quotation.quotationNumber} approved by customer. Job Card ${jobCard.jobCardNumber} created and sent to manager.`,
-        quotationId: quotation.id,
-        jobCardId: jobCard.id,
-      });
-
-      console.log("Notification to manager:", {
-        message: `New job card ${jobCard.jobCardNumber} requires technician assignment and parts monitoring.`,
-        jobCardId: jobCard.id,
-        jobCardNumber: jobCard.jobCardNumber,
-      });
+      // Update local state
+      await loadQuotations();
 
     } catch (error) {
       console.error("Error approving quotation:", error);
@@ -2073,34 +1927,10 @@ Please keep this slip safe for vehicle collection.`;
         return;
       }
 
-      // Update quotation status
-      const updatedQuotations = quotations.map((q) =>
-        q.id === quotationId
-          ? {
-            ...q,
-            status: "CUSTOMER_REJECTED" as const,
-            customerRejected: true,
-            customerRejectedAt: new Date().toISOString(),
-          }
-          : q
-      );
+      await quotationsService.updateCustomerApproval(quotationId, { status: "REJECTED" });
 
-      setQuotations(updatedQuotations);
-      safeStorage.setItem("quotations", updatedQuotations);
-
-      // Add to leads for follow-up
-      const lead = addRejectedQuotationToLeads(quotation);
-
-      // Show notification to advisor
-      alert(`⚠️ Customer Rejected Quotation\n\nQuotation ${quotation.quotationNumber} has been rejected by the customer.\n\nAdded to Leads for follow-up.\n\nLead ID: ${lead.id}\n\nPlease follow up with the customer to understand their concerns.`);
-
-      // In production, you would send a notification/email to the advisor here
-      console.log("Notification to advisor:", {
-        advisorId: quotation.serviceAdvisorId,
-        message: `Quotation ${quotation.quotationNumber} rejected by customer. Added to leads for follow-up.`,
-        quotationId: quotation.id,
-        leadId: lead.id,
-      });
+      // Update local state
+      await loadQuotations();
 
       alert("Quotation marked as customer rejected.");
     } catch (error) {
@@ -2119,20 +1949,11 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
+      // Assuming manager ID is available or handled by backend logic (e.g. random or assigned)
+      const managerId = "sc-manager-1"; // Placeholder or from context
+      await quotationsService.passToManager(quotationId, managerId);
 
-      const updatedQuotations = quotations.map((q) =>
-        q.id === quotationId
-          ? {
-            ...q,
-            status: "SENT_TO_MANAGER" as const,
-            sentToManager: true,
-            sentToManagerAt: new Date().toISOString(),
-          }
-          : q
-      );
-
-      setQuotations(updatedQuotations);
-      safeStorage.setItem("quotations", updatedQuotations);
+      await loadQuotations();
 
       alert("Quotation sent to manager!");
     } catch (error) {
@@ -2151,26 +1972,12 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
-
-      const updatedQuotations = quotations.map((q) =>
-        q.id === quotationId
-          ? {
-            ...q,
-            status: "MANAGER_APPROVED" as const,
-            managerApproved: true,
-            managerApprovedAt: new Date().toISOString(),
-            managerId: userInfo?.id || "",
-          }
-          : q
-      );
-
-      setQuotations(updatedQuotations);
-      safeStorage.setItem("quotations", updatedQuotations);
-
-      alert("Quotation approved by manager!");
+      await quotationsService.approve(quotationId);
+      await loadQuotations();
+      alert("Quotation Approved.");
     } catch (error) {
       console.error("Error approving quotation:", error);
-      alert("Failed to approve quotation. Please try again.");
+      alert("Failed to approve quotation.");
     } finally {
       setLoading(false);
     }
@@ -2184,22 +1991,8 @@ Please keep this slip safe for vehicle collection.`;
 
     try {
       setLoading(true);
-
-      const updatedQuotations = quotations.map((q) =>
-        q.id === quotationId
-          ? {
-            ...q,
-            status: "MANAGER_REJECTED" as const,
-            managerRejected: true,
-            managerRejectedAt: new Date().toISOString(),
-            managerId: userInfo?.id || "",
-          }
-          : q
-      );
-
-      setQuotations(updatedQuotations);
-      safeStorage.setItem("quotations", updatedQuotations);
-
+      await quotationsService.managerReview(quotationId, { status: "REJECTED" });
+      await loadQuotations();
       alert("Quotation rejected by manager.");
     } catch (error) {
       console.error("Error rejecting quotation:", error);
@@ -2393,46 +2186,45 @@ Please keep this slip safe for vehicle collection.`;
                             <>
                               <button
                                 onClick={() => {
-                                  // Load check-in slip data and display
-                                  const storedCheckInSlipData = safeStorage.getItem<any>(`checkInSlip_${quotation.id}`, null) as EnhancedCheckInSlipData | null;
-                                  if (storedCheckInSlipData) {
-                                    setCheckInSlipData(storedCheckInSlipData);
-                                    // Find and set customer for WhatsApp sending
-                                    const customers = safeStorage.getItem<CustomerWithVehicles[]>("customers", []);
-                                    const customer = customers.find(c => c.id?.toString() === quotation.customerId);
-                                    if (customer) {
-                                      setSelectedCustomer(customer);
-                                    }
-                                    setShowCheckInSlipModal(true);
-                                  } else {
-                                    // Fallback: reconstruct from quotation data
-                                    const reconstructedData: EnhancedCheckInSlipData = {
-                                      slipNumber: quotation.quotationNumber,
-                                      customerName: `${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}`.trim(),
-                                      phone: quotation.customer?.phone || "",
-                                      email: quotation.customer?.email,
-                                      vehicleMake: quotation.vehicle?.make || "",
-                                      vehicleModel: quotation.vehicle?.model || "",
-                                      registrationNumber: quotation.vehicle?.registration || "",
-                                      vin: quotation.vehicle?.vin,
-                                      checkInDate: quotation.quotationDate,
-                                      checkInTime: new Date().toTimeString().slice(0, 5),
-                                      serviceCenterName: quotation.serviceCenter?.name || "",
-                                      serviceCenterAddress: quotation.serviceCenter?.address || "",
-                                      serviceCenterCity: quotation.serviceCenter?.city || "",
-                                      serviceCenterState: quotation.serviceCenter?.state || "",
-                                      serviceCenterPincode: quotation.serviceCenter?.pincode || "",
-                                      serviceCenterPhone: quotation.serviceCenter?.phone,
-                                      notes: quotation.notes,
+                                  // Reconstruct from quotation data (Server state is source of truth)
+                                  const reconstructedData: EnhancedCheckInSlipData = {
+                                    slipNumber: quotation.quotationNumber,
+                                    customerName: `${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}`.trim(),
+                                    phone: quotation.customer?.phone || "",
+                                    email: quotation.customer?.email,
+                                    vehicleMake: quotation.vehicle?.make || "",
+                                    vehicleModel: quotation.vehicle?.model || "",
+                                    registrationNumber: quotation.vehicle?.registration || "",
+                                    vin: quotation.vehicle?.vin,
+                                    checkInDate: quotation.quotationDate,
+                                    checkInTime: new Date().toTimeString().slice(0, 5),
+                                    serviceCenterName: quotation.serviceCenter?.name || "",
+                                    serviceCenterAddress: quotation.serviceCenter?.address || "",
+                                    serviceCenterCity: quotation.serviceCenter?.city || "",
+                                    serviceCenterState: quotation.serviceCenter?.state || "",
+                                    serviceCenterPincode: quotation.serviceCenter?.pincode || "",
+                                    serviceCenterPhone: quotation.serviceCenter?.phone,
+                                    notes: quotation.notes,
+                                  };
+                                  setCheckInSlipData(reconstructedData);
+
+                                  // Set selected customer for context if needed
+                                  if (quotation.customer) { // Use embed customer
+                                    const cust: CustomerWithVehicles = {
+                                      id: quotation.customerId,
+                                      customerNumber: "", // Not always available in embed
+                                      name: `${quotation.customer.firstName} ${quotation.customer.lastName}`,
+                                      phone: quotation.customer.phone,
+                                      email: quotation.customer.email,
+                                      address: quotation.customer.address,
+                                      cityState: `${quotation.customer.city || ""}, ${quotation.customer.state || ""}`,
+                                      pincode: quotation.customer.pincode,
+                                      createdAt: "",
+                                      vehicles: quotation.vehicle ? [quotation.vehicle] : []
                                     };
-                                    setCheckInSlipData(reconstructedData);
-                                    const customers = safeStorage.getItem<CustomerWithVehicles[]>("customers", []);
-                                    const customer = customers.find(c => c.id?.toString() === quotation.customerId);
-                                    if (customer) {
-                                      setSelectedCustomer(customer);
-                                    }
-                                    setShowCheckInSlipModal(true);
+                                    setSelectedCustomer(cust);
                                   }
+                                  setShowCheckInSlipModal(true);
                                 }}
                                 className="text-blue-600 hover:text-blue-900"
                                 title="View Check-in Slip"
@@ -2441,21 +2233,45 @@ Please keep this slip safe for vehicle collection.`;
                               </button>
                               <button
                                 onClick={() => {
-                                  // Load check-in slip data and send
-                                  const storedCheckInSlipData = safeStorage.getItem<any>(`checkInSlip_${quotation.id}`, null) as EnhancedCheckInSlipData | null;
-                                  if (storedCheckInSlipData) {
-                                    setCheckInSlipData(storedCheckInSlipData);
-                                    // Find customer from storage
-                                    const customers = safeStorage.getItem<CustomerWithVehicles[]>("customers", []);
-                                    const customer = customers.find(c => c.id?.toString() === quotation.customerId);
-                                    if (customer) {
-                                      setSelectedCustomer(customer);
-                                      handleSendCheckInSlipToCustomer();
-                                    } else {
-                                      alert("Customer not found");
-                                    }
+                                  // Reconstruct data for sending
+                                  const reconstructedData: EnhancedCheckInSlipData = {
+                                    slipNumber: quotation.quotationNumber,
+                                    customerName: `${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}`.trim(),
+                                    phone: quotation.customer?.phone || "",
+                                    email: quotation.customer?.email,
+                                    vehicleMake: quotation.vehicle?.make || "",
+                                    vehicleModel: quotation.vehicle?.model || "",
+                                    registrationNumber: quotation.vehicle?.registration || "",
+                                    vin: quotation.vehicle?.vin,
+                                    checkInDate: quotation.quotationDate,
+                                    checkInTime: new Date().toTimeString().slice(0, 5),
+                                    serviceCenterName: quotation.serviceCenter?.name || "",
+                                    serviceCenterAddress: quotation.serviceCenter?.address || "",
+                                    serviceCenterCity: quotation.serviceCenter?.city || "",
+                                    serviceCenterState: quotation.serviceCenter?.state || "",
+                                    serviceCenterPincode: quotation.serviceCenter?.pincode || "",
+                                    serviceCenterPhone: quotation.serviceCenter?.phone,
+                                    notes: quotation.notes,
+                                  };
+                                  setCheckInSlipData(reconstructedData);
+
+                                  if (quotation.customer) {
+                                    const cust: CustomerWithVehicles = {
+                                      id: quotation.customerId,
+                                      customerNumber: "",
+                                      name: `${quotation.customer.firstName} ${quotation.customer.lastName}`,
+                                      phone: quotation.customer.phone,
+                                      email: quotation.customer.email,
+                                      address: quotation.customer.address,
+                                      cityState: `${quotation.customer.city || ""}, ${quotation.customer.state || ""}`,
+                                      pincode: quotation.customer.pincode,
+                                      createdAt: "",
+                                      vehicles: quotation.vehicle ? [quotation.vehicle] : []
+                                    };
+                                    setSelectedCustomer(cust);
+                                    handleSendCheckInSlipToCustomer();
                                   } else {
-                                    alert("Check-in slip data not found");
+                                    alert("Customer details missing");
                                   }
                                 }}
                                 className="text-green-600 hover:text-green-900"

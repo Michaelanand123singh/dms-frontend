@@ -3,7 +3,17 @@
  * Migrated from mock data to use backend + localStorage caching
  */
 
-import { safeStorage } from "@/shared/lib/localStorage";
+// Simple safe storage helper for this file
+const getStorageItem = <T>(key: string, defaultValue: T): T => {
+  if (typeof window === "undefined") return defaultValue;
+  try {
+    const item = window.localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error(`Error reading ${key} from localStorage:`, error);
+    return defaultValue;
+  }
+};
 
 export interface ServiceCenterContext {
   serviceCenterId: string | number | null;
@@ -18,8 +28,8 @@ const DEFAULT_CENTER_MAP: Record<string, string> = {
 };
 
 export const getServiceCenterContext = (): ServiceCenterContext => {
-  const storedUserInfo = safeStorage.getItem<any>("userInfo", null);
-  const storedUserRole = safeStorage.getItem<any>("userRole", null);
+  const storedUserInfo = getStorageItem<any>("userInfo", null);
+  const storedUserRole = getStorageItem<any>("userRole", null);
   const userRole = typeof storedUserRole === "string" ? storedUserRole : null;
 
   // Try to get serviceCenterId from user info
@@ -32,7 +42,7 @@ export const getServiceCenterContext = (): ServiceCenterContext => {
 
   // Check cached service centers if we have a string service center name
   if (!explicitCenterId && storedUserInfo?.serviceCenter) {
-    const cachedCenters = safeStorage.getItem<any[]>("serviceCenters", []);
+    const cachedCenters = getStorageItem<any[]>("serviceCenters", []);
     const matchedCenter = cachedCenters.find(
       (center) => center.name === storedUserInfo.serviceCenter
     );
@@ -94,5 +104,3 @@ export const filterByServiceCenter = <T extends { serviceCenterId?: number | str
     return false;
   });
 };
-
-

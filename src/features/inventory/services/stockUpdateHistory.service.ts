@@ -1,103 +1,37 @@
-/**
- * Stock Update History Service - Track automatic stock updates from inventory approvals
- */
 
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-
-export interface StockUpdateHistory {
-  id: string;
-  partId: string;
-  partName: string;
-  partNumber: string;
-  quantity: number;
-  operation: "decrease" | "increase";
-  previousStock: number;
-  newStock: number;
-  jobCardId: string;
-  jobCardNumber?: string;
-  customerName?: string;
-  assignedEngineer?: string;
-  updatedBy: string;
-  updatedAt: string;
-  reason: string; // e.g., "Parts assigned to engineer from job card"
-}
-
-const STORAGE_KEY = "stockUpdateHistory";
+// Stub service for Stock Update History
+// Backend does not currently support history log retrieval via API.
+// This service is now a no-op placeholder.
 
 class StockUpdateHistoryService {
-  /**
-   * Record a stock update
-   */
   async recordUpdate(
     partId: string,
     partName: string,
     partNumber: string,
     quantity: number,
-    operation: "decrease" | "increase",
+    operation: "increase" | "decrease" | "set",
     previousStock: number,
     newStock: number,
-    jobCardId: string,
-    jobCardNumber?: string,
+    referenceId: string,
+    referenceNumber?: string,
     customerName?: string,
-    assignedEngineer?: string,
-    updatedBy: string = "Inventory Manager",
-    reason: string = "Parts assigned from job card"
-  ): Promise<StockUpdateHistory> {
-    const update: StockUpdateHistory = {
-      id: `update-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      partId,
-      partName,
-      partNumber,
-      quantity,
-      operation,
-      previousStock,
-      newStock,
-      jobCardId,
-      jobCardNumber,
-      customerName,
-      assignedEngineer,
-      updatedBy,
-      updatedAt: new Date().toISOString(),
-      reason,
-    };
-
-    const history = await this.getAll();
-    safeStorage.setItem(STORAGE_KEY, [update, ...history]);
-
-    return update;
+    technicianName?: string,
+    updatedBy?: string,
+    notes?: string
+  ): Promise<void> {
+    console.log("Stock update recorded (client-side log):", {
+      partId, partName, quantity, operation, newStock
+    });
+    // API call to log history would go here if backend supported it
   }
 
-  /**
-   * Get all stock update history
-   */
-  async getAll(): Promise<StockUpdateHistory[]> {
-    return safeStorage.getItem<StockUpdateHistory[]>(STORAGE_KEY, []);
+  async getAll(): Promise<any[]> {
+    return [];
   }
 
-  /**
-   * Get updates by part ID
-   */
-  async getByPartId(partId: string): Promise<StockUpdateHistory[]> {
-    const all = await this.getAll();
-    return all.filter((u) => u.partId === partId);
-  }
-
-  /**
-   * Get updates by job card ID
-   */
-  async getByJobCardId(jobCardId: string): Promise<StockUpdateHistory[]> {
-    const all = await this.getAll();
-    return all.filter((u) => u.jobCardId === jobCardId);
-  }
-
-  /**
-   * Get recent updates (last N updates)
-   */
-  async getRecent(limit: number = 50): Promise<StockUpdateHistory[]> {
-    const all = await this.getAll();
-    return all.slice(0, limit);
+  async getByPartId(partId: string): Promise<any[]> {
+    return [];
   }
 }
 
 export const stockUpdateHistoryService = new StockUpdateHistoryService();
-

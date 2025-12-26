@@ -25,7 +25,12 @@ class ApiClient {
     private defaultTimeout = API_CONFIG.TIMEOUT || 30000;
 
     constructor(baseURL: string = API_BASE_URL) {
-        this.baseURL = baseURL;
+        if (!baseURL) {
+            console.warn("ApiClient: baseURL is undefined. Using default http://localhost:3001/api");
+            this.baseURL = "http://localhost:3001/api";
+        } else {
+            this.baseURL = baseURL;
+        }
     }
 
     /**

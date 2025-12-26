@@ -1,7 +1,26 @@
 "use client";
 import { useState, useMemo } from "react";
 import { Trash, Key, History, UserCog, Edit, Power, Eye, ArrowLeft, Users } from "lucide-react";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+// Local storage helper
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (e) {
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(e);
+    }
+  },
+};
 
 // Types
 interface User {
@@ -547,8 +566,8 @@ export default function UsersAndRolesPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`text-sm font-semibold ${user.status === "Active"
-                              ? "text-green-600"
-                              : "text-red-500"
+                            ? "text-green-600"
+                            : "text-red-500"
                             }`}
                         >
                           {user.status}
@@ -794,8 +813,8 @@ export default function UsersAndRolesPage() {
                   <span className="text-sm font-medium text-gray-600">Status:</span>
                   <span
                     className={`text-sm font-semibold ${selectedUser.status === "Active"
-                        ? "text-green-600"
-                        : "text-red-500"
+                      ? "text-green-600"
+                      : "text-red-500"
                       }`}
                   >
                     {selectedUser.status}
@@ -830,8 +849,8 @@ export default function UsersAndRolesPage() {
                 <button
                   onClick={() => handleToggleUserStatus(selectedUser)}
                   className={`px-4 py-2 rounded-md transition flex items-center justify-center gap-2 text-sm ${selectedUser.status === "Active"
-                      ? "bg-orange-600 text-white hover:bg-orange-700"
-                      : "bg-green-600 text-white hover:bg-green-700"
+                    ? "bg-orange-600 text-white hover:bg-orange-700"
+                    : "bg-green-600 text-white hover:bg-green-700"
                     }`}
                 >
                   <Power size={16} />

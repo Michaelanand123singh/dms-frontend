@@ -1,5 +1,16 @@
 
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  }
+};
 import { staticServiceCenters } from "@/shared/types";
 
 export type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
