@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Plus, Search, Filter, CheckCircle, Loader2, UserCheck, X, Clock, User,
   Wrench, AlertCircle, Package, FileText, Eye, Edit, Car, Calendar
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+
 
 // Components
 import JobCardFilters from "./components/JobCardFilters";
@@ -39,29 +39,29 @@ const JobCardTable = dynamic(() => import("./components/JobCardTable"), {
 
 const getStatusColor = (status: JobCardStatus): string => {
   const colors: Record<JobCardStatus, string> = {
-    arrival_pending: "bg-gray-100 text-gray-700 border-gray-300",
-    job_card_pending_vehicle: "bg-blue-50 text-blue-700 border-blue-200",
-    job_card_active: "bg-yellow-100 text-yellow-700 border-yellow-300",
-    check_in_only: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    no_response_lead: "bg-red-100 text-red-700 border-red-200",
-    manager_quote: "bg-purple-50 text-purple-700 border-purple-200",
-    "Awaiting Quotation Approval": "bg-amber-100 text-amber-700 border-amber-300",
-    Created: "bg-gray-100 text-gray-700 border-gray-300",
-    Assigned: "bg-blue-100 text-blue-700 border-blue-300",
-    "In Progress": "bg-yellow-100 text-yellow-700 border-yellow-300",
-    "Parts Pending": "bg-orange-100 text-orange-700 border-orange-300",
-    Completed: "bg-green-100 text-green-700 border-green-300",
-    Invoiced: "bg-purple-100 text-purple-700 border-purple-300",
+    ARRIVAL_PENDING: "bg-gray-100 text-gray-700 border-gray-300",
+    JOB_CARD_PENDING_VEHICLE: "bg-blue-50 text-blue-700 border-blue-200",
+    JOB_CARD_ACTIVE: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    CHECK_IN_ONLY: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    NO_RESPONSE_LEAD: "bg-red-100 text-red-700 border-red-200",
+    MANAGER_QUOTE: "bg-purple-50 text-purple-700 border-purple-200",
+    AWAITING_QUOTATION_APPROVAL: "bg-amber-100 text-amber-700 border-amber-300",
+    CREATED: "bg-gray-100 text-gray-700 border-gray-300",
+    ASSIGNED: "bg-blue-100 text-blue-700 border-blue-300",
+    IN_PROGRESS: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    PARTS_PENDING: "bg-orange-100 text-orange-700 border-orange-300",
+    COMPLETED: "bg-green-100 text-green-700 border-green-300",
+    INVOICED: "bg-purple-100 text-purple-700 border-purple-300",
   };
-  return colors[status] || colors.Created;
+  return colors[status] || colors.CREATED;
 };
 
 const getPriorityColor = (priority: string): string => {
   const colors: Record<string, string> = {
-    Low: "bg-gray-500",
-    Normal: "bg-blue-500",
-    High: "bg-orange-500",
-    Urgent: "bg-red-500",
+    LOW: "bg-gray-500",
+    NORMAL: "bg-blue-500",
+    HIGH: "bg-orange-500",
+    CRITICAL: "bg-red-500",
   };
   return colors[priority] || "bg-gray-500";
 };
@@ -138,9 +138,9 @@ export default function JobCards() {
 
   // Derived state for Technician view
   const assignedJobCards = visibleJobCards; // For technician, visible cards are already filtered
-  const assignedJobs = isTechnician ? visibleJobCards.filter((job) => job.status === "Assigned") : [];
-  const inProgressJobs = isTechnician ? visibleJobCards.filter((job) => job.status === "In Progress") : [];
-  const completedJobs = isTechnician ? visibleJobCards.filter((job) => job.status === "Completed") : [];
+  const assignedJobs = isTechnician ? visibleJobCards.filter((job) => job.status === "ASSIGNED") : [];
+  const inProgressJobs = isTechnician ? visibleJobCards.filter((job) => job.status === "IN_PROGRESS") : [];
+  const completedJobs = isTechnician ? visibleJobCards.filter((job) => job.status === "COMPLETED") : [];
 
   const handleEditDraft = (job: JobCard) => {
     if (!job.sourceAppointmentId) {
@@ -188,19 +188,19 @@ export default function JobCards() {
 
   const getNextStatus = (currentStatus: JobCardStatus): JobCardStatus[] => {
     const workflow: Record<JobCardStatus, JobCardStatus[]> = {
-      arrival_pending: ["job_card_pending_vehicle"],
-      job_card_pending_vehicle: ["job_card_active"],
-      job_card_active: ["check_in_only", "manager_quote"],
-      check_in_only: ["manager_quote"],
-      no_response_lead: [],
-      manager_quote: ["Assigned"],
-      "Awaiting Quotation Approval": ["Created"],
-      Created: ["Assigned"],
-      Assigned: ["In Progress"],
-      "In Progress": ["Parts Pending", "Completed"],
-      "Parts Pending": ["In Progress", "Completed"],
-      Completed: ["Invoiced"],
-      Invoiced: [],
+      ARRIVAL_PENDING: ["JOB_CARD_PENDING_VEHICLE"],
+      JOB_CARD_PENDING_VEHICLE: ["JOB_CARD_ACTIVE"],
+      JOB_CARD_ACTIVE: ["CHECK_IN_ONLY", "MANAGER_QUOTE"],
+      CHECK_IN_ONLY: ["MANAGER_QUOTE"],
+      NO_RESPONSE_LEAD: [],
+      MANAGER_QUOTE: ["ASSIGNED"],
+      AWAITING_QUOTATION_APPROVAL: ["CREATED"],
+      CREATED: ["ASSIGNED"],
+      ASSIGNED: ["IN_PROGRESS"],
+      IN_PROGRESS: ["PARTS_PENDING", "COMPLETED"],
+      PARTS_PENDING: ["IN_PROGRESS", "COMPLETED"],
+      COMPLETED: ["INVOICED"],
+      INVOICED: [],
     };
     return workflow[currentStatus] || [];
   };
@@ -330,7 +330,7 @@ export default function JobCards() {
                     updateStatus(jobId, status as JobCardStatus);
                   } else {
                     setUpdatingStatusJobId(jobId);
-                    const currentStatus = visibleJobCards.find(j => j.id === jobId)?.status || "Assigned";
+                    const currentStatus = visibleJobCards.find(j => j.id === jobId)?.status || "ASSIGNED";
                     setNewStatus(getNextStatus(currentStatus)[0]);
                     setShowStatusUpdateModal(true);
                   }
@@ -506,23 +506,13 @@ export default function JobCards() {
             }}
             getNextStatus={getNextStatus}
             hasQuotation={(jobId) => {
-              if (typeof window === "undefined") return false;
-              const quotations = safeStorage.getItem<any[]>("quotations", []);
-              return quotations.some((q) => q.jobCardId === jobId);
+              const job = filteredJobs.find(j => j.id === jobId);
+              return !!job?.quotationId;
             }}
             onCreateQuotation={(job) => {
-              safeStorage.setItem("pendingQuotationFromJobCard", {
-                jobCardId: job.id,
-                jobCardNumber: job.jobCardNumber,
-                customerName: job.customerName,
-                customerId: job.customerId,
-                vehicleId: job.vehicleId,
-                serviceCenterId: job.serviceCenterId,
-                serviceCenterName: job.serviceCenterName,
-                jobCardData: job,
-              });
               router.push(`/sc/quotations?fromJobCard=true&jobCardId=${job.id}`);
             }}
+            onPassToManager={handleSubmitToManager}
           />
         )}
 
@@ -550,21 +540,10 @@ export default function JobCards() {
             }}
             getNextStatus={getNextStatus}
             hasQuotation={(jobId) => {
-              if (typeof window === "undefined") return false;
-              const quotations = safeStorage.getItem<any[]>("quotations", []);
-              return quotations.some((q) => q.jobCardId === jobId);
+              const job = filteredJobs.find(j => j.id === jobId);
+              return !!job?.quotationId;
             }}
             onCreateQuotation={(job) => {
-              safeStorage.setItem("pendingQuotationFromJobCard", {
-                jobCardId: job.id,
-                jobCardNumber: job.jobCardNumber,
-                customerName: job.customerName,
-                customerId: job.customerId,
-                vehicleId: job.vehicleId,
-                serviceCenterId: job.serviceCenterId,
-                serviceCenterName: job.serviceCenterName,
-                jobCardData: job,
-              });
               router.push(`/sc/quotations?fromJobCard=true&jobCardId=${job.id}`);
             }}
           />
@@ -624,7 +603,7 @@ export default function JobCards() {
           setShowStatusUpdateModal(false);
           setUpdatingStatusJobId(null);
         }}
-        currentStatus={visibleJobCards.find((j) => j.id === updatingStatusJobId)?.status || "Created"}
+        currentStatus={visibleJobCards.find((j) => j.id === updatingStatusJobId)?.status || "CREATED"}
         newStatus={newStatus}
         onStatusChange={setNewStatus}
         onSubmit={handleStatusUpdate}

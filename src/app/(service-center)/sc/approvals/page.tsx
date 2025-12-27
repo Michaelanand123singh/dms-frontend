@@ -1,7 +1,34 @@
-    "use client";
+"use client";
 import { useState, useEffect, useMemo } from "react";
 import { CheckCircle, XCircle, Clock, Eye, UserCheck, FileText, ShieldCheck, ShieldX, X, Car, User, Phone, Calendar, Wrench, AlertCircle, Search, ClipboardList } from "lucide-react";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing ${key} from localStorage:`, error);
+    }
+  }
+};
 import type { Quotation } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
 import { getServiceCenterContext, filterByServiceCenter, shouldFilterByServiceCenter } from "@/shared/lib/serviceCenter";
@@ -9,6 +36,8 @@ import { getServiceCenterContext, filterByServiceCenter, shouldFilterByServiceCe
 // Service Intake Request types (matching appointments page)
 // Import from shared types
 import type { DocumentationFiles } from '@/shared/types/documentation.types';
+import { jobCardService } from "@/features/job-cards/services/jobCard.service";
+import { quotationsService } from "@/features/quotations/services/quotations.service";
 
 interface ServiceIntakeForm {
   customerIdProof: DocumentationFiles;
@@ -28,7 +57,7 @@ interface ServiceIntakeForm {
   insuranceEndDate: string;
   insuranceCompanyName: string;
   serviceType: string;
-  customerComplaintIssue: string;
+  customerComplaint: string;
   previousServiceHistory: string;
   estimatedServiceTime: string;
   estimatedCost: string;
@@ -89,708 +118,86 @@ export default function Approvals() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showJobCardModal, setShowJobCardModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  
+
   // Service center context for filtering
   const serviceCenterContext = useMemo(() => getServiceCenterContext(), []);
   const shouldFilter = shouldFilterByServiceCenter(serviceCenterContext);
 
   // Load quotations and service intake requests from localStorage
   useEffect(() => {
-    const loadData = () => {
+    const loadData = async () => {
       // Load quotations
-      let storedQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
-      
-      // Check if we have any pending quotations for manager approval
-      const hasPendingQuotations = storedQuotations.some(q => q.status === "sent_to_manager");
-      
-        // Initialize mock quotations if none exist (for testing)
-      if (!hasPendingQuotations) {
-        // Get service center info
-        let serviceCenterId: string;
-        let serviceCenterCode: string;
-        let serviceCenterName: string;
-        let serviceCenterAddress: string;
-        let serviceCenterCity: string;
-        let serviceCenterState: string;
-        let serviceCenterPincode: string;
-        
-        if (serviceCenterContext.serviceCenterId) {
-          const contextId = String(serviceCenterContext.serviceCenterId);
-          if (contextId === "1" || contextId === "sc-001") {
-            serviceCenterId = "sc-001";
-            serviceCenterCode = "SC001";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Delhi Central Hub";
-            serviceCenterAddress = "123 Connaught Place, Block A";
-            serviceCenterCity = "New Delhi";
-            serviceCenterState = "Delhi";
-            serviceCenterPincode = "110001";
-          } else if (contextId === "2" || contextId === "sc-002") {
-            serviceCenterId = "sc-002";
-            serviceCenterCode = "SC002";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Mumbai Metroplex";
-            serviceCenterAddress = "456 Bandra West, Linking Road";
-            serviceCenterCity = "Mumbai";
-            serviceCenterState = "Maharashtra";
-            serviceCenterPincode = "400050";
-          } else if (contextId === "3" || contextId === "sc-003") {
-            serviceCenterId = "sc-003";
-            serviceCenterCode = "SC003";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Bangalore Innovation Center";
-            serviceCenterAddress = "789 Koramangala, 5th Block";
-            serviceCenterCity = "Bangalore";
-            serviceCenterState = "Karnataka";
-            serviceCenterPincode = "560095";
-          } else {
-            serviceCenterId = "sc-001";
-            serviceCenterCode = "SC001";
-            serviceCenterName = "Delhi Central Hub";
-            serviceCenterAddress = "123 Connaught Place, Block A";
-            serviceCenterCity = "New Delhi";
-            serviceCenterState = "Delhi";
-            serviceCenterPincode = "110001";
-          }
-        } else {
-          serviceCenterId = "sc-001";
-          serviceCenterCode = "SC001";
-          serviceCenterName = "Delhi Central Hub";
-          serviceCenterAddress = "123 Connaught Place, Block A";
-          serviceCenterCity = "New Delhi";
-          serviceCenterState = "Delhi";
-          serviceCenterPincode = "110001";
+      // Load quotations from API
+      try {
+        // Use a more inclusive filter or Specific status as per backend Enum
+        const pendingQuotations = await quotationsService.getAll({ status: 'SENT_TO_MANAGER' });
+
+        // Filter by service center if needed (though backend might already handle this if we pass serviceCenterId)
+        let finalQuotations = pendingQuotations;
+        if (shouldFilter && serviceCenterContext.serviceCenterId) {
+          // Backend filtering via param is preferred, but filtering here is safe too
+          finalQuotations = filterByServiceCenter(pendingQuotations, serviceCenterContext);
         }
-        
-        const mockQuotations: Quotation[] = [
-          {
-            id: "QT-MOCK-001",
-            quotationNumber: `QT-${serviceCenterCode}-202501-0001`,
-            serviceCenterId: serviceCenterId,
-            customerId: "cust-mock-003",
-            vehicleId: "veh-mock-003",
-            serviceAdvisorId: "user-001",
-            documentType: "Quotation",
-            quotationDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-            validUntil: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-            hasInsurance: true,
-            insurerId: "ins-001",
-            subtotal: 12000,
-            discount: 1200,
-            discountPercent: 10,
-            preGstAmount: 10800,
-            cgstAmount: 972,
-            sgstAmount: 972,
-            igstAmount: 0,
-            totalAmount: 12744,
-            notes: "Complete battery diagnostics and service. Battery warranty check required.",
-            batterySerialNumber: "BAT-2024-001",
-            customNotes: "Customer reported range reduction. Battery health check mandatory.",
-            noteTemplateId: "",
-            status: "sent_to_manager",
-            passedToManager: true,
-            passedToManagerAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            managerId: undefined,
-            sentToManager: true,
-            sentToManagerAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            items: [
-              {
-                id: "item-mock-001",
-                serialNumber: 1,
-                partName: "Battery Diagnostic Service",
-                partNumber: "BAT-DIAG-001",
-                hsnSacCode: "998314",
-                quantity: 1,
-                rate: 5000,
-                gstPercent: 18,
-                amount: 5000,
-              },
-              {
-                id: "item-mock-002",
-                serialNumber: 2,
-                partName: "Battery Cell Replacement (if needed)",
-                partNumber: "BAT-CELL-001",
-                hsnSacCode: "8507",
-                quantity: 1,
-                rate: 5000,
-                gstPercent: 18,
-                amount: 5000,
-              },
-              {
-                id: "item-mock-003",
-                serialNumber: 3,
-                partName: "Labor Charges",
-                partNumber: "",
-                hsnSacCode: "998314",
-                quantity: 1,
-                rate: 2000,
-                gstPercent: 18,
-                amount: 2000,
-              },
-            ],
-            customer: {
-              id: "cust-mock-003",
-              firstName: "Vikram",
-              lastName: "Singh",
-              phone: "9876543214",
-              email: "vikram.singh@example.com",
-              address: "456 MG Road, Bangalore, Karnataka 560001",
-              city: "Bangalore",
-              state: "Karnataka",
-              pincode: "560001",
-            },
-            vehicle: {
-              id: "veh-mock-003",
-              make: "MG",
-              model: "ZS EV",
-              registration: "KA-05-EF-3456",
-              vin: "MG1234567890123456",
-            },
-            insurer: {
-              id: "ins-001",
-              name: "HDFC Ergo",
-              address: "Mumbai, Maharashtra",
-              gstNumber: "27AAACH1234R1Z5",
-              phone: "1800-202-2020",
-              email: "support@hdfcergo.com",
-              isActive: true,
-            },
-            serviceCenter: {
-              id: serviceCenterId,
-              name: serviceCenterName,
-              code: serviceCenterCode,
-              address: serviceCenterAddress,
-              city: serviceCenterCity,
-              state: serviceCenterState,
-              pincode: serviceCenterPincode,
-            },
-          },
-          {
-            id: "QT-MOCK-002",
-            quotationNumber: `QT-${serviceCenterCode}-202501-0002`,
-            serviceCenterId: serviceCenterId,
-            customerId: "cust-mock-004",
-            vehicleId: "veh-mock-004",
-            serviceAdvisorId: "user-001",
-            documentType: "Quotation",
-            quotationDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-            validUntil: new Date(Date.now() + 29 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-            hasInsurance: false,
-            subtotal: 8500,
-            discount: 0,
-            discountPercent: 0,
-            preGstAmount: 8500,
-            cgstAmount: 765,
-            sgstAmount: 765,
-            igstAmount: 0,
-            totalAmount: 10030,
-            notes: "Complete AC system service including compressor check, refrigerant refill, and filter replacement.",
-            batterySerialNumber: "",
-            customNotes: "AC not working properly, customer wants comprehensive service",
-            noteTemplateId: "",
-            status: "sent_to_manager",
-            passedToManager: true,
-            passedToManagerAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-            managerId: undefined,
-            sentToManager: true,
-            sentToManagerAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-            items: [
-              {
-                id: "item-mock-004",
-                serialNumber: 1,
-                partName: "AC Compressor Service",
-                partNumber: "AC-COMP-001",
-                hsnSacCode: "8708",
-                quantity: 1,
-                rate: 4000,
-                gstPercent: 18,
-                amount: 4000,
-              },
-              {
-                id: "item-mock-005",
-                serialNumber: 2,
-                partName: "AC Refrigerant R134a",
-                partNumber: "AC-REF-001",
-                hsnSacCode: "2903",
-                quantity: 1,
-                rate: 2000,
-                gstPercent: 18,
-                amount: 2000,
-              },
-              {
-                id: "item-mock-006",
-                serialNumber: 3,
-                partName: "AC Filter Replacement",
-                partNumber: "AC-FIL-001",
-                hsnSacCode: "8708",
-                quantity: 1,
-                rate: 1500,
-                gstPercent: 18,
-                amount: 1500,
-              },
-              {
-                id: "item-mock-007",
-                serialNumber: 4,
-                partName: "Labor Charges",
-                partNumber: "",
-                hsnSacCode: "998314",
-                quantity: 1,
-                rate: 1000,
-                gstPercent: 18,
-                amount: 1000,
-              },
-            ],
-            customer: {
-              id: "cust-mock-004",
-              firstName: "Anjali",
-              lastName: "Mehta",
-              phone: "9876543215",
-              email: "anjali.mehta@example.com",
-              address: "789 Park Street, Mumbai, Maharashtra 400001",
-              city: "Mumbai",
-              state: "Maharashtra",
-              pincode: "400001",
-            },
-            vehicle: {
-              id: "veh-mock-004",
-              make: "Hyundai",
-              model: "Kona Electric",
-              registration: "MH-01-GH-7890",
-              vin: "HYU9876543210987",
-            },
-            serviceCenter: {
-              id: serviceCenterId,
-              name: serviceCenterName,
-              code: serviceCenterCode,
-              address: serviceCenterAddress,
-              city: serviceCenterCity,
-              state: serviceCenterState,
-              pincode: serviceCenterPincode,
-            },
-          },
-        ];
-        
-        // Add mock quotations if they don't exist
-        const existingQuotationIds = new Set(storedQuotations.map(q => q.id));
-        const newQuotations = mockQuotations.filter(q => !existingQuotationIds.has(q.id));
-        if (newQuotations.length > 0) {
-          storedQuotations = [...storedQuotations, ...newQuotations];
-          safeStorage.setItem("quotations", storedQuotations);
-        }
+        setQuotations(finalQuotations);
+      } catch (error) {
+        console.error("Failed to load quotations:", error);
+        setQuotations([]);
       }
-      
-      // Reload from localStorage
-      storedQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
-      let pendingApprovals = storedQuotations.filter(
-        (q) => q.status === "sent_to_manager"
-      );
-      
-      // Filter by service center if needed
-      if (shouldFilter) {
-        pendingApprovals = filterByServiceCenter(pendingApprovals, serviceCenterContext);
-      }
-      
-      setQuotations(pendingApprovals);
-      
+
       // Load service intake requests
       let storedRequests = safeStorage.getItem<ServiceIntakeRequest[]>("serviceIntakeRequests", []);
-      
+
       // Check if we have any pending service intake requests
       const hasPendingRequests = storedRequests.some(r => r.status === "pending");
-      
-      // Initialize mock service intake requests if none exist (for testing)
-      if (!hasPendingRequests) {
-        // Get service center info
-        let serviceCenterId: string;
-        let serviceCenterName: string;
-        
-        if (serviceCenterContext.serviceCenterId) {
-          const contextId = String(serviceCenterContext.serviceCenterId);
-          if (contextId === "1" || contextId === "sc-001") {
-            serviceCenterId = "sc-001";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Delhi Central Hub";
-          } else if (contextId === "2" || contextId === "sc-002") {
-            serviceCenterId = "sc-002";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Mumbai Metroplex";
-          } else if (contextId === "3" || contextId === "sc-003") {
-            serviceCenterId = "sc-003";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Bangalore Innovation Center";
-          } else {
-            serviceCenterId = "sc-001";
-            serviceCenterName = "Delhi Central Hub";
-          }
-        } else {
-          serviceCenterId = "sc-001";
-          serviceCenterName = "Delhi Central Hub";
-        }
-        
-        const mockServiceIntakeRequests: ServiceIntakeRequest[] = [
-          {
-            id: "SIR-001",
-            appointmentId: 1001,
-            appointment: {
-              id: 1001,
-              customerName: "Amit Patel",
-              vehicle: "Mahindra XUV400",
-              phone: "9876543212",
-              serviceType: "Battery Service",
-              date: new Date().toISOString().split("T")[0],
-              time: "10:00 AM",
-              status: "confirmed",
-            },
-            serviceIntakeForm: {
-              customerIdProof: { urls: [], publicIds: [], metadata: [] },
-              vehicleRCCopy: { urls: [], publicIds: [], metadata: [] },
-              warrantyCardServiceBook: { urls: [], publicIds: [], metadata: [] },
-              photosVideos: { urls: [], publicIds: [], metadata: [] },
-              vehicleBrand: "Mahindra",
-              vehicleModel: "XUV400",
-              registrationNumber: "DL-01-AB-5678",
-              vinChassisNumber: "MAH1234567890123",
-              variantBatteryCapacity: "39.4 kWh",
-              motorNumber: "MOT-001-2024",
-              chargerSerialNumber: "CHG-001-2024",
-              dateOfPurchase: "2023-06-15",
-              warrantyStatus: "Active",
-              insuranceStartDate: "2023-06-20",
-              insuranceEndDate: "2024-06-19",
-              insuranceCompanyName: "HDFC Ergo",
-              serviceType: "Battery Service",
-              customerComplaintIssue: "Battery not holding charge properly, range reduced significantly",
-              previousServiceHistory: "Last service done 3 months ago, routine maintenance",
-              estimatedServiceTime: "4 hours",
-              estimatedCost: "₹8,500",
-              odometerReading: "15,000 km",
-              estimatedDeliveryDate: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().split("T")[0],
-              assignedServiceAdvisor: "Ravi Kumar",
-              assignedTechnician: "",
-              pickupDropRequired: true,
-              pickupAddress: "123 Sector 5, Noida, UP 201301",
-              dropAddress: "123 Sector 5, Noida, UP 201301",
-              preferredCommunicationMode: "WhatsApp",
-              paymentMethod: "UPI",
-              gstRequirement: false,
-              businessNameForInvoice: "",
-              arrivalMode: "vehicle_present",
-              checkInNotes: "Vehicle checked in, battery diagnostics required",
-              checkInSlipNumber: "CHK-001",
-              checkInDate: new Date().toISOString().split("T")[0],
-              checkInTime: "09:45 AM",
-            },
-            status: "pending",
-            submittedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-            submittedBy: "Service Advisor",
-            serviceCenterId: serviceCenterId,
-            serviceCenterName: serviceCenterName,
-          },
-          {
-            id: "SIR-002",
-            appointmentId: 1002,
-            appointment: {
-              id: 1002,
-              customerName: "Sneha Reddy",
-              vehicle: "Tata Tigor EV",
-              phone: "9876543213",
-              serviceType: "AC Service",
-              date: new Date().toISOString().split("T")[0],
-              time: "11:30 AM",
-              status: "confirmed",
-            },
-            serviceIntakeForm: {
-              customerIdProof: { urls: [], publicIds: [], metadata: [] },
-              vehicleRCCopy: { urls: [], publicIds: [], metadata: [] },
-              warrantyCardServiceBook: { urls: [], publicIds: [], metadata: [] },
-              photosVideos: { urls: [], publicIds: [], metadata: [] },
-              vehicleBrand: "Tata",
-              vehicleModel: "Tigor EV",
-              registrationNumber: "KA-03-CD-9012",
-              vinChassisNumber: "TATA9876543210987",
-              variantBatteryCapacity: "26 kWh",
-              motorNumber: "MOT-002-2023",
-              chargerSerialNumber: "CHG-002-2023",
-              dateOfPurchase: "2022-11-10",
-              warrantyStatus: "Active",
-              insuranceStartDate: "2022-11-15",
-              insuranceEndDate: "2023-11-14",
-              insuranceCompanyName: "ICICI Lombard",
-              serviceType: "AC Service",
-              customerComplaintIssue: "AC not cooling properly, air flow is weak",
-              previousServiceHistory: "First service after purchase, no previous issues",
-              estimatedServiceTime: "2 hours",
-              estimatedCost: "₹3,200",
-              odometerReading: "8,500 km",
-              estimatedDeliveryDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-              assignedServiceAdvisor: "Priya Sharma",
-              assignedTechnician: "",
-              pickupDropRequired: false,
-              pickupAddress: "",
-              dropAddress: "",
-              preferredCommunicationMode: "Phone",
-              paymentMethod: "Card",
-              gstRequirement: false,
-              businessNameForInvoice: "",
-              arrivalMode: "vehicle_present",
-              checkInNotes: "AC compressor needs inspection",
-              checkInSlipNumber: "CHK-002",
-              checkInDate: new Date().toISOString().split("T")[0],
-              checkInTime: "11:20 AM",
-            },
-            status: "pending",
-            submittedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            submittedBy: "Service Advisor",
-            serviceCenterId: serviceCenterId,
-            serviceCenterName: serviceCenterName,
-          },
-        ];
-        
-        // Add mock requests if they don't exist
-        const existingRequestIds = new Set(storedRequests.map(r => r.id));
-        const newRequests = mockServiceIntakeRequests.filter(r => !existingRequestIds.has(r.id));
-        if (newRequests.length > 0) {
-          storedRequests = [...storedRequests, ...newRequests];
-          safeStorage.setItem("serviceIntakeRequests", storedRequests);
-        }
-      }
-      
+
+
+
+
       // Reload from localStorage
       storedRequests = safeStorage.getItem<ServiceIntakeRequest[]>("serviceIntakeRequests", []);
       let pendingRequests = storedRequests.filter(
         (r) => r.status === "pending"
       );
-      
+
       // Filter by service center if needed
       if (shouldFilter) {
         pendingRequests = filterByServiceCenter(pendingRequests, serviceCenterContext);
       }
-      
+
       setServiceIntakeRequests(pendingRequests);
-      
+
       // Load job cards submitted to manager
       let storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-      
+
       // Check if we have any pending job card approvals
-      const hasPendingApprovals = storedJobCards.some(jc => jc.submittedToManager === true && jc.status === "Created");
-      
-      // Initialize mock job card approvals if none exist (for testing)
-      if (!hasPendingApprovals) {
-        // Get service center info - use actual service center from context or default to first one
-        // Service centers: 1="Delhi Central Hub" (sc-001), 2="Mumbai Metroplex" (sc-002), 3="Bangalore Innovation Center" (sc-003)
-        let serviceCenterId: string;
-        let serviceCenterCode: string;
-        let serviceCenterName: string;
-        
-        if (serviceCenterContext.serviceCenterId) {
-          const contextId = String(serviceCenterContext.serviceCenterId);
-          // Map numeric IDs to sc-xxx format
-          if (contextId === "1" || contextId === "sc-001") {
-            serviceCenterId = "sc-001";
-            serviceCenterCode = "SC001";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Delhi Central Hub";
-          } else if (contextId === "2" || contextId === "sc-002") {
-            serviceCenterId = "sc-002";
-            serviceCenterCode = "SC002";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Mumbai Metroplex";
-          } else if (contextId === "3" || contextId === "sc-003") {
-            serviceCenterId = "sc-003";
-            serviceCenterCode = "SC003";
-            serviceCenterName = serviceCenterContext.serviceCenterName || "Bangalore Innovation Center";
-          } else {
-            // Default to first service center
-            serviceCenterId = "sc-001";
-            serviceCenterCode = "SC001";
-            serviceCenterName = "Delhi Central Hub";
-          }
-        } else {
-          // Default to first service center
-          serviceCenterId = "sc-001";
-          serviceCenterCode = "SC001";
-          serviceCenterName = "Delhi Central Hub";
-        }
-        
-        const mockJobCardApprovals: JobCard[] = [
-          {
-            id: "JC-APPROVAL-001",
-            jobCardNumber: `${serviceCenterCode}-202501-APPROVAL-001`,
-            serviceCenterId: serviceCenterId,
-            serviceCenterCode: serviceCenterCode,
-            serviceCenterName: serviceCenterName,
-            customerId: "cust-mock-001",
-            customerName: "Rajesh Kumar",
-            vehicleId: "veh-mock-001",
-            vehicle: "Tata Nexon EV Max",
-            registration: "MH-12-AB-1234",
-            vehicleMake: "Tata",
-            vehicleModel: "Nexon EV Max",
-            customerType: "B2C",
-            serviceType: "Routine Maintenance",
-            description: "Regular service - oil change, filter replacement, battery check",
-            status: "Created",
-            priority: "Normal",
-            assignedEngineer: null,
-            estimatedCost: "₹3,500",
-            estimatedTime: "2 hours",
-            createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toLocaleString(), // 1 hour ago
-            parts: ["Engine Oil", "Air Filter", "Battery Check"],
-            location: "Station",
-            submittedToManager: true,
-            submittedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-            part1: {
-              fullName: "Rajesh Kumar",
-              mobilePrimary: "9876543210",
-              customerType: "B2C",
-              vehicleBrand: "Tata",
-              vehicleModel: "Nexon EV Max",
-              registrationNumber: "MH-12-AB-1234",
-              vinChassisNumber: "TATA1234567890123",
-              variantBatteryCapacity: "40.5 kWh",
-              warrantyStatus: "Active",
-              estimatedDeliveryDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-              customerAddress: "123 Main Street, Pune, Maharashtra 411001",
-              jobCardNumber: `${serviceCenterCode}-202501-APPROVAL-001`,
-              customerFeedback: "Vehicle making unusual noise, needs inspection",
-              technicianObservation: "",
-              insuranceStartDate: "",
-              insuranceEndDate: "",
-              insuranceCompanyName: "",
-              batterySerialNumber: "",
-              mcuSerialNumber: "",
-              vcuSerialNumber: "",
-              otherPartSerialNumber: "",
-            },
-            part2: [
-              {
-                srNo: 1,
-                partWarrantyTag: false,
-                partName: "Engine Oil",
-                partCode: "EO-001",
-                qty: 1,
-                amount: 1500,
-                technician: "",
-                labourCode: "Auto Select With Part",
-                itemType: "part",
-              },
-              {
-                srNo: 2,
-                partWarrantyTag: false,
-                partName: "Air Filter",
-                partCode: "AF-002",
-                qty: 1,
-                amount: 800,
-                technician: "",
-                labourCode: "Auto Select With Part",
-                itemType: "part",
-              },
-            ],
-          },
-          {
-            id: "JC-APPROVAL-002",
-            jobCardNumber: `${serviceCenterCode}-202501-APPROVAL-002`,
-            serviceCenterId: serviceCenterId,
-            serviceCenterCode: serviceCenterCode,
-            serviceCenterName: serviceCenterName,
-            customerId: "cust-mock-002",
-            customerName: "Priya Sharma",
-            vehicleId: "veh-mock-002",
-            vehicle: "Honda City VX",
-            registration: "MH-12-CD-5678",
-            vehicleMake: "Honda",
-            vehicleModel: "City VX",
-            customerType: "B2C",
-            serviceType: "Repair",
-            description: "Brake pads replacement - front and rear, brake fluid top-up",
-            status: "Created",
-            priority: "High",
-            assignedEngineer: null,
-            estimatedCost: "₹4,200",
-            estimatedTime: "3 hours",
-            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toLocaleString(), // 2 hours ago
-            parts: ["Brake Pads Front", "Brake Pads Rear", "Brake Fluid"],
-            location: "Station",
-            submittedToManager: true,
-            submittedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            part1: {
-              fullName: "Priya Sharma",
-              mobilePrimary: "9876543211",
-              customerType: "B2C",
-              vehicleBrand: "Honda",
-              vehicleModel: "City VX",
-              registrationNumber: "MH-12-CD-5678",
-              vinChassisNumber: "HONDA9876543210987",
-              variantBatteryCapacity: "N/A",
-              warrantyStatus: "Active",
-              estimatedDeliveryDate: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().split("T")[0],
-              customerAddress: "456 Park Avenue, Pune, Maharashtra 411002",
-              jobCardNumber: `${serviceCenterCode}-202501-APPROVAL-002`,
-              customerFeedback: "Brake pedal feels soft, needs immediate attention",
-              technicianObservation: "",
-              insuranceStartDate: "",
-              insuranceEndDate: "",
-              insuranceCompanyName: "",
-              batterySerialNumber: "",
-              mcuSerialNumber: "",
-              vcuSerialNumber: "",
-              otherPartSerialNumber: "",
-            },
-            part2: [
-              {
-                srNo: 1,
-                partWarrantyTag: false,
-                partName: "Brake Pads Front",
-                partCode: "BP-F-001",
-                qty: 1,
-                amount: 2500,
-                technician: "",
-                labourCode: "Auto Select With Part",
-                itemType: "part",
-              },
-              {
-                srNo: 2,
-                partWarrantyTag: false,
-                partName: "Brake Pads Rear",
-                partCode: "BP-R-001",
-                qty: 1,
-                amount: 1500,
-                technician: "",
-                labourCode: "Auto Select With Part",
-                itemType: "part",
-              },
-              {
-                srNo: 3,
-                partWarrantyTag: false,
-                partName: "Brake Fluid",
-                partCode: "BF-001",
-                qty: 1,
-                amount: 200,
-                technician: "",
-                labourCode: "Auto Select With Part",
-                itemType: "part",
-              },
-            ],
-          },
-        ];
-        
-        // Add mock approvals if they don't exist
-        const existingIds = new Set(storedJobCards.map(jc => jc.id));
-        const newApprovals = mockJobCardApprovals.filter(jc => !existingIds.has(jc.id));
-        if (newApprovals.length > 0) {
-          storedJobCards = [...storedJobCards, ...newApprovals];
-          safeStorage.setItem("jobCards", storedJobCards);
-        }
+      const hasPendingApprovals = storedJobCards.some(jc => jc.submittedToManager === true && jc.status === "CREATED");
+
+      // Fetch real pending job cards from API
+      try {
+        const pendingJobCards = await jobCardService.getAll({
+          passedToManager: 'true',
+          managerReviewStatus: 'PENDING'
+        });
+        setJobCardApprovals(pendingJobCards);
+      } catch (error) {
+        console.error("Failed to fetch pending job cards:", error);
+        // Fallback to empty if API fails (or keep mock logic if preferred, but usually we want real data)
+        // For now, let's just use empty or the mock data if fetch fails
+        setJobCardApprovals([]);
       }
-      
+
       // Reload from localStorage to ensure we have the latest data
       storedJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-      
+
       let pendingJobCards = storedJobCards.filter(
-        (jc) => jc.submittedToManager === true && jc.status === "Created"
+        (jc) => jc.submittedToManager === true && jc.status === "CREATED"
       );
-      
+
       // Filter by service center if needed
       if (shouldFilter) {
         pendingJobCards = filterByServiceCenter(pendingJobCards, serviceCenterContext);
       }
-      
+
       setJobCardApprovals(pendingJobCards);
     };
 
@@ -810,47 +217,47 @@ export default function Approvals() {
       clearInterval(interval);
     };
   }, [shouldFilter, serviceCenterContext]);
-  
+
   // Filter requests and quotations by search query
   const filteredServiceIntakeRequests = useMemo(() => {
     if (!searchQuery.trim()) return serviceIntakeRequests;
-    
+
     const query = searchQuery.toLowerCase();
     return serviceIntakeRequests.filter((request) => {
       const customerName = request.appointment.customerName?.toLowerCase() || "";
       const vehicle = request.appointment.vehicle?.toLowerCase() || "";
       const phone = request.appointment.phone?.toLowerCase() || "";
       const serviceType = request.serviceIntakeForm.serviceType?.toLowerCase() || request.appointment.serviceType?.toLowerCase() || "";
-      const complaint = request.serviceIntakeForm.customerComplaintIssue?.toLowerCase() || request.appointment.customerComplaintIssue?.toLowerCase() || "";
+      const complaint = request.serviceIntakeForm.customerComplaint?.toLowerCase() || request.appointment.customerComplaint?.toLowerCase() || "";
       const requestId = request.id?.toLowerCase() || "";
-      
-      return customerName.includes(query) || 
-             vehicle.includes(query) || 
-             phone.includes(query) || 
-             serviceType.includes(query) || 
-             complaint.includes(query) ||
-             requestId.includes(query);
+
+      return customerName.includes(query) ||
+        vehicle.includes(query) ||
+        phone.includes(query) ||
+        serviceType.includes(query) ||
+        complaint.includes(query) ||
+        requestId.includes(query);
     });
   }, [serviceIntakeRequests, searchQuery]);
-  
+
   const filteredQuotations = useMemo(() => {
     if (!searchQuery.trim()) return quotations;
-    
+
     const query = searchQuery.toLowerCase();
     return quotations.filter((quotation) => {
       const customerName = `${quotation.customer?.firstName || ""} ${quotation.customer?.lastName || ""}`.toLowerCase();
       const vehicle = `${quotation.vehicle?.make || ""} ${quotation.vehicle?.model || ""}`.toLowerCase();
       const quotationNumber = quotation.quotationNumber?.toLowerCase() || "";
-      
-      return customerName.includes(query) || 
-             vehicle.includes(query) || 
-             quotationNumber.includes(query);
+
+      return customerName.includes(query) ||
+        vehicle.includes(query) ||
+        quotationNumber.includes(query);
     });
   }, [quotations, searchQuery]);
-  
+
   const filteredJobCardApprovals = useMemo(() => {
     if (!searchQuery.trim()) return jobCardApprovals;
-    
+
     const query = searchQuery.toLowerCase();
     return jobCardApprovals.filter((jobCard) => {
       const customerName = jobCard.customerName?.toLowerCase() || "";
@@ -859,80 +266,51 @@ export default function Approvals() {
       const jobCardNumber = jobCard.jobCardNumber?.toLowerCase() || jobCard.id?.toLowerCase() || "";
       const serviceType = jobCard.serviceType?.toLowerCase() || "";
       const description = jobCard.description?.toLowerCase() || "";
-      
-      return customerName.includes(query) || 
-             vehicle.includes(query) || 
-             registration.includes(query) ||
-             jobCardNumber.includes(query) ||
-             serviceType.includes(query) ||
-             description.includes(query);
+
+      return customerName.includes(query) ||
+        vehicle.includes(query) ||
+        registration.includes(query) ||
+        jobCardNumber.includes(query) ||
+        serviceType.includes(query) ||
+        description.includes(query);
     });
   }, [jobCardApprovals, searchQuery]);
 
-  const handleApprove = (quotationId: string): void => {
-    if (!confirm("Approve this quotation? This will allow job card creation.")) {
-      return;
+  const handleApproveQuotation = async (quotationId: string) => {
+    if (!confirm("Are you sure you want to approve this quotation?")) return;
+
+    try {
+      await quotationsService.managerReview(quotationId, { status: "APPROVED", notes: "Approved by manager" });
+
+      // Refresh list
+      const pendingQuotations = await quotationsService.getAll({ status: 'SENT_TO_MANAGER' });
+      const finalQuotations = shouldFilter ? filterByServiceCenter(pendingQuotations, serviceCenterContext) : pendingQuotations;
+      setQuotations(finalQuotations);
+
+      alert("Quotation approved by manager!");
+    } catch (error) {
+      console.error("Failed to approve quotation", error);
+      alert("Failed to approve quotation");
     }
-
-    const updatedQuotations = quotations.map((q) =>
-      q.id === quotationId
-        ? {
-            ...q,
-            status: "manager_approved" as const,
-            managerApproved: true,
-            managerApprovedAt: new Date().toISOString(),
-          }
-        : q
-    );
-
-    // Update all quotations in localStorage
-    const allQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
-    const updatedAllQuotations = allQuotations.map((q) =>
-      q.id === quotationId
-        ? {
-            ...q,
-            status: "manager_approved" as const,
-            managerApproved: true,
-            managerApprovedAt: new Date().toISOString(),
-          }
-        : q
-    );
-    safeStorage.setItem("quotations", updatedAllQuotations);
-    setQuotations(updatedQuotations.filter((q) => q.status === "sent_to_manager"));
-    alert("Quotation approved by manager!");
   };
 
-  const handleReject = (quotationId: string): void => {
-    if (!confirm("Reject this quotation? This will notify the service advisor.")) {
-      return;
+  const handleRejectQuotation = async (quotationId: string) => {
+    const reason = prompt("Please provide a reason for rejection:");
+    if (!reason) return;
+
+    try {
+      await quotationsService.managerReview(quotationId, { status: "REJECTED", notes: reason });
+
+      // Refresh list
+      const pendingQuotations = await quotationsService.getAll({ status: 'SENT_TO_MANAGER' });
+      const finalQuotations = shouldFilter ? filterByServiceCenter(pendingQuotations, serviceCenterContext) : pendingQuotations;
+      setQuotations(finalQuotations);
+
+      alert("Quotation rejected!");
+    } catch (error) {
+      console.error("Failed to reject quotation", error);
+      alert("Failed to reject quotation");
     }
-
-    const updatedQuotations = quotations.map((q) =>
-      q.id === quotationId
-        ? {
-            ...q,
-            status: "manager_rejected" as const,
-            managerRejected: true,
-            managerRejectedAt: new Date().toISOString(),
-          }
-        : q
-    );
-
-    // Update all quotations in localStorage
-    const allQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
-    const updatedAllQuotations = allQuotations.map((q) =>
-      q.id === quotationId
-        ? {
-            ...q,
-            status: "manager_rejected" as const,
-            managerRejected: true,
-            managerRejectedAt: new Date().toISOString(),
-          }
-        : q
-    );
-    safeStorage.setItem("quotations", updatedAllQuotations);
-    setQuotations(updatedQuotations.filter((q) => q.status === "sent_to_manager"));
-    alert("Quotation rejected!");
   };
 
   const handleApproveServiceIntake = (requestId: string): void => {
@@ -944,11 +322,11 @@ export default function Approvals() {
     const updatedRequests = allRequests.map((r) =>
       r.id === requestId
         ? {
-            ...r,
-            status: "approved" as const,
-            approvedAt: new Date().toISOString(),
-            approvedBy: "Service Manager",
-          }
+          ...r,
+          status: "approved" as const,
+          approvedAt: new Date().toISOString(),
+          approvedBy: "Service Manager",
+        }
         : r
     );
     safeStorage.setItem("serviceIntakeRequests", updatedRequests);
@@ -968,12 +346,12 @@ export default function Approvals() {
     const updatedRequests = allRequests.map((r) =>
       r.id === requestId
         ? {
-            ...r,
-            status: "rejected" as const,
-            rejectedAt: new Date().toISOString(),
-            rejectedBy: "Service Manager",
-            rejectionReason: reason,
-          }
+          ...r,
+          status: "rejected" as const,
+          rejectedAt: new Date().toISOString(),
+          rejectedBy: "Service Manager",
+          rejectionReason: reason,
+        }
         : r
     );
     safeStorage.setItem("serviceIntakeRequests", updatedRequests);
@@ -983,51 +361,54 @@ export default function Approvals() {
     alert("Service intake request rejected!");
   };
 
-  const handleApproveJobCard = (jobCardId: string): void => {
+  const handleApproveJobCard = async (jobCardId: string) => { // Removed : void return type for async
     if (!confirm("Approve this job card? This will allow technician assignment and parts monitoring.")) {
       return;
     }
 
-    const allJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-    const updatedJobCards = allJobCards.map((jc) =>
-      jc.id === jobCardId
-        ? {
-            ...jc,
-            submittedToManager: false,
-            status: "Created" as const,
-            // Job card is approved and ready for technician assignment
-          }
-        : jc
-    );
-    safeStorage.setItem("jobCards", updatedJobCards);
-    setJobCardApprovals(updatedJobCards.filter((jc) => jc.submittedToManager === true && jc.status === "Created"));
-    setShowJobCardModal(false);
-    setSelectedJobCard(null);
-    alert("Job card approved! You can now assign a technician.");
+    try {
+      await jobCardService.managerReview(jobCardId, { status: "APPROVED", notes: "Approved via Web Portal" });
+      alert("Job card approved! You can now assign a technician.");
+
+      // Refresh list
+      const pendingJobCards = await jobCardService.getAll({
+        passedToManager: 'true',
+        managerReviewStatus: 'PENDING'
+      });
+      setJobCardApprovals(pendingJobCards);
+
+      setShowJobCardModal(false);
+      setSelectedJobCard(null);
+
+    } catch (error) {
+      console.error("Approval failed", error);
+      alert("Failed to approve job card. Please try again.");
+    }
   };
 
-  const handleRejectJobCard = (jobCardId: string): void => {
+  const handleRejectJobCard = async (jobCardId: string) => { // Removed : void return type
     const reason = prompt("Please provide a reason for rejection:");
     if (!reason) {
       return;
     }
 
-    const allJobCards = safeStorage.getItem<JobCard[]>("jobCards", []);
-    const updatedJobCards = allJobCards.map((jc) =>
-      jc.id === jobCardId
-        ? {
-            ...jc,
-            submittedToManager: false,
-            status: "Created" as const,
-            // In production, you might want to add a rejectionReason field
-          }
-        : jc
-    );
-    safeStorage.setItem("jobCards", updatedJobCards);
-    setJobCardApprovals(updatedJobCards.filter((jc) => jc.submittedToManager === true && jc.status === "Created"));
-    setShowJobCardModal(false);
-    setSelectedJobCard(null);
-    alert(`Job card rejected. Reason: ${reason}`);
+    try {
+      await jobCardService.managerReview(jobCardId, { status: "REJECTED", notes: reason });
+      alert(`Job card rejected. Reason: ${reason}`);
+
+      // Refresh list
+      const pendingJobCards = await jobCardService.getAll({
+        passedToManager: 'true',
+        managerReviewStatus: 'PENDING'
+      });
+      setJobCardApprovals(pendingJobCards);
+
+      setShowJobCardModal(false);
+      setSelectedJobCard(null);
+    } catch (error) {
+      console.error("Rejection failed", error);
+      alert("Failed to reject job card. Please try again.");
+    }
   };
 
   return (
@@ -1071,7 +452,7 @@ export default function Approvals() {
                             Pending Approval
                           </span>
                         </div>
-                        
+
                         <div className="space-y-2 mb-4">
                           <p className="text-gray-700">
                             <span className="font-semibold">Customer:</span> {jobCard.customerName}
@@ -1101,7 +482,7 @@ export default function Approvals() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-col gap-2">
                         <button
                           onClick={() => {
@@ -1153,7 +534,7 @@ export default function Approvals() {
                             Pending Approval
                           </span>
                         </div>
-                        
+
                         <div className="space-y-2 mb-4">
                           <p className="text-gray-700">
                             <span className="font-semibold">Customer:</span> {request.appointment.customerName}
@@ -1165,7 +546,7 @@ export default function Approvals() {
                             <span className="font-semibold">Service Type:</span> {request.serviceIntakeForm.serviceType || request.appointment.serviceType}
                           </p>
                           <p className="text-gray-700">
-                            <span className="font-semibold">Complaint:</span> {request.serviceIntakeForm.customerComplaintIssue || request.appointment.customerComplaintIssue || "N/A"}
+                            <span className="font-semibold">Complaint:</span> {request.serviceIntakeForm.customerComplaint || request.appointment.customerComplaint || "N/A"}
                           </p>
                           <p className="text-sm text-gray-500">
                             Submitted: {new Date(request.submittedAt).toLocaleString("en-IN")}
@@ -1173,7 +554,7 @@ export default function Approvals() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-col gap-2">
                         <button
                           onClick={() => {
@@ -1215,105 +596,105 @@ export default function Approvals() {
               </h2>
             )}
             {filteredQuotations.length === 0 && filteredServiceIntakeRequests.length === 0 && filteredJobCardApprovals.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-md p-12 text-center">
-              <FileText className="mx-auto text-gray-400 mb-4" size={48} />
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">No Pending Approvals</h3>
+              <div className="bg-white rounded-2xl shadow-md p-12 text-center">
+                <FileText className="mx-auto text-gray-400 mb-4" size={48} />
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">No Pending Approvals</h3>
                 <p className="text-gray-500">
-                  {searchQuery.trim() 
-                    ? "No requests match your search criteria." 
+                  {searchQuery.trim()
+                    ? "No requests match your search criteria."
                     : "There are no requests pending your approval at this time."}
                 </p>
-            </div>
+              </div>
             ) : filteredQuotations.length > 0 ? (
-            filteredQuotations.map((quotation) => (
-              <div key={quotation.id} className="bg-white rounded-2xl shadow-md p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <FileText className="text-blue-600" size={20} />
-                      <span className="font-semibold text-lg">{quotation.quotationNumber}</span>
-                      <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-                        Pending Approval
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-2 mb-4">
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Customer:</span>{" "}
-                        {quotation.customer?.firstName || ""} {quotation.customer?.lastName || ""}
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Vehicle:</span>{" "}
-                        {quotation.vehicle?.make || ""} {quotation.vehicle?.model || ""} ({quotation.vehicle?.registration || ""})
-                      </p>
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Total Amount:</span>{" "}
-                        <span className="text-green-600 font-bold">₹{quotation.totalAmount.toLocaleString("en-IN")}</span>
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Date: {new Date(quotation.quotationDate).toLocaleDateString("en-IN")}
-                      </p>
+              filteredQuotations.map((quotation) => (
+                <div key={quotation.id} className="bg-white rounded-2xl shadow-md p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <FileText className="text-blue-600" size={20} />
+                        <span className="font-semibold text-lg">{quotation.quotationNumber}</span>
+                        <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                          Pending Approval
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 mb-4">
+                        <p className="text-gray-700">
+                          <span className="font-semibold">Customer:</span>{" "}
+                          {quotation.customer?.firstName || ""} {quotation.customer?.lastName || ""}
+                        </p>
+                        <p className="text-gray-700">
+                          <span className="font-semibold">Vehicle:</span>{" "}
+                          {quotation.vehicle?.make || ""} {quotation.vehicle?.model || ""} ({quotation.vehicle?.registration || ""})
+                        </p>
+                        <p className="text-gray-700">
+                          <span className="font-semibold">Total Amount:</span>{" "}
+                          <span className="text-green-600 font-bold">₹{quotation.totalAmount.toLocaleString("en-IN")}</span>
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Date: {new Date(quotation.quotationDate).toLocaleDateString("en-IN")}
+                        </p>
+                      </div>
+
+                      {/* Customer Approval Status */}
+                      {quotation.customerApproved && (
+                        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <UserCheck className="text-green-600" size={18} />
+                            <span className="font-semibold text-green-700">Approved by Customer</span>
+                          </div>
+                          {quotation.customerApprovedAt && (
+                            <p className="text-sm text-green-600 ml-6">
+                              Approved on: {new Date(quotation.customerApprovedAt).toLocaleString("en-IN")}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {quotation.customerRejected && (
+                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <XCircle className="text-red-600" size={18} />
+                            <span className="font-semibold text-red-700">Rejected by Customer</span>
+                          </div>
+                          {quotation.customerRejectedAt && (
+                            <p className="text-sm text-red-600 ml-6">
+                              Rejected on: {new Date(quotation.customerRejectedAt).toLocaleString("en-IN")}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Customer Approval Status */}
-                    {quotation.customerApproved && (
-                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <UserCheck className="text-green-600" size={18} />
-                          <span className="font-semibold text-green-700">Approved by Customer</span>
-                        </div>
-                        {quotation.customerApprovedAt && (
-                          <p className="text-sm text-green-600 ml-6">
-                            Approved on: {new Date(quotation.customerApprovedAt).toLocaleString("en-IN")}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {quotation.customerRejected && (
-                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <XCircle className="text-red-600" size={18} />
-                          <span className="font-semibold text-red-700">Rejected by Customer</span>
-                        </div>
-                        {quotation.customerRejectedAt && (
-                          <p className="text-sm text-red-600 ml-6">
-                            Rejected on: {new Date(quotation.customerRejectedAt).toLocaleString("en-IN")}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => handleApprove(quotation.id)}
-                      className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2 font-medium"
-                    >
-                      <ShieldCheck size={18} />
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleReject(quotation.id)}
-                      className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-medium"
-                    >
-                      <ShieldX size={18} />
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Open quotation view modal or navigate to quotations page
-                        window.location.href = `/sc/quotations?view=${quotation.id}`;
-                      }}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-medium"
-                    >
-                      <Eye size={18} />
-                      View Details
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleApproveQuotation(quotation.id)}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2 font-medium"
+                      >
+                        <ShieldCheck size={18} />
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleRejectQuotation(quotation.id)}
+                        className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-medium"
+                      >
+                        <ShieldX size={18} />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Open quotation view modal or navigate to quotations page
+                          window.location.href = `/sc/quotations?view=${quotation.id}`;
+                        }}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 font-medium"
+                      >
+                        <Eye size={18} />
+                        View Details
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))
             ) : null}
           </div>
         </div>
@@ -1425,7 +806,7 @@ export default function Approvals() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Customer Complaint/Issue</p>
-                      <p className="font-medium text-gray-800">{selectedRequest.serviceIntakeForm.customerComplaintIssue || selectedRequest.appointment.customerComplaintIssue || "N/A"}</p>
+                      <p className="font-medium text-gray-800">{selectedRequest.serviceIntakeForm.customerComplaint || selectedRequest.appointment.customerComplaint || "N/A"}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Previous Service History</p>
@@ -1517,32 +898,32 @@ export default function Approvals() {
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Customer ID Proof</p>
                       <p className="font-medium text-gray-800">
-                        {selectedRequest.serviceIntakeForm.customerIdProof?.urls?.length > 0 
-                          ? `${selectedRequest.serviceIntakeForm.customerIdProof.urls.length} file(s)` 
+                        {selectedRequest.serviceIntakeForm.customerIdProof?.urls?.length > 0
+                          ? `${selectedRequest.serviceIntakeForm.customerIdProof.urls.length} file(s)`
                           : "Not provided"}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Vehicle RC Copy</p>
                       <p className="font-medium text-gray-800">
-                        {selectedRequest.serviceIntakeForm.vehicleRCCopy?.urls?.length > 0 
-                          ? `${selectedRequest.serviceIntakeForm.vehicleRCCopy.urls.length} file(s)` 
+                        {selectedRequest.serviceIntakeForm.vehicleRCCopy?.urls?.length > 0
+                          ? `${selectedRequest.serviceIntakeForm.vehicleRCCopy.urls.length} file(s)`
                           : "Not provided"}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Warranty Card/Service Book</p>
                       <p className="font-medium text-gray-800">
-                        {selectedRequest.serviceIntakeForm.warrantyCardServiceBook?.urls?.length > 0 
-                          ? `${selectedRequest.serviceIntakeForm.warrantyCardServiceBook.urls.length} file(s)` 
+                        {selectedRequest.serviceIntakeForm.warrantyCardServiceBook?.urls?.length > 0
+                          ? `${selectedRequest.serviceIntakeForm.warrantyCardServiceBook.urls.length} file(s)`
                           : "Not provided"}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Photos/Videos</p>
                       <p className="font-medium text-gray-800">
-                        {selectedRequest.serviceIntakeForm.photosVideos?.urls?.length > 0 
-                          ? `${selectedRequest.serviceIntakeForm.photosVideos.urls.length} file(s)` 
+                        {selectedRequest.serviceIntakeForm.photosVideos?.urls?.length > 0
+                          ? `${selectedRequest.serviceIntakeForm.photosVideos.urls.length} file(s)`
                           : "Not provided"}
                       </p>
                     </div>

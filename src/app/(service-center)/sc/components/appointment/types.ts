@@ -1,5 +1,16 @@
 
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  }
+};
 import { staticServiceCenters } from "@/shared/types";
 
 export type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
@@ -17,7 +28,7 @@ export interface Appointment {
   serviceCenterId?: string | number;
   serviceCenterName?: string;
   customerType?: "B2C" | "B2B";
-  customerComplaintIssue?: string;
+  customerComplaint?: string;
   previousServiceHistory?: string;
   estimatedServiceTime?: string;
   estimatedCost?: string;
@@ -60,7 +71,7 @@ export interface AppointmentForm {
   serviceCenterId?: string | number;
   serviceCenterName?: string;
   customerType?: "B2C" | "B2B";
-  customerComplaintIssue?: string;
+  customerComplaint?: string;
   previousServiceHistory?: string;
   estimatedServiceTime?: string;
   estimatedCost?: string;
@@ -133,7 +144,7 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   serviceCenterId: undefined,
   serviceCenterName: undefined,
   customerType: undefined,
-  customerComplaintIssue: undefined,
+  customerComplaint: undefined,
   previousServiceHistory: undefined,
   estimatedServiceTime: undefined,
   estimatedCost: undefined,

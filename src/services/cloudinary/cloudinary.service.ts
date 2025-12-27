@@ -1,4 +1,4 @@
-import { getCloudinaryUploadUrl, CLOUDINARY_CONFIG } from '@/config/cloudinary.config';
+import { getCloudinaryUploadUrl, CLOUDINARY_CONFIG, validateCloudinaryConfig } from '@/config/cloudinary.config';
 import {
   CloudinaryUploadOptions,
   CloudinaryUploadResult,
@@ -17,6 +17,16 @@ export async function uploadToCloudinary(
   options: CloudinaryUploadOptions = {},
   onProgress?: UploadProgressCallback
 ): Promise<CloudinaryUploadResult> {
+  // Validate configuration
+  try {
+    validateCloudinaryConfig();
+  } catch (error) {
+    throw new CloudinaryUploadError(
+      UploadErrorType.CONFIG_ERROR,
+      error instanceof Error ? error.message : 'Invalid Cloudinary configuration'
+    );
+  }
+
   // Validate file
   const validation = validateFile(file);
   if (!validation.valid) {

@@ -4,7 +4,27 @@
  */
 
 import type { JobCard } from "@/shared/types/job-card.types";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+
+const safeStorage = {
+    getItem: <T>(key: string, defaultValue: T): T => {
+        if (typeof window === "undefined") return defaultValue;
+        try {
+            const item = window.localStorage.getItem(key);
+            return item ? JSON.parse(item) : defaultValue;
+        } catch (error) {
+            console.error(`Error reading ${key} from localStorage:`, error);
+            return defaultValue;
+        }
+    },
+    setItem: <T>(key: string, value: T): void => {
+        if (typeof window === "undefined") return;
+        try {
+            window.localStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+            console.error(`Error writing ${key} to localStorage:`, error);
+        }
+    }
+};
 
 /**
  * Migrates a single job card to ensure all fields are properly populated

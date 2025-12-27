@@ -27,13 +27,13 @@ export function useCreateQuotationFromAppointment() {
           hasInsurance: false,
           items: [],
           discount: 0,
-          notes: appointment.customerComplaintIssue || "",
+          notes: appointment.customerComplaint || "",
           customNotes: appointment.previousServiceHistory || "",
           ...quotationData,
         };
 
         const quotation = await quotationsService.createFromAppointment(String(appointment.id), appointment);
-        
+
         // Link quotation to appointment
         await appointmentsService.linkQuotation(String(appointment.id), quotation.id);
 

@@ -46,7 +46,7 @@ export const INITIAL_SERVICE_INTAKE_FORM: ServiceIntakeForm = {
 
   // Service Details
   serviceType: "",
-  customerComplaintIssue: "",
+  customerComplaint: "",
   previousServiceHistory: "",
   estimatedServiceTime: "",
   estimatedCost: "",

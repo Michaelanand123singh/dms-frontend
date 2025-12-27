@@ -24,7 +24,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import type { UserRole } from "@/shared/types";
 import { useRole } from "@/shared/hooks";
-import { safeStorage } from "@/shared/lib/localStorage";
+// safeStorage import removed
 
 interface MenuItem {
   name: string;
@@ -113,9 +113,9 @@ export function SCSidebar({ open, setOpen, role: roleProp }: SCSidebarProps) {
   };
 
   const handleLogout = () => {
-    safeStorage.removeItem("userRole");
-    safeStorage.removeItem("userInfo");
-    safeStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("isLoggedIn");
     router.push("/");
   };
 

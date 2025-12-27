@@ -22,9 +22,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRole } from "@/shared/hooks";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { useState, useEffect } from "react";
+import { appointmentsService } from "@/features/appointments/services/appointments.service";
 import type { DashboardCard, Alert, QuickAction, UserRole } from "@/shared/types";
+
 
 interface DashboardData {
   cards: DashboardCard[];
@@ -46,65 +47,25 @@ export default function SCDashboard() {
   const [todayAppointmentsCount, setTodayAppointmentsCount] = useState<number>(0);
 
   // Calculate today's appointments from localStorage
+  // Calculate today's appointments from API
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const calculateTodayAppointments = () => {
-        const appointments = safeStorage.getItem<Array<{
-          id: number;
-          customerName: string;
-          vehicle: string;
-          phone: string;
-          serviceType: string;
-          date: string;
-          time: string;
-          duration: string;
-          status: string;
-        }>>("appointments", []);
-
+    const fetchTodayAppointments = async () => {
+      try {
         const today = new Date().toISOString().split("T")[0];
-        const todayAppointments = appointments.filter((apt) => apt.date === today);
+        // Fetch all appointments (or filter by date if backend supports it)
+        // Assuming backend supports date filtering or we filter client side
+        const allAppointments = await appointmentsService.getAll();
+        // Filter purely to be safe if backend returns all
+        const count = allAppointments.filter((apt: any) => apt.date === today).length;
+        setTodayAppointmentsCount(count);
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats", error);
+      }
+    };
 
-        // Defer state update to avoid synchronous setState in effect
-        requestAnimationFrame(() => {
-          setTodayAppointmentsCount(todayAppointments.length);
-        });
-      };
-
-      // Initial calculation
-      calculateTodayAppointments();
-
-      // Listen for storage changes to update count
-      const handleStorageChange = () => {
-        const updatedAppointments = safeStorage.getItem<Array<{
-          id: number;
-          customerName: string;
-          vehicle: string;
-          phone: string;
-          serviceType: string;
-          date: string;
-          time: string;
-          duration: string;
-          status: string;
-        }>>("appointments", []);
-        const today = new Date().toISOString().split("T")[0];
-        const todayApts = updatedAppointments.filter((apt) => apt.date === today);
-
-        // Defer state update to avoid synchronous setState in callback
-        requestAnimationFrame(() => {
-          setTodayAppointmentsCount(todayApts.length);
-        });
-      };
-
-      window.addEventListener("storage", handleStorageChange);
-      // Also check periodically for same-tab updates
-      const interval = setInterval(handleStorageChange, 1000);
-
-      return () => {
-        window.removeEventListener("storage", handleStorageChange);
-        clearInterval(interval);
-      };
-    }
+    fetchTodayAppointments();
   }, []);
+
 
   const getDashboardData = (): DashboardData => {
     const baseData: Record<UserRole, DashboardData> = {

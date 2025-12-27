@@ -3,12 +3,11 @@
  */
 
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api",
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL,
   TIMEOUT: Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
-  // Default to real API, use mock only if explicitly enabled
-  USE_MOCK: process.env.NEXT_PUBLIC_USE_MOCK_API === "true",
+  USE_MOCK: false, // Force disable usage of mock API
 } as const;
 
 export const API_ENDPOINTS = {
@@ -39,12 +38,16 @@ export const API_ENDPOINTS = {
   // Job Cards
   JOB_CARDS: "/job-cards",
   JOB_CARD: (id: string) => `/job-cards/${id}`,
+  JOB_CARD_PASS_TO_MANAGER: (id: string) => `/job-cards/${id}/pass-to-manager`,
+  JOB_CARD_MANAGER_REVIEW: (id: string) => `/job-cards/${id}/manager-review`,
+  JOB_CARD_CONVERT_TO_ACTUAL: (id: string) => `/job-cards/${id}/convert-to-actual`,
 
 
 
   // Inventory
   INVENTORY: "/inventory",
   INVENTORY_ITEM: (id: string) => `/inventory/${id}`,
+  PARTS_ISSUES: "/parts-issues",
 
   // Invoices
   INVOICES: "/invoices",
@@ -59,6 +62,10 @@ export const API_ENDPOINTS = {
   QUOTATION: (id: string) => `/quotations/${id}`,
   QUOTATION_PASS_TO_MANAGER: (id: string) => `/quotations/${id}/pass-to-manager`,
   QUOTATION_STATUS: (id: string) => `/quotations/${id}/status`,
+
+  // Files
+  FILES_UPLOAD: "/files/upload",
+  FILES: "/files",
 
 
 

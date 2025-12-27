@@ -18,7 +18,7 @@ export interface Appointment {
   vehicleExternalId?: string;
   serviceCenterId?: string | number;
   serviceCenterName?: string;
-  customerComplaintIssue?: string;
+  customerComplaint?: string;
   previousServiceHistory?: string;
 }
 

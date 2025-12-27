@@ -1,9 +1,8 @@
 /**
  * Utility functions for creating parts requests from job cards
+ * Stubbed after removal of localStorage based jobCardPartsRequestService
  */
 
-import { jobCardPartsRequestService } from "@/features/inventory/services/jobCardPartsRequest.service";
-import { partsMasterService } from "@/features/inventory/services/partsMaster.service";
 import type { JobCard } from "@/shared/types/job-card.types";
 
 /**
@@ -21,46 +20,10 @@ export async function createPartsRequestFromJobCard(
     return;
   }
 
-  try {
-    // Get all parts from master to map names to IDs
-    const allParts = await partsMasterService.getAll();
-    
-    // Map part names to part IDs and quantities
-    const partsWithDetails = jobCard.parts
-      .map((partName) => {
-        // Find part by name (case-insensitive)
-        const part = allParts.find(
-          (p) => p.partName.toLowerCase() === partName.toLowerCase()
-        );
-        
-        if (part) {
-          return {
-            partId: part.id,
-            partName: part.partName,
-            quantity: 1, // Default quantity, can be enhanced later
-          };
-        }
-        
-        // If part not found in master, still create request with name
-        return {
-          partId: `unknown-${partName.replace(/\s+/g, "-").toLowerCase()}`,
-          partName: partName,
-          quantity: 1,
-        };
-      })
-      .filter((p) => p !== null);
-
-    // Create the parts request
-    if (partsWithDetails.length > 0) {
-      await jobCardPartsRequestService.createRequestFromJobCard(
-        jobCard,
-        partsWithDetails,
-        requestedBy
-      );
-    }
-  } catch (error) {
-    console.error("Failed to create parts request from job card:", error);
-    // Don't throw - job card creation should still succeed even if parts request fails
-  }
+  // Stub implementation
+  console.log("Parts Request Creation from Job Card Stubbed. Backend should handle parts allocation or separate API call needed.", {
+    jobCardId: jobCard.id,
+    parts: jobCard.parts,
+    requestedBy
+  });
 }
-

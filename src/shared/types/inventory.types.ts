@@ -6,7 +6,7 @@ export type StockStatus = "In Stock" | "Low Stock" | "Out of Stock";
 export type FilterType = "all" | "low_stock" | "out_of_stock";
 
 export interface InventoryItem {
-  id: number;
+  id: string | number;
   partName: string;
   hsnCode: string; // HSN Code
   partCode?: string;

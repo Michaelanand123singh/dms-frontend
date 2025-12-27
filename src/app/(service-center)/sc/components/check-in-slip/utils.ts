@@ -62,12 +62,12 @@ export function convertCheckInSlipFormToData(
     serviceCenterPhone: (serviceCenter as any)?.phone || undefined,
     expectedServiceDate: appointmentData?.estimatedDeliveryDate || formData.extendedDeliveryDate,
     serviceType: appointmentData?.serviceType,
-    notes: appointmentData?.customerComplaintIssue || formData.customerFeedback,
+    notes: appointmentData?.customerComplaint || formData.customerFeedback,
 
     // Section 1: Customer & Vehicle Details
     dateOfVehicleDelivery: formData.dateOfVehicleDelivery || vehicle?.purchaseDate || appointmentData?.dateOfPurchase,
     extendedDeliveryDate: formData.extendedDeliveryDate,
-    customerFeedback: formData.customerFeedback || appointmentData?.customerComplaintIssue,
+    customerFeedback: formData.customerFeedback || appointmentData?.customerComplaint,
     technicalObservation: formData.technicalObservation || appointmentData?.technicianObservation,
     batterySerialNumber: formData.batterySerialNumber || appointmentData?.batterySerialNumber,
     mcuSerialNumber: formData.mcuSerialNumber || appointmentData?.mcuSerialNumber,

@@ -6,7 +6,34 @@ import { AppointmentGrid, Toast } from "../components/appointments";
 import { useAppointmentLogic } from "./hooks/useAppointmentLogic";
 import { canCreateAppointment } from "@/shared/constants/roles";
 import type { JobCard } from "@/shared/types/job-card.types";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing ${key} from localStorage:`, error);
+    }
+  }
+};
 import { populateJobCardPart1, createEmptyJobCardPart1 } from "@/shared/utils/jobCardData.util";
 import { generateJobCardNumber } from "@/shared/utils/job-card.utils";
 import { jobCardService } from "@/features/job-cards/services/jobCard.service";
@@ -161,7 +188,7 @@ function AppointmentsContent() {
           vehicleMake: vehicleData.vehicleMake,
           vehicleModel: vehicleData.vehicleModel,
           registration: vehicleData.registration,
-          customerComplaint: appointment.customerComplaintIssue,
+          customerComplaint: appointment.customerComplaint,
           estimatedDeliveryDate: appointment.estimatedDeliveryDate,
           warrantyStatus: appointment.warrantyStatus,
           technicianObservation: appointment.technicianObservation,

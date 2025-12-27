@@ -1,6 +1,7 @@
 "use client";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { inventoryService } from "@/features/inventory/services/inventory.service";
 import {
   Package,
   Search,
@@ -19,7 +20,7 @@ import type { InventoryItem, StockStatus, FilterType, StockIndicator } from "@/s
 
 
 interface RequestItem {
-  partId: number;
+  partId: string | number;
   partName: string;
   hsnCode: string;
   partCode?: string;
@@ -35,7 +36,7 @@ export default function SCInventory() {
   const [showRequestModal, setShowRequestModal] = useState<boolean>(false);
   const [requestItems, setRequestItems] = useState<RequestItem[]>([]);
   const [currentRequest, setCurrentRequest] = useState<{
-    partId: number;
+    partId: string | number;
     partName: string;
     hsnCode: string;
     partCode?: string;
@@ -45,12 +46,20 @@ export default function SCInventory() {
   } | null>(null);
 
   // Load inventory from localStorage
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    if (typeof window !== "undefined") {
-      return safeStorage.getItem<InventoryItem[]>("inventory", []);
-    }
-    return [];
-  });
+  // Load inventory from API
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+
+  useEffect(() => {
+    const loadInventory = async () => {
+      try {
+        const data = await inventoryService.getAll();
+        setInventory(data);
+      } catch (error) {
+        console.error("Failed to load inventory:", error);
+      }
+    };
+    loadInventory();
+  }, []);
 
   const filteredInventory = inventory.filter((item) => {
     const matchesSearch =
@@ -494,7 +503,8 @@ export default function SCInventory() {
                     <select
                       value={selectedPart?.id || ""}
                       onChange={(e) => {
-                        const part = inventory.find((p) => p.id === parseInt(e.target.value));
+                        const val = e.target.value;
+                        const part = inventory.find((p) => String(p.id) === val);
                         setSelectedPart(part || null);
                         if (part) {
                           setCurrentRequest({

@@ -7,19 +7,19 @@ import type { ServiceLocation, Priority } from '@/shared/types/common.types';
 import type { DocumentationFiles } from '@/shared/types/documentation.types';
 
 export type JobCardStatus =
-  | "arrival_pending"
-  | "job_card_pending_vehicle"
-  | "job_card_active"
-  | "check_in_only"
-  | "no_response_lead"
-  | "manager_quote"
-  | "Awaiting Quotation Approval"
-  | "Created"
-  | "Assigned"
-  | "In Progress"
-  | "Parts Pending"
-  | "Completed"
-  | "Invoiced";
+  | "ARRIVAL_PENDING"
+  | "JOB_CARD_PENDING_VEHICLE"
+  | "JOB_CARD_ACTIVE"
+  | "CHECK_IN_ONLY"
+  | "NO_RESPONSE_LEAD"
+  | "MANAGER_QUOTE"
+  | "AWAITING_QUOTATION_APPROVAL"
+  | "CREATED"
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "PARTS_PENDING"
+  | "COMPLETED"
+  | "INVOICED";
 
 /**
  * PART 1 — CUSTOMER & VEHICLE INFORMATION

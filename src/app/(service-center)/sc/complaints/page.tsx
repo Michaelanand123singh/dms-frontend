@@ -22,7 +22,34 @@ import {
 } from "lucide-react";
 import { useCustomerSearch } from "../../../../hooks/api";
 import type { CustomerWithVehicles } from "@/shared/types";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing ${key} from localStorage:`, error);
+    }
+  }
+};
 import { useRole } from "@/shared/hooks";
 import { formatVehicleString } from "../components/shared/vehicle-utils";
 
@@ -44,6 +71,7 @@ type ServiceCenter = {
   name: string;
   status: string;
   address?: string;
+  location?: string;
 };
 
 type FilterType = "all" | "open" | "resolved" | "closed";
@@ -64,6 +92,18 @@ const INITIAL_COMPLAINT_FORM: ComplaintForm = {
   complaint: "",
   severity: "Medium",
   serviceCenterId: undefined,
+};
+
+// Mock function for service history
+const getMockServiceHistory = (vehicleId: string | number) => {
+  return [
+    { id: 1, date: "2023-10-15", type: "General Service", amount: "₹2,500", status: "Completed" },
+    { id: 2, date: "2023-06-20", type: "Battery Check", amount: "₹500", status: "Completed" },
+  ];
+};
+
+const findNearestServiceCenter = (address?: string) => {
+  return 1; // Mock implementation
 };
 
 // Reusable Modal Component

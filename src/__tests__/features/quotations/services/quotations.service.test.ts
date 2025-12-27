@@ -25,7 +25,7 @@ describe('QuotationsService', () => {
       expect(result.customerId).toBe('1');
       expect(result.vehicleId).toBe('1');
       expect(result.serviceCenterId).toBe('sc-001');
-      expect(result.status).toBe('draft');
+      expect(result.status).toBe('DRAFT');
     });
 
     it('sets quotation date to today', async () => {
@@ -47,7 +47,7 @@ describe('QuotationsService', () => {
     it('includes appointment notes in quotation', async () => {
       const appointment = createMockAppointment({
         id: '1',
-        customerComplaintIssue: 'Test complaint',
+        customerComplaint: 'Test complaint',
         previousServiceHistory: 'Test history',
       });
 
@@ -69,20 +69,20 @@ describe('QuotationsService', () => {
 
   describe('updateStatus', () => {
     it('updates quotation status in mock mode', async () => {
-      const result = await quotationsService.updateStatus('qtn-1', 'customer_approved');
+      const result = await quotationsService.updateStatus('qtn-1', 'CUSTOMER_APPROVED');
 
       expect(result.id).toBe('qtn-1');
-      expect(result.status).toBe('customer_approved');
+      expect(result.status).toBe('CUSTOMER_APPROVED');
     });
 
     it('includes reason when provided', async () => {
-      const result = await quotationsService.updateStatus('qtn-1', 'rejected', 'Not approved');
+      const result = await quotationsService.updateStatus('qtn-1', 'CUSTOMER_REJECTED', 'Not approved');
 
-      expect(result.status).toBe('rejected');
+      expect(result.status).toBe('CUSTOMER_REJECTED');
     });
 
     it('updates updatedAt timestamp', async () => {
-      const result = await quotationsService.updateStatus('qtn-1', 'approved');
+      const result = await quotationsService.updateStatus('qtn-1', 'MANAGER_APPROVED');
 
       expect(result.updatedAt).toBeDefined();
       expect(new Date(result.updatedAt).getTime()).toBeLessThanOrEqual(Date.now());

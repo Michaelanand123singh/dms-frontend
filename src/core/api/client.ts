@@ -11,6 +11,7 @@ import {
     loggingResponseInterceptor,
     unauthorizedResponseInterceptor
 } from './interceptors';
+import { errorInterceptor, successInterceptor } from './interceptors/error.interceptor';
 import { handleApiError } from './error-handler';
 import { ApiError } from './errors';
 
@@ -25,6 +26,11 @@ class ApiClient {
     private defaultTimeout = API_CONFIG.TIMEOUT || 30000;
 
     constructor(baseURL: string = API_BASE_URL) {
+        if (!baseURL) {
+            throw new Error(
+                'API_BASE_URL is not configured. Please set NEXT_PUBLIC_API_URL in your .env file'
+            );
+        }
         this.baseURL = baseURL;
     }
 

@@ -6,19 +6,19 @@
 import type { ServiceLocation, Priority } from './common.types';
 
 export type JobCardStatus =
-  | "arrival_pending"
-  | "job_card_pending_vehicle"
-  | "job_card_active"
-  | "check_in_only"
-  | "no_response_lead"
-  | "manager_quote"
-  | "Awaiting Quotation Approval"
-  | "Created"
-  | "Assigned"
-  | "In Progress"
-  | "Parts Pending"
-  | "Completed"
-  | "Invoiced";
+  | "ARRIVAL_PENDING"
+  | "JOB_CARD_PENDING_VEHICLE"
+  | "JOB_CARD_ACTIVE"
+  | "CHECK_IN_ONLY"
+  | "NO_RESPONSE_LEAD"
+  | "MANAGER_QUOTE"
+  | "AWAITING_QUOTATION_APPROVAL"
+  | "CREATED"
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "PARTS_PENDING"
+  | "COMPLETED"
+  | "INVOICED";
 
 /**
  * PART 1 — CUSTOMER & VEHICLE INFORMATION
@@ -167,6 +167,14 @@ export interface JobCard {
   // Service Advisor submission to manager
   submittedToManager?: boolean;
   submittedAt?: string;
+
+  // Manager Approval Workflow
+  passedToManager?: boolean;
+  passedToManagerAt?: Date | string;
+  managerId?: string;
+  managerReviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  managerReviewNotes?: string;
+  managerReviewedAt?: Date | string;
 
   // Invoice workflow
   invoiceNumber?: string;

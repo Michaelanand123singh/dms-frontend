@@ -24,7 +24,7 @@ describe('useCreateQuotationFromAppointment', () => {
     id: 'apt-1',
     customerId: 'cust-1',
     vehicleId: 'veh-1',
-    customerComplaintIssue: 'Brake issue',
+    customerComplaint: 'Brake issue',
     previousServiceHistory: 'Regular service',
   }) as Appointment;
 

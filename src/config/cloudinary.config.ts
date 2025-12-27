@@ -32,7 +32,8 @@ export const validateCloudinaryConfig = (): void => {
 };
 
 // Initialize validation on import (client-side only)
-if (typeof window !== 'undefined') {
-  validateCloudinaryConfig();
-}
+// Initialize validation on import (client-side only)
+// if (typeof window !== 'undefined') {
+//   validateCloudinaryConfig();
+// }
 

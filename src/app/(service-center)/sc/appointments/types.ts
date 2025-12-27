@@ -17,7 +17,7 @@ export interface AppointmentRecord {
   serviceCenterName?: string;
   assignedServiceCenter?: string; // Legacy field for backward compatibility
   customerType?: "B2C" | "B2B";
-  customerComplaintIssue?: string;
+  customerComplaint?: string;
   previousServiceHistory?: string;
   estimatedServiceTime?: string;
   estimatedCost?: string;
@@ -113,7 +113,7 @@ export interface ServiceIntakeForm {
 
   // Service Details
   serviceType: string;
-  customerComplaintIssue: string;
+  customerComplaint: string;
   previousServiceHistory: string;
   estimatedServiceTime: string;
   estimatedCost: string;

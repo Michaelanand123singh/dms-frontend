@@ -62,5 +62,5 @@ export type ServiceLocation = "STATION" | "DOORSTEP";
 /**
  * Priority type - shared across job cards, workshop, and other modules
  */
-export type Priority = "Low" | "Normal" | "High" | "Critical";
+export type Priority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 

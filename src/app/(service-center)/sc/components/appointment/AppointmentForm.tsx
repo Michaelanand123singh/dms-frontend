@@ -393,8 +393,8 @@ export const AppointmentForm = ({
       }
     }
 
-    if (isCallCenter && !finalFormData.customerComplaintIssue?.trim()) {
-      errors.customerComplaintIssue = "Customer Complaint / Issue Description is required";
+    if (isCallCenter && !finalFormData.customerComplaint?.trim()) {
+      errors.customerComplaint = "Customer Complaint / Issue Description is required";
       missingFields.push("Customer Complaint / Issue Description");
     }
 
@@ -884,20 +884,20 @@ export const AppointmentForm = ({
                 Customer Complaint / Issue Description {isCallCenter && <span className="text-red-500">*</span>}
               </label>
               <textarea
-                value={formData.customerComplaintIssue || ""}
-                onChange={(e) => updateFormData({ customerComplaintIssue: e.target.value })}
+                value={formData.customerComplaint || ""}
+                onChange={(e) => updateFormData({ customerComplaint: e.target.value })}
                 rows={3}
                 placeholder="Describe the customer complaint or issue..."
-                className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 resize-none ${fieldErrors.customerComplaintIssue
+                className={`w-full px-4 py-2.5 rounded-lg focus:ring-2 focus:outline-none text-gray-900 transition-all duration-200 resize-none ${fieldErrors.customerComplaint
                   ? "bg-red-50 border-2 border-red-300 focus:ring-red-500/20 focus:border-red-500"
                   : "border border-gray-200 focus:ring-purple-500/20 focus:border-purple-500 bg-gray-50/50 focus:bg-white"
                   }`}
                 required={isCallCenter}
               />
-              {fieldErrors.customerComplaintIssue && (
+              {fieldErrors.customerComplaint && (
                 <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
                   <span className="text-red-500">•</span>
-                  {fieldErrors.customerComplaintIssue}
+                  {fieldErrors.customerComplaint}
                 </p>
               )}
             </div>

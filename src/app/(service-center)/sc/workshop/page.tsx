@@ -18,7 +18,28 @@ import {
   BarChart3,
 } from "lucide-react";
 import type { Engineer, WorkshopStats, EngineerStatus, Workload, Priority, JobCard, JobCardStatus } from "@/shared/types";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+// import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+    }
+  }
+};
 import { staffService } from "@/features/workshop/services/staff.service";
 import {
   filterByServiceCenter,
@@ -84,9 +105,9 @@ export default function Workshop() {
   // Filter to show only active job cards (Assigned, In Progress, Parts Pending)
   const activeJobCards = useMemo(() => {
     return visibleJobCards.filter((job) =>
-      job.status === "Assigned" ||
-      job.status === "In Progress" ||
-      job.status === "Parts Pending"
+      job.status === "ASSIGNED" ||
+      job.status === "IN_PROGRESS" ||
+      job.status === "PARTS_PENDING"
     );
   }, [visibleJobCards]);
 
@@ -115,7 +136,7 @@ export default function Workshop() {
     const activeCount = activeJobCards.length;
     const occupiedBays = Math.min(activeCount, totalBays);
     const completedToday = visibleJobCards.filter(
-      (job) => job.status === "Completed" &&
+      (job) => job.status === "COMPLETED" &&
         job.completedAt &&
         new Date(job.completedAt).toDateString() === new Date().toDateString()
     ).length;
@@ -190,32 +211,25 @@ export default function Workshop() {
   };
 
   const getStatusColor = (status: JobCardStatus): string => {
-    const colors: Record<JobCardStatus, string> = {
-      arrival_pending: "bg-gray-100 text-gray-700 border-gray-300",
-      job_card_pending_vehicle: "bg-blue-50 text-blue-700 border-blue-200",
-      job_card_active: "bg-yellow-100 text-yellow-700 border-yellow-300",
-      check_in_only: "bg-indigo-50 text-indigo-700 border-indigo-200",
-      no_response_lead: "bg-red-100 text-red-700 border-red-200",
-      manager_quote: "bg-purple-50 text-purple-700 border-purple-200",
-      "Awaiting Quotation Approval": "bg-amber-100 text-amber-700 border-amber-300",
-      Created: "bg-gray-100 text-gray-700 border-gray-300",
-      Assigned: "bg-blue-100 text-blue-700 border-blue-300",
-      "In Progress": "bg-yellow-100 text-yellow-700 border-yellow-300",
-      "Parts Pending": "bg-orange-100 text-orange-700 border-orange-300",
-      Completed: "bg-green-100 text-green-700 border-green-300",
-      Invoiced: "bg-purple-100 text-purple-700 border-purple-300",
+    const colors: Record<string, string> = {
+      CREATED: "bg-gray-100 text-gray-700 border-gray-300",
+      ASSIGNED: "bg-blue-100 text-blue-700 border-blue-300",
+      IN_PROGRESS: "bg-yellow-100 text-yellow-700 border-yellow-300",
+      COMPLETED: "bg-green-100 text-green-700 border-green-300",
+      INVOICED: "bg-purple-100 text-purple-700 border-purple-300",
+      // Add other statuses if needed or map them
     };
-    return colors[status] || colors.Created;
+    return (colors as any)[status] || colors.CREATED;
   };
 
   const getPriorityColor = (priority: Priority): string => {
-    const colors: Record<Priority, string> = {
-      Low: "bg-gray-500",
-      Normal: "bg-blue-500",
-      High: "bg-orange-500",
-      Critical: "bg-red-500",
+    const colors: Record<string, string> = {
+      LOW: "bg-gray-500",
+      NORMAL: "bg-blue-500",
+      HIGH: "bg-orange-500",
+      CRITICAL: "bg-red-500",
     };
-    return colors[priority] || colors.Normal;
+    return (colors as any)[priority] || colors.NORMAL;
   };
 
   const getEngineerStatusColor = (status: EngineerStatus): string => {

@@ -64,7 +64,7 @@ export const mockAppointment1 = {
   serviceCenterId: "sc-001",
   serviceCenterName: "Pune Central Hub",
   customerType: "B2C",
-  customerComplaintIssue: "Vehicle making unusual noise. Need oil change and general inspection.",
+  customerComplaint: "Vehicle making unusual noise. Need oil change and general inspection.",
   previousServiceHistory: "Last service done 3 months ago. Regular maintenance customer.",
   estimatedServiceTime: "2 hours",
   estimatedCost: "₹3,500",
@@ -98,7 +98,7 @@ export const mockAppointment2 = {
   serviceCenterId: "sc-001",
   serviceCenterName: "Pune Central Hub",
   customerType: "B2C",
-  customerComplaintIssue: "AC not cooling properly. Need AC gas refill and cleaning.",
+  customerComplaint: "AC not cooling properly. Need AC gas refill and cleaning.",
   previousServiceHistory: "First time service at this center.",
   estimatedServiceTime: "3 hours",
   estimatedCost: "₹2,800",
@@ -278,7 +278,7 @@ const jobCard1Part1 = populateJobCardPart1(
   priyaVehicle,
   generateJobCardNumber("SC001", 1001),
   {
-    customerFeedback: mockAppointment2.customerComplaintIssue,
+    customerFeedback: mockAppointment2.customerComplaint,
     estimatedDeliveryDate: mockAppointment2.estimatedDeliveryDate,
     warrantyStatus: "Under Warranty",
   }
@@ -299,7 +299,7 @@ export const mockJobCard1: JobCard = {
   vehicleModel: priyaVehicle.vehicleModel,
   customerType: "B2C",
   serviceType: mockAppointment2.serviceType,
-  description: mockAppointment2.customerComplaintIssue || "",
+  description: mockAppointment2.customerComplaint || "",
   status: "Created",
   priority: "Normal",
   assignedEngineer: null, // Not assigned yet - sent to manager
@@ -307,7 +307,7 @@ export const mockJobCard1: JobCard = {
   estimatedTime: mockAppointment2.estimatedServiceTime || "3 hours",
   createdAt: getDateTime(0, -1), // 1 hour ago (after quotation approval)
   parts: mockQuotation2.items.map((item) => item.partName),
-  location: "Station",
+  location: "STATION",
   quotationId: mockQuotation2.id,
   sourceAppointmentId: mockAppointment2.id,
   submittedToManager: true, // ✅ Sent to manager

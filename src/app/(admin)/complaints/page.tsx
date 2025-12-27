@@ -1,7 +1,26 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import { Search, Filter, Eye, CheckCircle, XCircle, Clock, ArrowLeft, AlertCircle, Building } from "lucide-react";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+// Local storage helper
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (e) {
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error(e);
+    }
+  },
+};
 
 
 export type Complaint = {

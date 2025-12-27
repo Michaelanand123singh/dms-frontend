@@ -645,7 +645,7 @@ export default function CustomerDetailsPage() {
                             duration: form.duration?.toString(),
 
                             // Operational Details
-                            customerComplaint: form.customerComplaintIssue,
+                            customerComplaint: form.customerComplaint,
                             previousServiceHistory: form.previousServiceHistory,
                             estimatedServiceTime: form.estimatedServiceTime,
                             estimatedCost: form.estimatedCost ? parseFloat(form.estimatedCost.toString()) : undefined,

@@ -12,7 +12,9 @@
  * Open your browser console and paste:
  * 
  * ```javascript
- * fetch('http://localhost:3001/api/auth/login', {
+ * // Get API URL from environment (set in .env file)
+ * const API_URL = process.env.NEXT_PUBLIC_API_URL;
+ * fetch(`${API_URL}/auth/login`, {
  *   method: 'POST',
  *   headers: { 'Content-Type': 'application/json' },
  *   body: JSON.stringify({ email: 'admin@dms.com', password: 'admin123' })

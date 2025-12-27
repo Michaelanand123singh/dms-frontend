@@ -1,6 +1,6 @@
 import { Quotation } from "@/shared/types/quotation.types";
 import { getServiceCenterCode, normalizeServiceCenterId } from "./service-center.utils";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+// LocalStorage import removed
 
 /**
  * Generates a formatted quotation number based on service center, date, and sequence.
@@ -26,7 +26,7 @@ export function generateQuotationNumber(
     const monthKey = `${year}${month}`; // e.g. 202312
 
     // Get existing quotations if not provided
-    const quotations = existingQuotations || safeStorage.getItem<Quotation[]>("quotations", []);
+    const quotations = existingQuotations || [];
 
     // Filter for same service center and same month (YYYY-MM)
     // Note: quotationDate in Quotation type is usually YYYY-MM-DD string

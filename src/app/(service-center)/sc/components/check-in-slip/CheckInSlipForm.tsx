@@ -41,8 +41,8 @@ export function CheckInSlipForm({
         if (appointmentData.dateOfPurchase && !formData.dateOfVehicleDelivery) {
           updates.dateOfVehicleDelivery = appointmentData.dateOfPurchase;
         }
-        if (appointmentData.customerComplaintIssue && !formData.customerFeedback) {
-          updates.customerFeedback = appointmentData.customerComplaintIssue;
+        if (appointmentData.customerComplaint && !formData.customerFeedback) {
+          updates.customerFeedback = appointmentData.customerComplaint;
         }
         if (appointmentData.technicianObservation && !formData.technicalObservation) {
           updates.technicalObservation = appointmentData.technicianObservation;
@@ -96,8 +96,8 @@ export function CheckInSlipForm({
         appointmentData={appointmentData}
       />
 
-      <VehicleConditionSection 
-        formData={formData} 
+      <VehicleConditionSection
+        formData={formData}
         onUpdate={onUpdate}
         vehicleId={vehicle?.id?.toString()}
         userId={undefined} // Can be passed from parent if needed

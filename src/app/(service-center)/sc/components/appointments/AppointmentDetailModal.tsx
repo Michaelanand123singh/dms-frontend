@@ -7,7 +7,34 @@ import type { AppointmentRecord } from "../../appointments/types";
 import type { CustomerWithVehicles } from "@/shared/types";
 import type { JobCard } from "@/shared/types/job-card.types";
 import type { CustomerArrivalStatus, ServiceIntakeForm } from "../../appointments/types";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+const safeStorage = {
+  getItem: <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  },
+  setItem: <T,>(key: string, value: T): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing ${key} from localStorage:`, error);
+    }
+  }
+};
 import { INITIAL_SERVICE_INTAKE_FORM } from "../../appointments/constants";
 import { getFilesForEntity } from "@/services/files/fileMetadata.service";
 import { FileCategory, RelatedEntityType } from "@/services/files/types";
@@ -347,7 +374,7 @@ export function AppointmentDetailModal({
         )}
 
         {/* Service Details */}
-        {(appointment.customerComplaintIssue ||
+        {(appointment.customerComplaint ||
           appointment.previousServiceHistory ||
           appointment.estimatedServiceTime ||
           appointment.estimatedCost ||
@@ -359,10 +386,10 @@ export function AppointmentDetailModal({
                 Service Details
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {appointment.customerComplaintIssue && (
+                {appointment.customerComplaint && (
                   <div className="md:col-span-2">
                     <p className="text-sm text-gray-500 mb-1">Customer Complaint / Issue</p>
-                    <p className="font-medium text-gray-800 whitespace-pre-wrap">{appointment.customerComplaintIssue}</p>
+                    <p className="font-medium text-gray-800 whitespace-pre-wrap">{appointment.customerComplaint}</p>
                   </div>
                 )}
                 {appointment.previousServiceHistory && (

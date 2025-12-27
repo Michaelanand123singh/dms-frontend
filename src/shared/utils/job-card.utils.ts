@@ -4,7 +4,7 @@
 
 import type { JobCard } from "@/shared/types/job-card.types";
 import { getServiceCenterCode } from "./service-center.utils";
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+// LocalStorage import removed
 
 /**
  * Get next sequence number for job card generation
@@ -50,8 +50,7 @@ export function generateJobCardNumber(
   const month = String(now.getMonth() + 1).padStart(2, "0");
 
   // Get existing job cards if not provided
-  const jobCards =
-    existingJobCards || safeStorage.getItem<JobCard[]>("jobCards", []);
+  const jobCards = existingJobCards || [];
 
   const nextSequence = getNextSequenceNumber(
     jobCards,

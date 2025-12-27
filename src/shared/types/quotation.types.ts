@@ -56,16 +56,7 @@ export interface Quotation {
   batterySerialNumber?: string;
   customNotes?: string;
   noteTemplateId?: string;
-  status:
-    | "draft"
-    | "sent_to_customer"
-    | "customer_approved"
-    | "customer_rejected"
-    | "sent_to_manager"
-    | "manager_approved"
-    | "manager_rejected"
-    | "no_response_lead"
-    | "manager_quote";
+  status: QuotationStatus;
   passedToManager: boolean;
   passedToManagerAt?: string;
   managerId?: string;
@@ -144,26 +135,26 @@ export interface CreateQuotationForm {
 }
 
 export type QuotationStatus =
-  | "draft"
-  | "sent_to_customer"
-  | "customer_approved"
-  | "customer_rejected"
-  | "sent_to_manager"
-  | "manager_approved"
-  | "manager_rejected"
-  | "no_response_lead"
-  | "manager_quote";
+  | "DRAFT"
+  | "SENT_TO_CUSTOMER"
+  | "CUSTOMER_APPROVED"
+  | "CUSTOMER_REJECTED"
+  | "SENT_TO_MANAGER"
+  | "MANAGER_APPROVED"
+  | "MANAGER_REJECTED"
+  | "NO_RESPONSE_LEAD"
+  | "MANAGER_QUOTE";
 export type QuotationFilterType =
   | "all"
-  | "draft"
-  | "sent_to_customer"
-  | "customer_approved"
-  | "customer_rejected"
-  | "sent_to_manager"
-  | "manager_approved"
-  | "manager_rejected"
-  | "no_response_lead"
-  | "manager_quote";
+  | "DRAFT"
+  | "SENT_TO_CUSTOMER"
+  | "CUSTOMER_APPROVED"
+  | "CUSTOMER_REJECTED"
+  | "SENT_TO_MANAGER"
+  | "MANAGER_APPROVED"
+  | "MANAGER_REJECTED"
+  | "NO_RESPONSE_LEAD"
+  | "MANAGER_QUOTE";
 
 
 

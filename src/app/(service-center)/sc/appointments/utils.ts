@@ -20,7 +20,7 @@ export const convertAppointmentToFormData = (appointment: AppointmentRecord): Pa
     serviceCenterId: appointment.serviceCenterId ? appointment.serviceCenterId.toString() : undefined,
     serviceCenterName: appointment.serviceCenterName || undefined,
     customerType: appointment.customerType,
-    customerComplaintIssue: appointment.customerComplaintIssue,
+    customerComplaint: appointment.customerComplaint,
     previousServiceHistory: appointment.previousServiceHistory,
     estimatedServiceTime: appointment.estimatedServiceTime,
     estimatedCost: appointment.estimatedCost?.replace("₹", "").replace(",", ""),

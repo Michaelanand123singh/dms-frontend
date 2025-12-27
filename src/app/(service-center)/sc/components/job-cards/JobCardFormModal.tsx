@@ -13,6 +13,7 @@ import { getServiceCenterCode } from "@/shared/utils/service-center.utils";
 import { JobCard } from "@/shared/types/job-card.types";
 import { Quotation } from "@/shared/types/quotation.types";
 import { CustomerWithVehicles, Vehicle } from "@/shared/types/vehicle.types";
+import { quotationsService } from "@/features/quotations/services/quotations.service";
 
 // New Hooks, Utils and Sections
 import { useJobCardForm } from "@/features/job-cards/hooks/useJobCardForm";
@@ -115,14 +116,14 @@ export default function JobCardFormModal({
         const query = searchQuery.toLowerCase();
 
         // 1. Search Approved Quotations
-        const allQuotations = safeStorage.getItem<Quotation[]>("quotations", []);
+        const allQuotations = await quotationsService.getAll();
         const approvedQuotations = allQuotations.filter(
-          q => q.status === "customer_approved" || q.customerApproved === true
+          (q: Quotation) => q.status === "customer_approved" || q.customerApproved === true
         );
 
         const quotationResults = approvedQuotations
-          .filter(q => q.quotationNumber?.toLowerCase().includes(query))
-          .map(async q => {
+          .filter((q: Quotation) => q.quotationNumber?.toLowerCase().includes(query))
+          .map(async (q: Quotation) => {
             try {
               const customer = await customerService.getById(q.customerId);
               const vehicle = customer.vehicles?.find(v => v.id.toString() === q.vehicleId);
