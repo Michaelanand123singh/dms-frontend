@@ -11,6 +11,10 @@ class PartsEntryService {
     console.warn("Parts Entry creation not implemented.");
     return data;
   }
+
+  async getRecent(limit: number = 10) {
+    return [];
+  }
 }
 
 export const partsEntryService = new PartsEntryService();

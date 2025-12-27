@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from "@/config/api.config";
 import { apiClient } from "@/core/api/client";
-import type { InventoryItem, StockStatus } from "@/shared/types/inventory.types";
+import type { InventoryItem, StockStatus } from "../types/inventory.types";
 
 interface InventoryFilterParams {
     serviceCenterId?: string;
@@ -11,16 +11,51 @@ interface InventoryFilterParams {
 
 interface CreateInventoryPartPayload {
     serviceCenterId: string;
+
+    // Basic Part Information
+    oemPartNumber?: string;
     partName: string;
     partNumber: string;
+    originType?: string;
     category: string;
-    unitPrice: number;
-    costPrice: number;
-    gstRate: number;
+    description?: string;
+
+    // Stock Information
     stockQuantity: number;
     minStockLevel: number;
     maxStockLevel: number;
+    unit?: string;
     location?: string;
+
+    // Part Details
+    brandName?: string;
+    variant?: string;
+    partType?: string;
+    color?: string;
+
+    // Pricing - Purchase
+    costPrice: number;
+    pricePreGst?: number;
+    gstRateInput?: number;
+    gstInput?: number;
+
+    // Pricing - Sale
+    unitPrice: number;
+    gstRate: number;
+    gstRateOutput?: number;
+    totalPrice?: number;
+    totalGst?: number;
+
+    // Labour Information
+    labourName?: string;
+    labourCode?: string;
+    labourWorkTime?: string;
+    labourRate?: number;
+    labourGstRate?: number;
+    labourPrice?: number;
+
+    // Flags
+    highValuePart?: boolean;
 }
 
 interface AdjustStockPayload {
@@ -35,9 +70,7 @@ class InventoryService {
      */
     async getAll(params?: InventoryFilterParams): Promise<InventoryItem[]> {
         try {
-            // Backend returns array of items directly based on our previous analysis of Client usage
             const response = await apiClient.get<any[]>(API_ENDPOINTS.INVENTORY, { params: params as any });
-
             return response.data.map(this.transformBackendToFrontend);
         } catch (error) {
             console.error("Failed to fetch inventory:", error);
@@ -59,6 +92,31 @@ class InventoryService {
     }
 
     /**
+     * Update an inventory part
+     */
+    async update(id: string, payload: Partial<CreateInventoryPartPayload>): Promise<InventoryItem> {
+        try {
+            const response = await apiClient.patch<any>(`${API_ENDPOINTS.INVENTORY}/parts/${id}`, payload);
+            return this.transformBackendToFrontend(response.data);
+        } catch (error) {
+            console.error("Failed to update inventory part:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete an inventory part
+     */
+    async delete(id: string): Promise<void> {
+        try {
+            await apiClient.delete(`${API_ENDPOINTS.INVENTORY}/parts/${id}`);
+        } catch (error) {
+            console.error("Failed to delete inventory part:", error);
+            throw error;
+        }
+    }
+
+    /**
      * Adjust stock level
      */
     async adjustStock(id: string, payload: AdjustStockPayload): Promise<InventoryItem> {
@@ -73,6 +131,7 @@ class InventoryService {
 
     /**
      * Transform backend entity to frontend InventoryItem
+     * Maps the complete part master schema
      */
     private transformBackendToFrontend(item: any): InventoryItem {
         let status: StockStatus = "In Stock";
@@ -80,24 +139,61 @@ class InventoryService {
         else if (item.stockQuantity <= item.minStockLevel) status = "Low Stock";
 
         return {
-            id: item.id, // ID is usually string UUID from backend, but Interface says number. We might need to adjust interface or cast.
-            // The backend uses UUIDs (string). The frontend Interface defined id: number (line 9).
-            // This is a mismatch. I will cast to any for now or try to use string if logic permits.
-            // IMPORTANT: If frontend strictly expects number, this will break. 
-            // Looking at page.tsx usage is recommended. For now, assuming string is acceptable or will fix types later.
+            id: item.id,
 
+            // Basic Part Information
+            oemPartNumber: item.oemPartNumber || "",
             partName: item.partName,
-            hsnCode: "0000", // Not in backend DTO yet, placeholder
-            partCode: item.partNumber,
+            partNumber: item.partNumber,
+            partCode: item.partNumber, // Alias
+            originType: item.originType || "",
             category: item.category,
+            description: item.description || "",
+
+            // Stock Information
             currentQty: item.stockQuantity,
+            stockQuantity: item.stockQuantity,
             minStock: item.minStockLevel,
-            unitPrice: `₹${item.unitPrice}`,
-            costPrice: `₹${item.costPrice}`,
-            supplier: "Unknown", // Not in backend DTO
+            minStockLevel: item.minStockLevel,
+            maxStockLevel: item.maxStockLevel,
+            unit: item.unit || "piece",
             location: item.location || "N/A",
-            status: status
-        } as unknown as InventoryItem; // Cast because 'id' type mismatch (string vs number)
+
+            // Part Details
+            brandName: item.brandName || "",
+            variant: item.variant || "",
+            partType: item.partType || "",
+            color: item.color || "",
+
+            // Pricing - Purchase
+            costPrice: `₹${item.costPrice || 0}`,
+            pricePreGst: item.pricePreGst || 0,
+            gstRateInput: item.gstRateInput || 0,
+            gstInput: item.gstInput || 0,
+
+            // Pricing - Sale
+            unitPrice: `₹${item.unitPrice || 0}`,
+            gstRate: item.gstRate || 0,
+            gstRateOutput: item.gstRateOutput || 0,
+            totalPrice: item.totalPrice || 0,
+            totalGst: item.totalGst || 0,
+
+            // Labour Information
+            labourName: item.labourName || "",
+            labourCode: item.labourCode || "",
+            labourWorkTime: item.labourWorkTime || "",
+            labourRate: item.labourRate || 0,
+            labourGstRate: item.labourGstRate || 0,
+            labourPrice: item.labourPrice || 0,
+
+            // Flags
+            highValuePart: item.highValuePart || false,
+
+            // Legacy fields
+            hsnCode: item.oemPartNumber || "0000",
+            supplier: item.brandName || "Unknown",
+            status: status,
+        } as unknown as InventoryItem;
     }
 }
 

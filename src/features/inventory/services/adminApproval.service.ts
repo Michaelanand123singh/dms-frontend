@@ -1,322 +1,138 @@
 /**
- * Admin Approval Service for Parts Issue Requests
- * 
- * NOTE: This service uses localStorage for workflow state management of pending approvals.
- * This is intentional as it handles approval workflows that span user sessions.
- * The actual parts issues are synced with backend via centralIssueService.
+ * Admin Approval Service
+ * Migrated to use Backend APIs directly, replacing localStorage mock.
  */
 
-import { localStorage as safeStorage } from "@/shared/lib/localStorage";
-import { centralIssueService } from './centralIssue.service';
+import { apiClient } from "@/core/api/client";
 import { centralInventoryRepository } from '@/core/repositories/central-inventory.repository';
-import { serviceCenterRepository } from '@/core/repositories/service-center.repository';
 import type { PartsIssue, PartsIssueFormData } from "@/shared/types/central-inventory.types";
 
-const STORAGE_KEY = "partsIssueRequests";
-
-
 class AdminApprovalService {
+
   /**
-   * Create a parts issue request (pending admin approval)
+   * Create a parts issue request
    */
-  async createPartsIssueRequest(
-    formData: PartsIssueFormData,
-    requestedBy: string
-  ): Promise<PartsIssue> {
-    // Generate issue number
-    const allRequests = this.getAllRequests();
-    const issueNumber = `PI-${new Date().getFullYear()}-${String(
-      allRequests.length + 1
-    ).padStart(3, "0")}`;
-
-    // Calculate total amount
-    const stock = await centralInventoryRepository.getAllStock();
-    const totalAmount = formData.items.reduce((sum, item) => {
-      const stockItem = stock.find((s) => s.id === item.fromStock);
-      if (!stockItem) return sum;
-      return sum + stockItem.unitPrice * item.quantity;
-    }, 0);
-
-    // Get service center info
-    const serviceCenters = await serviceCenterRepository.getAll();
-    const serviceCenter = serviceCenters.find((sc) => sc.id === formData.serviceCenterId);
-    if (!serviceCenter) {
-      throw new Error("Service center not found");
-    }
-
-    // Create issue items
-    const issueItems = formData.items.map((item) => {
-      const stockItem = stock.find((s) => s.id === item.fromStock);
-      if (!stockItem) {
-        throw new Error(`Stock not found for item: ${item.partId}`);
-      }
-
-      return {
-        id: `pii-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-        partId: item.partId,
-        partName: stockItem.partName,
-        partNumber: stockItem.partNumber,
-        hsnCode: stockItem.hsnCode || '',
-        quantity: item.quantity,
-        unitPrice: stockItem.unitPrice,
-        totalPrice: stockItem.unitPrice * item.quantity,
-        fromStock: item.fromStock,
-      };
-    });
-
-    const issue: PartsIssue = {
-      id: `pi-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-      issueNumber,
-      serviceCenterId: formData.serviceCenterId,
-      serviceCenterName: serviceCenter.name,
-      issuedBy: requestedBy,
-      issuedAt: new Date().toISOString(),
-      status: "pending_admin_approval",
-      items: issueItems,
-      totalAmount,
-      purchaseOrderId: formData.purchaseOrderId,
-      notes: formData.notes,
-      transportDetails: formData.transportDetails,
-      sentToAdmin: true,
-      sentToAdminAt: new Date().toISOString(),
-    };
-
-    const requests = this.getAllRequests();
-    requests.unshift(issue);
-    safeStorage.setItem(STORAGE_KEY, requests);
-
-    // Debug: Log the saved request
-    console.log("Parts issue request created and saved:", {
-      id: issue.id,
-      issueNumber: issue.issueNumber,
-      status: issue.status,
-      sentToAdmin: issue.sentToAdmin,
-      totalRequests: requests.length
-    });
-
+  async createPartsIssueRequest(formData: PartsIssueFormData, requestedBy: string): Promise<PartsIssue> {
+    const { issue } = await centralInventoryRepository.createPartsIssue(formData, requestedBy);
     return issue;
   }
 
   /**
-   * Get all requests (from storage)
-   */
-  private getAllRequests(): PartsIssue[] {
-    return safeStorage.getItem<PartsIssue[]>(STORAGE_KEY, []);
-  }
-
-  /**
-   * Get all pending admin approval requests
+   * Get pending approvals from backend
    */
   async getPendingApprovals(): Promise<PartsIssue[]> {
-    const all = await this.getAllIssues();
-    const storageRequests = this.getAllRequests();
+    try {
+      const response = await apiClient.get<any>('/parts-issues', { params: { status: 'PENDING_APPROVAL', limit: 100 } });
 
-    // Debug: Log what we're finding
-    console.log("Fetching pending approvals:", {
-      totalIssues: all.length,
-      storageRequests: storageRequests.length,
-      storageRequestsWithStatus: storageRequests.filter(r => r.status === "pending_admin_approval").length
-    });
+      // Handle pagination structure
+      let data = response.data;
+      if (data && typeof data === 'object' && 'data' in data) {
+        data = data.data;
+      }
 
-    const pending = all.filter(
-      (issue) =>
-        issue.status === "pending_admin_approval" &&
-        issue.sentToAdmin &&
-        !issue.adminApproved &&
-        !issue.adminRejected
-    );
-
-    console.log("Pending approvals found:", pending.length);
-
-    return pending;
+      const list = Array.isArray(data) ? data : [];
+      return list.map(this.mapBackendIssueToFrontend);
+    } catch (e) {
+      console.error("Failed to fetch pending approvals", e);
+      return [];
+    }
   }
 
   /**
-   * Get all issues (combine storage and repository)
+   * Get all issues
    */
   async getAllIssues(): Promise<PartsIssue[]> {
-    const storageRequests = this.getAllRequests();
-    const repositoryIssues = await centralInventoryRepository.getAllPartsIssues();
-
-    // Prioritize storage requests (pending approvals) over repository issues
-    // Merge and deduplicate by ID, but storage requests take precedence
-    const allIssues: PartsIssue[] = [...storageRequests];
-
-    // Add repository issues that aren't already in storage
-    repositoryIssues.forEach((repoIssue) => {
-      const exists = allIssues.find((issue) => issue.id === repoIssue.id);
-      if (!exists) {
-        allIssues.push(repoIssue);
-      }
-    });
-
-    return allIssues;
+    return centralInventoryRepository.getAllPartsIssues();
   }
 
   /**
    * Get issue by ID
    */
   async getIssueById(id: string): Promise<PartsIssue | null> {
-    const all = await this.getAllIssues();
-    return all.find((issue) => issue.id === id) || null;
+    try {
+      const response = await apiClient.get<any>(`/parts-issues/${id}`);
+      return this.mapBackendIssueToFrontend(response.data);
+    } catch (e) {
+      return null;
+    }
   }
 
   /**
-   * Approve parts issue request by admin
+   * Approve parts issue
    */
-  async approvePartsIssue(
-    issueId: string,
-    approvedBy: string,
-    notes?: string
-  ): Promise<PartsIssue> {
+  async approvePartsIssue(issueId: string, approvedBy: string, notes?: string): Promise<PartsIssue> {
     const issue = await this.getIssueById(issueId);
-    if (!issue) {
-      throw new Error("Issue request not found");
-    }
+    if (!issue) throw new Error("Issue not found");
 
-    if (issue.status !== "pending_admin_approval") {
-      throw new Error("Issue is not pending admin approval");
-    }
+    // Auto-approve all requested items
+    const approvedItems = issue.items.map(item => ({
+      itemId: item.id, // ID from fetching issue
+      approvedQty: item.quantity
+    }));
 
-    // Update issue status - just approve, don't issue yet
-    // Central inventory manager will issue the parts after approval
-    issue.adminApproved = true;
-    issue.adminApprovedBy = approvedBy;
-    issue.adminApprovedAt = new Date().toISOString();
-    issue.status = "admin_approved";
-    if (notes) {
-      issue.notes = issue.notes ? `${issue.notes}\nAdmin Notes: ${notes}` : notes;
-    }
-
-    // Update storage - don't issue parts yet, just mark as approved
-    const requests = this.getAllRequests();
-    const index = requests.findIndex((r) => r.id === issueId);
-    if (index >= 0) {
-      requests[index] = issue;
-      safeStorage.setItem(STORAGE_KEY, requests);
-    }
-
-    return issue;
+    const response = await apiClient.patch<any>(`/parts-issues/${issueId}/approve`, {
+      approvedItems
+    });
+    return this.mapBackendIssueToFrontend(response.data);
   }
 
   /**
-   * Reject parts issue request by admin
+   * Reject parts issue
    */
-  async rejectPartsIssue(
-    issueId: string,
-    rejectedBy: string,
-    rejectionReason: string
-  ): Promise<PartsIssue> {
-    const issue = await this.getIssueById(issueId);
-    if (!issue) {
-      throw new Error("Issue request not found");
-    }
-
-    if (issue.status !== "pending_admin_approval") {
-      throw new Error("Issue is not pending admin approval");
-    }
-
-    issue.adminRejected = true;
-    issue.adminRejectedBy = rejectedBy;
-    issue.adminRejectedAt = new Date().toISOString();
-    issue.adminRejectionReason = rejectionReason;
-    issue.status = "admin_rejected";
-
-    // Update storage
-    const requests = this.getAllRequests();
-    const index = requests.findIndex((r) => r.id === issueId);
-    if (index >= 0) {
-      requests[index] = issue;
-      safeStorage.setItem(STORAGE_KEY, requests);
-    }
-
-    return issue;
+  async rejectPartsIssue(issueId: string, rejectedBy: string, rejectionReason: string): Promise<PartsIssue> {
+    const response = await apiClient.patch<any>(`/parts-issues/${issueId}/reject`, {
+      reason: rejectionReason
+    });
+    return this.mapBackendIssueToFrontend(response.data);
   }
 
   /**
-   * Resend request to admin (if no response)
+   * Resend to admin (Not supported by backend yet)
    */
   async resendToAdmin(issueId: string): Promise<PartsIssue> {
+    console.warn("Resend not supported by backend. Please create a new request.");
     const issue = await this.getIssueById(issueId);
-    if (!issue) {
-      throw new Error("Issue request not found");
-    }
-
-    if (issue.adminApproved || issue.adminRejected) {
-      throw new Error("Issue has already been responded to");
-    }
-
-    issue.sentToAdmin = true;
-    issue.sentToAdminAt = new Date().toISOString();
-    issue.status = "pending_admin_approval";
-
-    // Update storage
-    const requests = this.getAllRequests();
-    const index = requests.findIndex((r) => r.id === issueId);
-    if (index >= 0) {
-      requests[index] = issue;
-      safeStorage.setItem(STORAGE_KEY, requests);
-    }
-
-    return issue;
+    return issue!;
   }
 
   /**
-   * Issue parts for an approved request (called by central inventory manager)
+   * Issue/Dispatch parts
    */
-  async issueApprovedParts(
-    issueId: string,
-    issuedBy: string
-  ): Promise<PartsIssue> {
-    const issue = await this.getIssueById(issueId);
-    if (!issue) {
-      throw new Error("Issue request not found");
-    }
+  async issueApprovedParts(issueId: string, issuedBy: string): Promise<PartsIssue> {
+    const response = await apiClient.patch<any>(`/parts-issues/${issueId}/dispatch`, {
+      transportDetails: { dispatchedBy: issuedBy }
+    });
+    return this.mapBackendIssueToFrontend(response.data);
+  }
 
-    if (issue.status === "issued") {
-      throw new Error("Parts have already been issued for this request");
-    }
-
-    if (!issue.adminApproved || issue.status !== "admin_approved") {
-      throw new Error("Issue must be approved by admin before parts can be issued");
-    }
-
-    // Now actually issue the parts (decrease stock)
-    const formData: PartsIssueFormData = {
-      serviceCenterId: issue.serviceCenterId,
-      purchaseOrderId: issue.purchaseOrderId,
-      items: issue.items.map((item) => ({
-        partId: item.partId,
-        quantity: item.quantity,
-        fromStock: item.fromStock,
-      })),
-      notes: issue.notes,
-      transportDetails: issue.transportDetails,
+  /**
+   * Map backend entity to PartsIssue
+   */
+  private mapBackendIssueToFrontend(backendIssue: any): PartsIssue {
+    const statusMap: Record<string, any> = {
+      'PENDING_APPROVAL': 'pending_admin_approval',
+      'APPROVED': 'admin_approved',
+      'REJECTED': 'admin_rejected',
+      'DISPATCHED': 'issued',
+      'COMPLETED': 'received'
     };
 
-    // Issue parts (this will decrease stock)
-    const result = await centralInventoryRepository.createPartsIssue(
-      formData,
-      issuedBy
-    );
-
-    // Update the original request with the issued status
-    issue.status = "issued";
-    issue.issueNumber = result.issue.issueNumber;
-    issue.issuedBy = issuedBy;
-    issue.issuedAt = new Date().toISOString();
-
-    // Update storage
-    const requests = this.getAllRequests();
-    const index = requests.findIndex((r) => r.id === issueId);
-    if (index >= 0) {
-      requests[index] = issue;
-      safeStorage.setItem(STORAGE_KEY, requests);
-    }
-
-    return issue;
+    return {
+      ...backendIssue,
+      status: statusMap[backendIssue.status] || backendIssue.status?.toLowerCase(),
+      items: backendIssue.items?.map((item: any) => ({
+        id: item.id,
+        partId: item.centralInventoryPartId || item.partId,
+        partName: item.centralInventoryPart?.partName || item.partName || "Unknown Part",
+        partNumber: item.centralInventoryPart?.partNumber || item.partNumber || "",
+        hsnCode: item.centralInventoryPart?.hsnCode || "",
+        fromStock: item.centralInventoryPartId || item.fromStock,
+        quantity: item.requestedQty || item.quantity,
+        unitPrice: item.centralInventoryPart?.unitPrice || 0,
+        totalPrice: (item.centralInventoryPart?.unitPrice || 0) * (item.requestedQty || item.quantity),
+      })) || []
+    };
   }
 }
 
 export const adminApprovalService = new AdminApprovalService();
-

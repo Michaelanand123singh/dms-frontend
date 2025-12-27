@@ -11,6 +11,7 @@ import { partsIssueService, type PartsIssue } from "@/features/inventory/service
 const mapPartsIssueToRequest = (issue: PartsIssue): JobCardPartsRequest => {
   const isApproved = issue.status === 'APPROVED' || issue.status === 'ISSUED';
   const isIssued = issue.status === 'ISSUED';
+  const items = issue.items || []; // Safety check for undefined items
 
   return {
     id: issue.id,
@@ -20,7 +21,7 @@ const mapPartsIssueToRequest = (issue: PartsIssue): JobCardPartsRequest => {
     requestedBy: issue.requestedBy,
     requestedAt: issue.requestedAt,
     status: issue.status === 'ISSUED' ? 'approved' : issue.status === 'REJECTED' ? 'rejected' : 'pending',
-    parts: issue.items.map(i => ({
+    parts: items.map(i => ({
       partId: i.partId,
       partName: `Part ${i.partId}`,
       quantity: i.quantity,

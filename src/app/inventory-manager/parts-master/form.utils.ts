@@ -4,15 +4,26 @@
  * Updated with new parameters from image
  */
 
-import type { Part, PartFormData } from "@/shared/types/inventory.types";
+import type { Part, PartFormData } from "@/features/inventory/types/inventory.types";
 import { getInitialFormData, type PartsMasterFormData } from "./form.schema";
 
 /**
- * Helper to get trimmed value if not empty
+ * Helper to get trimmed string value if not empty
  */
-function getValueIfNotEmpty(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+function getStringIfNotEmpty(value: string | number | undefined | null): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const stringValue = String(value).trim();
+  return stringValue.length > 0 ? stringValue : undefined;
+}
+
+/**
+ * Helper to get numeric value if valid
+ */
+function getNumberIfValid(value: string | number | undefined | null): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'number') return value;
+  const num = parseFloat(String(value).replace(/[%₹,\s]/g, ''));
+  return isNaN(num) ? undefined : num;
 }
 
 /**
@@ -21,46 +32,54 @@ function getValueIfNotEmpty(value: string | undefined): string | undefined {
 export function mapFormDataToPartFormData(formData: PartsMasterFormData): PartFormData {
   const partData: PartFormData = {
     // partName is required
-    partName: formData.partName?.trim() || "",
+    partName: String(formData.partName || "").trim(),
+
     // Optional basic fields - only include if they have data
-    ...(formData.partNumber?.trim() && { partNumber: formData.partNumber.trim() }),
-    ...(formData.category?.trim() && { category: formData.category.trim() }),
-    // Calculate price from totalPrice if available, otherwise use purchasePrice
-    ...(formData.totalPrice && { price: parseFloat(formData.totalPrice) || 0 }),
-    ...((!formData.totalPrice && formData.purchasePrice) && { price: parseFloat(formData.purchasePrice) || 0 }),
-    ...(getValueIfNotEmpty(formData.description) && { description: getValueIfNotEmpty(formData.description) }),
-    ...(formData.minStock !== undefined && formData.minStock !== null && { minStockLevel: formData.minStock }),
-    ...(formData.unit?.trim() && { unit: formData.unit.trim() }),
-    // New fields from image
-    ...(getValueIfNotEmpty(formData.oemPartNumber) && { oemPartNumber: getValueIfNotEmpty(formData.oemPartNumber) }),
-    ...(getValueIfNotEmpty(formData.originType) && { originType: getValueIfNotEmpty(formData.originType) }),
-    ...(getValueIfNotEmpty(formData.purchasePrice) && { purchasePrice: getValueIfNotEmpty(formData.purchasePrice) }),
+    ...(getStringIfNotEmpty(formData.partNumber) && { partNumber: getStringIfNotEmpty(formData.partNumber) }),
+    ...(getStringIfNotEmpty(formData.category) && { category: getStringIfNotEmpty(formData.category) }),
+    ...(getStringIfNotEmpty(formData.description) && { description: getStringIfNotEmpty(formData.description) }),
+    ...(formData.minStock !== undefined && formData.minStock !== null && { minStockLevel: Number(formData.minStock) || 0 }),
+    ...(getStringIfNotEmpty(formData.unit) && { unit: getStringIfNotEmpty(formData.unit) }),
+
+    // OEM and Origin
+    ...(getStringIfNotEmpty(formData.oemPartNumber) && { oemPartNumber: getStringIfNotEmpty(formData.oemPartNumber) }),
+    ...(getStringIfNotEmpty(formData.originType) && { originType: getStringIfNotEmpty(formData.originType) }),
+
     // Basic Part Info
-    ...(getValueIfNotEmpty(formData.brandName) && { brandName: getValueIfNotEmpty(formData.brandName) }),
-    ...(getValueIfNotEmpty(formData.variant) && { variant: getValueIfNotEmpty(formData.variant) }),
-    ...(getValueIfNotEmpty(formData.partType) && { partType: getValueIfNotEmpty(formData.partType) }),
-    ...(getValueIfNotEmpty(formData.color) && { color: getValueIfNotEmpty(formData.color) }),
-    // GST and Pricing
-    ...(getValueIfNotEmpty(formData.gstAmount) && { gstAmount: getValueIfNotEmpty(formData.gstAmount) }),
-    ...(getValueIfNotEmpty(formData.gstRateInput) && { gstRateInput: getValueIfNotEmpty(formData.gstRateInput) }),
-    ...(getValueIfNotEmpty(formData.pricePreGst) && { pricePreGst: getValueIfNotEmpty(formData.pricePreGst) }),
-    ...(getValueIfNotEmpty(formData.gstRateOutput) && { gstRateOutput: getValueIfNotEmpty(formData.gstRateOutput) }),
-    // Labour Information
-    ...(getValueIfNotEmpty(formData.estimatedLabour) && { estimatedLabour: getValueIfNotEmpty(formData.estimatedLabour) }),
-    ...(getValueIfNotEmpty(formData.estimatedLabourWorkTime) && { estimatedLabourWorkTime: getValueIfNotEmpty(formData.estimatedLabourWorkTime) }),
-    ...(getValueIfNotEmpty(formData.labourRate) && { labourRate: getValueIfNotEmpty(formData.labourRate) }),
-    ...(getValueIfNotEmpty(formData.labourGstRate) && { labourGstRate: getValueIfNotEmpty(formData.labourGstRate) }),
-    ...(getValueIfNotEmpty(formData.labourPrice) && { labourPrice: getValueIfNotEmpty(formData.labourPrice) }),
-    // Calculated Totals
-    ...(getValueIfNotEmpty(formData.gstInput) && { gstInput: getValueIfNotEmpty(formData.gstInput) }),
-    ...(getValueIfNotEmpty(formData.totalPrice) && { totalPrice: getValueIfNotEmpty(formData.totalPrice) }),
-    ...(getValueIfNotEmpty(formData.totalGst) && { totalGst: getValueIfNotEmpty(formData.totalGst) }),
+    ...(getStringIfNotEmpty(formData.brandName) && { brandName: getStringIfNotEmpty(formData.brandName) }),
+    ...(getStringIfNotEmpty(formData.variant) && { variant: getStringIfNotEmpty(formData.variant) }),
+    ...(getStringIfNotEmpty(formData.partType) && { partType: getStringIfNotEmpty(formData.partType) }),
+    ...(getStringIfNotEmpty(formData.color) && { color: getStringIfNotEmpty(formData.color) }),
+
+    // Pricing - Purchase
+    ...(getNumberIfValid(formData.purchasePrice) !== undefined && { costPrice: getNumberIfValid(formData.purchasePrice) }),
+    ...(getNumberIfValid(formData.pricePreGst) !== undefined && { pricePreGst: getNumberIfValid(formData.pricePreGst) }),
+    ...(getNumberIfValid(formData.gstRateInput) !== undefined && { gstRateInput: getNumberIfValid(formData.gstRateInput) }),
+    ...(getNumberIfValid(formData.gstInput) !== undefined && { gstInput: getNumberIfValid(formData.gstInput) }),
+
+    // Pricing - Sale
+    ...(getNumberIfValid(formData.pricePreGst) !== undefined && { unitPrice: getNumberIfValid(formData.pricePreGst) }),
+    ...(getNumberIfValid(formData.pricePreGst) !== undefined && { price: getNumberIfValid(formData.pricePreGst) }),
+    ...(getNumberIfValid(formData.gstRateOutput) !== undefined && { gstRate: getNumberIfValid(formData.gstRateOutput) }),
+    ...(getNumberIfValid(formData.gstRateOutput) !== undefined && { gstRateOutput: getNumberIfValid(formData.gstRateOutput) }),
+    ...(getNumberIfValid(formData.totalPrice) !== undefined && { totalPrice: getNumberIfValid(formData.totalPrice) }),
+    ...(getNumberIfValid(formData.totalGst) !== undefined && { totalGst: getNumberIfValid(formData.totalGst) }),
+
+    // Labour Information - using new field names
+    ...(getStringIfNotEmpty(formData.labourName) && { labourName: getStringIfNotEmpty(formData.labourName) }),
+    ...(getStringIfNotEmpty(formData.labourCode) && { labourCode: getStringIfNotEmpty(formData.labourCode) }),
+    ...(getStringIfNotEmpty(formData.labourWorkTime) && { labourWorkTime: getStringIfNotEmpty(formData.labourWorkTime) }),
+    ...(getNumberIfValid(formData.labourRate) !== undefined && { labourRate: getNumberIfValid(formData.labourRate) }),
+    ...(getNumberIfValid(formData.labourGstRate) !== undefined && { labourGstRate: getNumberIfValid(formData.labourGstRate) }),
+    ...(getNumberIfValid(formData.labourPrice) !== undefined && { labourPrice: getNumberIfValid(formData.labourPrice) }),
+
     // High Value Part
     ...(formData.highValuePart !== undefined && { highValuePart: formData.highValuePart }),
-    // Optional
-    ...(getValueIfNotEmpty(formData.centerId) && { centerId: getValueIfNotEmpty(formData.centerId) }),
+
+    // Service Center
+    ...(getStringIfNotEmpty(formData.centerId) && { serviceCenterId: getStringIfNotEmpty(formData.centerId) }),
   };
-  
+
   return partData;
 }
 
@@ -69,42 +88,50 @@ export function mapFormDataToPartFormData(formData: PartsMasterFormData): PartFo
  */
 export function mapPartToFormData(part: Part): PartsMasterFormData {
   const initialData = getInitialFormData();
-  
+
   return {
     ...initialData,
-    partName: part.partName,
-    partNumber: part.partNumber,
-    category: part.category,
+    partName: part.partName || "",
+    partNumber: part.partNumber || "",
+    category: part.category || "",
     description: part.description || "",
     minStock: part.minStockLevel || 0,
-    unit: part.unit,
-    // New fields from image
+    unit: part.unit || "piece",
+
+    // OEM and Origin
     oemPartNumber: part.oemPartNumber || "",
     originType: part.originType || "NEW",
-    purchasePrice: part.purchasePrice || "",
+    purchasePrice: String(part.costPrice || ""),
+
     // Basic Part Info
     brandName: part.brandName || "",
     variant: part.variant || "",
     partType: part.partType || "",
     color: part.color || "",
+
     // GST and Pricing
-    gstAmount: part.gstAmount || "",
-    gstRateInput: part.gstRateInput || "",
-    pricePreGst: part.pricePreGst || "",
-    gstRateOutput: part.gstRateOutput || "",
-    // Labour Information
-    estimatedLabour: part.estimatedLabour || "",
-    estimatedLabourWorkTime: part.estimatedLabourWorkTime || "",
-    labourRate: part.labourRate || "",
-    labourGstRate: part.labourGstRate || "",
-    labourPrice: part.labourPrice || "",
+    gstAmount: String(part.gstInput || ""),
+    gstRateInput: String(part.gstRateInput || ""),
+    pricePreGst: String(part.unitPrice || part.pricePreGst || ""),
+    gstRateOutput: String(part.gstRate || part.gstRateOutput || ""),
+
+    // Labour Information - using new field names
+    labourName: part.labourName || "",
+    labourCode: part.labourCode || "",
+    labourWorkTime: part.labourWorkTime || "",
+    labourRate: String(part.labourRate || ""),
+    labourGstRate: String(part.labourGstRate || ""),
+    labourPrice: String(part.labourPrice || ""),
+
     // Calculated Totals
-    gstInput: part.gstInput || "",
-    totalPrice: part.totalPrice || "",
-    totalGst: part.totalGst || "",
+    gstInput: String(part.gstInput || ""),
+    totalPrice: String(part.totalPrice || ""),
+    totalGst: String(part.totalGst || ""),
+
     // High Value Part
     highValuePart: part.highValuePart || false,
-    // Optional
-    centerId: part.centerId,
+
+    // Service Center
+    centerId: part.serviceCenterId,
   };
 }

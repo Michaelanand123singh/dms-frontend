@@ -26,8 +26,9 @@ export interface PartsMasterFormData {
   pricePreGst: string; // Sale price pre GST
   gstRateOutput: string; // Percentage (e.g., 18%)
   // Labour Information
-  estimatedLabour: string;
-  estimatedLabourWorkTime: string; // Format like "0.3M"
+  labourName: string; // Associated Labour Name
+  labourCode: string; // Associated Labour Code
+  labourWorkTime: string; // Format like "0.3M"
   labourRate: string;
   labourGstRate: string; // Percentage
   labourPrice: string; // Auto-calculated
@@ -41,15 +42,15 @@ export interface PartsMasterFormData {
   centerId?: string;
 }
 
-export type FieldType = 
-  | "text" 
-  | "number" 
-  | "textarea" 
-  | "select" 
+export type FieldType =
+  | "text"
+  | "number"
+  | "textarea"
+  | "select"
   | "checkbox"
   | "readonly";
 
-export type FieldSection = 
+export type FieldSection =
   | "basic"
   | "serviceCenter"
   | "basicPartInfo"
@@ -88,7 +89,7 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
     required: true,
     options: [],
   },
-  
+
   // Basic Information Section
   {
     name: "oemPartNumber",
@@ -230,15 +231,24 @@ export const PARTS_MASTER_FORM_SCHEMA: FormFieldDefinition[] = [
 
   // Labour Association Section
   {
-    name: "estimatedLabour",
-    label: "Estimated Labour",
+    name: "labourName",
+    label: "Associated Labour Name",
     type: "text",
     section: "labour",
     required: false,
+    placeholder: "TOP COCKIT FITTING",
   },
   {
-    name: "estimatedLabourWorkTime",
-    label: "Estimated Labour Work Time",
+    name: "labourCode",
+    label: "Associated Labour Code",
+    type: "text",
+    section: "labour",
+    required: false,
+    placeholder: "LB_000000000121",
+  },
+  {
+    name: "labourWorkTime",
+    label: "Work Time",
     type: "text",
     section: "labour",
     required: false,
@@ -351,8 +361,9 @@ export function getInitialFormData(): PartsMasterFormData {
     pricePreGst: "",
     gstRateOutput: "",
     // Labour
-    estimatedLabour: "",
-    estimatedLabourWorkTime: "",
+    labourName: "",
+    labourCode: "",
+    labourWorkTime: "",
     labourRate: "",
     labourGstRate: "",
     labourPrice: "",
@@ -390,7 +401,7 @@ export function getFieldsGroupedBySection(
   showServiceCenter: boolean = false
 ): Record<FieldSection, FormFieldDefinition[]> {
   const grouped: Partial<Record<FieldSection, FormFieldDefinition[]>> = {};
-  
+
   SECTION_ORDER.forEach((section) => {
     grouped[section] = getFieldsBySection(section, showServiceCenter);
   });
