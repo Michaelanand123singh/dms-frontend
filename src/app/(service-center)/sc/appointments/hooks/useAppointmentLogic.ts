@@ -40,6 +40,15 @@ export const useAppointmentLogic = () => {
     const isServiceAdvisor = userRole === "service_advisor";
     const isServiceManager = userRole === "sc_manager";
 
+    // Helper to get initial form with logged-in service advisor pre-filled
+    const getFormWithServiceAdvisor = useCallback((additionalData?: Partial<AppointmentFormType>) => {
+        return getInitialAppointmentForm({
+            // Pre-fill service advisor with logged-in user if they are a service advisor
+            assignedServiceAdvisor: isServiceAdvisor && userInfo?.name ? userInfo.name : "",
+            ...additionalData,
+        });
+    }, [isServiceAdvisor, userInfo?.name]);
+
     // State
     const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
     const [selectedAppointment, setSelectedAppointment] = useState<AppointmentRecord | null>(null);
@@ -53,7 +62,7 @@ export const useAppointmentLogic = () => {
     // Form & Selection States
     const [selectedAppointmentCustomer, setSelectedAppointmentCustomer] = useState<CustomerWithVehicles | null>(null);
     const [selectedAppointmentVehicle, setSelectedAppointmentVehicle] = useState<Vehicle | null>(null);
-    const [appointmentFormData, setAppointmentFormData] = useState<Partial<AppointmentFormType>>(() => getInitialAppointmentForm());
+    const [appointmentFormData, setAppointmentFormData] = useState<Partial<AppointmentFormType>>(() => getFormWithServiceAdvisor());
     const [customerSearchValue, setCustomerSearchValue] = useState("");
 
     // Other States
@@ -144,12 +153,11 @@ export const useAppointmentLogic = () => {
                             ? `${vehicle.vehicleMake} ${vehicle.vehicleModel} (${vehicle.vehicleYear})`
                             : "";
 
-                        setAppointmentFormData({
-                            ...getInitialAppointmentForm(),
+                        setAppointmentFormData(getFormWithServiceAdvisor({
                             customerName: customer.name,
                             phone: customer.phone,
                             vehicle: vehicleString,
-                        });
+                        }));
 
                         setShowAppointmentFormModal(true);
 
@@ -310,9 +318,9 @@ export const useAppointmentLogic = () => {
         setSelectedAppointment(null);
         setSelectedAppointmentCustomer(null);
         setSelectedAppointmentVehicle(null);
-        setAppointmentFormData(getInitialAppointmentForm());
+        setAppointmentFormData(getFormWithServiceAdvisor());
         setCustomerSearchValue("");
-    }, []);
+    }, [getFormWithServiceAdvisor]);
 
     // Handlers
     const handleCustomerSelectForAppointment = useCallback((customer: CustomerWithVehicles) => {
@@ -458,6 +466,8 @@ export const useAppointmentLogic = () => {
             await appointmentsService.update(selectedAppointment.id.toString(), updatePayload);
 
             // Step 2: Create Job Card in Database
+            let createdJobCardId: string | null = null;
+
             try {
                 const customerId = (selectedAppointment.customerExternalId || selectedAppointmentCustomer?.id)?.toString();
                 const vehicleId = (selectedAppointment.vehicleExternalId || selectedAppointmentVehicle?.id)?.toString();
@@ -475,7 +485,7 @@ export const useAppointmentLogic = () => {
                     vehicleId,
                     serviceCenterId,
                     serviceType: selectedAppointment.serviceType,
-                    priority: "MEDIUM",
+                    priority: "NORMAL",
                 };
 
                 // Create job card via API
@@ -485,7 +495,8 @@ export const useAppointmentLogic = () => {
                     console.log("✅ Job Card Created Successfully:", createdJobCard);
                     console.log("Job Card ID:", createdJobCard.id);
                     console.log("Job Card Number:", createdJobCard.jobCardNumber);
-                    showToast(`Job card ${createdJobCard.jobCardNumber} created successfully!`, "success");
+                    createdJobCardId = createdJobCard.id;
+                    showToast(`Job card ${createdJobCard.jobCardNumber} created successfully! Redirecting...`, "success");
                 } else {
                     showToast("Customer arrival recorded. Appointment status updated.", "success");
                 }
@@ -497,21 +508,29 @@ export const useAppointmentLogic = () => {
                 showToast(`Customer arrival recorded. Job card creation failed: ${errorMsg}`, "error");
             }
 
+            // Close the form modal
+            setShowAppointmentFormModal(false);
+            setSelectedAppointment(null);
+            setSelectedAppointmentCustomer(null);
+            setSelectedAppointmentVehicle(null);
+
             // Refresh list
             loadAppointments();
 
-            // Update local state
-            setSelectedAppointment({
-                ...selectedAppointment,
-                status: "IN_PROGRESS"
-            });
+            // Step 3: Redirect to the created job card page
+            if (createdJobCardId) {
+                // Small delay to allow toast to be visible before navigation
+                setTimeout(() => {
+                    router.push(`/sc/job-cards/${createdJobCardId}`);
+                }, 500);
+            }
 
         } catch (error: any) {
             console.error("Error marking customer arrived:", error);
             const msg = error?.response?.data?.message || error?.message || "Failed to update status.";
             showToast(msg, "error");
         }
-    }, [selectedAppointment, selectedAppointmentCustomer, selectedAppointmentVehicle, serviceCenterContext, showToast, loadAppointments]);
+    }, [selectedAppointment, selectedAppointmentCustomer, selectedAppointmentVehicle, serviceCenterContext, showToast, loadAppointments, router, setShowAppointmentFormModal, setSelectedAppointment, setSelectedAppointmentCustomer, setSelectedAppointmentVehicle]);
 
     const handleOpenJobCard = useCallback((appointmentId: number | string) => {
         try {

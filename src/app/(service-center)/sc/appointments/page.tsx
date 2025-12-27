@@ -180,7 +180,7 @@ function AppointmentsContent() {
         vehicleId: appointment.vehicleExternalId.toString(),
         appointmentId: appointment.id?.toString(), // Link to appointment
         serviceType: appointment.serviceType,
-        priority: "MEDIUM" as const, // Backend enum: LOW, MEDIUM, HIGH, URGENT
+        priority: "NORMAL" as const, // Backend enum: LOW, NORMAL, HIGH, CRITICAL
         location: "STATION" as const, // Backend enum: STATION, DOORSTEP
         part1Data: customerData && vehicleData ? {
           customerName: appointment.customerName || customerData.name,
@@ -265,7 +265,7 @@ function AppointmentsContent() {
               className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
             >
               <Calendar size={20} />
-              Create New Appointment
+              New Appointment
             </button>
           )}
         </div>

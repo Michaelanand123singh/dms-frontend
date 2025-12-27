@@ -86,6 +86,7 @@ export default function CustomerFind() {
   } = rolePermissions;
   const { userRole } = useRole();
   const canCreateNewCustomer = canCreateCustomer(userRole);
+  const isServiceAdvisor = userRole === "service_advisor";
 
   const { toast, showToast, ToastComponent } = useToast();
 
@@ -161,7 +162,9 @@ export default function CustomerFind() {
   const [validationError, setValidationError] = useState<string>("");
   const [detectedSearchType, setDetectedSearchType] = useState<CustomerSearchType | null>(null);
   const [serviceCenterSearch, setServiceCenterSearch] = useState<string>("");
-  const [appointmentForm, setAppointmentForm] = useState<Partial<AppointmentFormType>>(() => getInitialAppointmentForm());
+  const [appointmentForm, setAppointmentForm] = useState<Partial<AppointmentFormType>>(() => getInitialAppointmentForm({
+    assignedServiceAdvisor: isServiceAdvisor && userInfo?.name ? userInfo.name : "",
+  }));
   const [pickupAddressDifferent, setPickupAddressDifferent] = useState<boolean>(false);
   const [pickupState, setPickupState] = useState<string>("");
   const [pickupCity, setPickupCity] = useState<string>("");
@@ -326,14 +329,16 @@ export default function CustomerFind() {
   }, [resetVehicleForm]);
 
   const resetAppointmentForm = useCallback(() => {
-    setAppointmentForm(getInitialAppointmentForm());
+    setAppointmentForm(getInitialAppointmentForm({
+      assignedServiceAdvisor: isServiceAdvisor && userInfo?.name ? userInfo.name : "",
+    }));
     setPickupState("");
     setPickupCity("");
     setDropState("");
     setDropCity("");
     setPickupAddressDifferent(false);
     setDropSameAsPickup(false);
-  }, [setAppointmentForm]);
+  }, [isServiceAdvisor, userInfo?.name]);
 
   // Helper to initialize appointment form with customer and optional vehicle data
   const initializeAppointmentForm = useCallback((customer: CustomerWithVehicles, vehicle?: Vehicle | null) => {
@@ -344,7 +349,9 @@ export default function CustomerFind() {
         : "");
 
     setAppointmentForm({
-      ...getInitialAppointmentForm(),
+      ...getInitialAppointmentForm({
+        assignedServiceAdvisor: isServiceAdvisor && userInfo?.name ? userInfo.name : "",
+      }),
       customerName: customer.name,
       phone: customer.phone,
       vehicle: vehicleString,
@@ -391,7 +398,9 @@ export default function CustomerFind() {
       if (prev.photosVideos?.urls) {
         prev.photosVideos.urls.forEach((url: string) => URL.revokeObjectURL(url));
       }
-      return getInitialAppointmentForm();
+      return getInitialAppointmentForm({
+        assignedServiceAdvisor: isServiceAdvisor && userInfo?.name ? userInfo.name : "",
+      });
     });
     appointmentModal.close();
     setValidationError("");

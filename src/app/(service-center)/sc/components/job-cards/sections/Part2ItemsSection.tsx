@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Upload, Eye } from 'lucide-react';
 import { CreateJobCardForm, JobCardPart2Item } from "@/features/job-cards/types/job-card.types";
 import { extractPartCode, extractPartName, extractLabourCode, generateSrNoForPart2Items } from "@/features/job-cards/utils/jobCardUtils";
@@ -8,6 +8,8 @@ import { CLOUDINARY_FOLDERS } from "@/services/cloudinary/folderStructure";
 import { saveFileMetadata } from "@/services/files/fileMetadata.service";
 import { FileCategory, RelatedEntityType } from "@/services/files/types";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
+import { apiClient } from "@/core/api/client";
+import type { Part } from "@/shared/types/inventory.types";
 
 interface WarrantyDocumentationData {
     videoEvidence: string[];
@@ -57,11 +59,70 @@ export const Part2ItemsSection: React.FC<Part2ItemsSectionProps> = ({
     const { uploadMultiple } = useCloudinaryUpload();
     const jobCardId = propJobCardId || form.vehicleId || "temp";
 
+    // Search state
+    const [allParts, setAllParts] = useState<Part[]>([]);
+    const [searchResults, setSearchResults] = useState<Part[]>([]);
+    const [showResults, setShowResults] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const [partsLoaded, setPartsLoaded] = useState(false);
+
+    // Fetch all parts once when component mounts
+    useEffect(() => {
+        const fetchAllParts = async () => {
+            try {
+                const response = await apiClient.get<Part[]>('/inventory', {
+                    cache: false,
+                });
+                setAllParts(response.data || []);
+                setPartsLoaded(true);
+            } catch (error) {
+                console.error("Error fetching parts:", error);
+                setAllParts([]);
+                setPartsLoaded(true);
+            }
+        };
+
+        fetchAllParts();
+    }, []);
+
+    // Handle part search - filter locally from allParts
+    useEffect(() => {
+        const query = newItem.partName;
+
+        if (!query || query.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+
+        // Filter locally from already fetched parts
+        const normalizedQuery = query.toLowerCase().trim();
+        const filtered = allParts.filter(
+            (part) =>
+                part.partName?.toLowerCase().includes(normalizedQuery) ||
+                part.partNumber?.toLowerCase().includes(normalizedQuery) ||
+                part.partId?.toLowerCase().includes(normalizedQuery)
+        );
+
+        setSearchResults(filtered.slice(0, 10)); // Limit to 10 results
+        setShowResults(true);
+    }, [newItem.partName, allParts]);
+
+    const handleSelectPart = (part: any) => {
+        setNewItem(prev => ({
+            ...prev,
+            partName: part.partName,
+            partCode: part.partNumber || part.partCode || "",
+            amount: part.unitPrice || part.price || 0,
+        }));
+        setShowResults(false);
+    };
+
+
     const handleFileUpload = useCallback(
         async (field: 'videoEvidence' | 'vinImage' | 'odoImage' | 'damageImages', files: FileList | null) => {
-        if (!files) return;
-        const newFiles = Array.from(files);
-            
+            if (!files) return;
+            const newFiles = Array.from(files);
+
             // Determine folder based on field type (using default item index 0)
             let folder: string;
             switch (field) {
@@ -97,7 +158,7 @@ export const Part2ItemsSection: React.FC<Part2ItemsSectionProps> = ({
                 const existingUrls = form[field]?.urls || [];
                 const existingPublicIds = form[field]?.publicIds || [];
 
-        updateField(field, {
+                updateField(field, {
                     urls: [...existingUrls, ...newUrls],
                     publicIds: [...existingPublicIds, ...newPublicIds],
                     metadata: [
@@ -136,7 +197,7 @@ export const Part2ItemsSection: React.FC<Part2ItemsSectionProps> = ({
                         authToken || undefined
                     ).catch(err => {
                         console.error('Failed to save file metadata to backend:', err);
-        });
+                    });
                 }
             } catch (err) {
                 console.error('Upload failed:', err);
@@ -216,18 +277,56 @@ export const Part2ItemsSection: React.FC<Part2ItemsSectionProps> = ({
                     {editingIndex !== null ? "Edit Item" : "Add New Item"}
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* Part Name */}
-                    <div>
+                    {/* Part Name with Search */}
+                    <div className="relative">
                         <label className="block text-xs font-medium text-gray-600 mb-1">
                             Part Name <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
                             value={newItem.partName || ""}
-                            onChange={(e) => setNewItem({ ...newItem, partName: e.target.value })}
+                            onChange={(e) => {
+                                setNewItem({ ...newItem, partName: e.target.value });
+                                setShowResults(true);
+                            }}
+                            onFocus={() => setShowResults(true)}
+                            onBlur={() => {
+                                // Delay hiding results to allow click to register
+                                setTimeout(() => setShowResults(false), 200);
+                            }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                            placeholder="e.g., Front Fender"
+                            placeholder="Search part by name..."
+                            autoComplete="off"
                         />
+                        {/* Search Results Dropdown */}
+                        {showResults && (searchResults.length > 0 || isSearching) && newItem.partName && newItem.partName.length >= 2 && (
+                            <div className="absolute z-10 w-full bg-white mt-1 border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                {isSearching ? (
+                                    <div className="p-3 text-center text-gray-500 text-xs">Searching...</div>
+                                ) : (
+                                    <ul>
+                                        {searchResults.map((part: Part) => (
+                                            <li
+                                                key={part.id}
+                                                className="px-4 py-2 hover:bg-indigo-50 cursor-pointer text-sm border-b border-gray-100 last:border-0"
+                                                onMouseDown={() => handleSelectPart(part)}
+                                            >
+                                                <div className="font-medium text-gray-800">{part.partName}</div>
+                                                <div className="flex justify-between text-xs text-gray-500 mt-0.5">
+                                                    <span>Code: {part.partNumber || part.partId}</span>
+                                                    <span>Stock: {part.stockQuantity}</span>
+                                                </div>
+                                                {part.price && (
+                                                    <div className="text-xs text-indigo-600 mt-0.5">
+                                                        ₹{part.price.toLocaleString("en-IN")}
+                                                    </div>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Part Code */}

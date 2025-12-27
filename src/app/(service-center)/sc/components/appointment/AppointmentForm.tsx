@@ -121,6 +121,8 @@ export const AppointmentForm = ({
   const [validationError, setValidationError] = useState("");
 
   const [realServiceCenters, setRealServiceCenters] = useState<any[]>([]);
+  const [technicians, setTechnicians] = useState<{ id: string; name: string }[]>([]);
+  const [serviceAdvisors, setServiceAdvisors] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     const fetchSCs = async () => {
@@ -143,6 +145,38 @@ export const AppointmentForm = ({
       }
     };
     fetchSCs();
+  }, []);
+
+  // Fetch technicians (service_engineer role)
+  useEffect(() => {
+    const fetchTechnicians = async () => {
+      try {
+        const res = await apiClient.get(`${API_ENDPOINTS.USERS}?role=service_engineer`) as any;
+        const data = Array.isArray(res) ? res : res.data || [];
+        if (Array.isArray(data)) {
+          setTechnicians(data.map((user: any) => ({ id: user.id, name: user.name })));
+        }
+      } catch (e) {
+        console.error("Error fetching technicians", e);
+      }
+    };
+    fetchTechnicians();
+  }, []);
+
+  // Fetch service advisors (service_advisor role)
+  useEffect(() => {
+    const fetchServiceAdvisors = async () => {
+      try {
+        const res = await apiClient.get(`${API_ENDPOINTS.USERS}?role=service_advisor`) as any;
+        const data = Array.isArray(res) ? res : res.data || [];
+        if (Array.isArray(data)) {
+          setServiceAdvisors(data.map((user: any) => ({ id: user.id, name: user.name })));
+        }
+      } catch (e) {
+        console.error("Error fetching service advisors", e);
+      }
+    };
+    fetchServiceAdvisors();
   }, []);
 
   const availableServiceCenters = useMemo(
@@ -1295,19 +1329,33 @@ export const AppointmentForm = ({
               />
             )}
             {(isServiceAdvisor || isServiceManager) && (
-              <FormInput
+              <FormSelect
                 label="Assigned Service Advisor"
                 value={formData.assignedServiceAdvisor || ""}
                 onChange={(e) => updateFormData({ assignedServiceAdvisor: e.target.value })}
-                placeholder="Enter service advisor name"
+                placeholder="Select service advisor"
+                options={[
+                  { value: "", label: "Select service advisor" },
+                  ...serviceAdvisors.map((advisor) => ({
+                    value: advisor.name,
+                    label: advisor.name,
+                  })),
+                ]}
               />
             )}
             {canAssignTechnician && (
-              <FormInput
+              <FormSelect
                 label="Assigned Technician"
                 value={formData.assignedTechnician || ""}
                 onChange={(e) => updateFormData({ assignedTechnician: e.target.value })}
-                placeholder="Enter technician name"
+                placeholder="Select technician"
+                options={[
+                  { value: "", label: "Select technician" },
+                  ...technicians.map((tech) => ({
+                    value: tech.name,
+                    label: tech.name,
+                  })),
+                ]}
               />
             )}
             {/* Pickup / Drop Required */}

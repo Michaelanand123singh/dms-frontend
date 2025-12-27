@@ -24,13 +24,8 @@ const fetchJobCard = async (id: string): Promise<JobCard | undefined> => {
     // Import the job card service
     const { jobCardService } = await import("@/features/job-cards/services/jobCard.service");
 
-    // Fetch all job cards from API
-    const allJobCards = await jobCardService.getAll();
-
-    // Find the one we need
-    const jobCard = allJobCards.find((card) =>
-      card.id === id || card.jobCardNumber === id
-    );
+    // Fetch job card directly by ID from API
+    const jobCard = await jobCardService.getById(id);
 
     if (jobCard) {
       console.log("Found job card from API:", jobCard);
@@ -141,9 +136,9 @@ export default function AdvisorJobCardDetailPage({ params, searchParams }: Advis
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${jobCard.status === "Created" ? "bg-blue-100 text-blue-700" :
-              jobCard.status === "In Progress" ? "bg-yellow-100 text-yellow-700" :
-                jobCard.status === "Completed" ? "bg-green-100 text-green-700" :
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${jobCard.status === "CREATED" ? "bg-blue-100 text-blue-700" :
+              jobCard.status === "IN_PROGRESS" ? "bg-yellow-100 text-yellow-700" :
+                jobCard.status === "COMPLETED" ? "bg-green-100 text-green-700" :
                   "bg-gray-100 text-gray-700"
               }`}>
               {jobCard.status}

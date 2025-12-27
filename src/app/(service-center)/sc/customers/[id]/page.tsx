@@ -54,6 +54,7 @@ export default function CustomerDetailsPage() {
     const customerId = params.id as string;
     const { userInfo, userRole } = useRole();
     const { toast, showToast, ToastComponent } = useToast();
+    const isServiceAdvisor = userRole === "service_advisor";
 
     const [customer, setCustomer] = useState<CustomerWithVehicles | null>(null);
     const [loading, setLoading] = useState(true);
@@ -68,7 +69,9 @@ export default function CustomerDetailsPage() {
     // Selection state
     const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
     const [shouldOpenAppointmentAfterVehicleAdd, setShouldOpenAppointmentAfterVehicleAdd] = useState<boolean>(false);
-    const [appointmentForm, setAppointmentForm] = useState<Partial<AppointmentFormType>>(() => getInitialAppointmentForm());
+    const [appointmentForm, setAppointmentForm] = useState<Partial<AppointmentFormType>>(() => getInitialAppointmentForm({
+        assignedServiceAdvisor: isServiceAdvisor && userInfo?.name ? userInfo.name : "",
+    }));
 
     // Service History Hook
     const {
@@ -142,7 +145,9 @@ export default function CustomerDetailsPage() {
                 : "");
 
         const baseForm: Partial<AppointmentFormType> = {
-            ...getInitialAppointmentForm(),
+            ...getInitialAppointmentForm({
+                assignedServiceAdvisor: isServiceAdvisor && userInfo?.name ? userInfo.name : "",
+            }),
             customerName: customerCtx.name,
             phone: customerCtx.phone,
             vehicle: vehicleString,
@@ -212,10 +217,12 @@ export default function CustomerDetailsPage() {
             // Basic cleanup logic invoked
             if (prev.customerIdProof?.urls) prev.customerIdProof.urls.forEach(URL.revokeObjectURL);
             // ... other cleanups omitted for brevity but should be here
-            return getInitialAppointmentForm();
+            return getInitialAppointmentForm({
+                assignedServiceAdvisor: isServiceAdvisor && userInfo?.name ? userInfo.name : "",
+            });
         });
         appointmentModal.close();
-    }, [appointmentModal]);
+    }, [appointmentModal, isServiceAdvisor, userInfo?.name]);
 
     if (loading) {
         return <div className="min-h-screen bg-gray-50 pt-20 flex justify-center"><div className="text-gray-500">Loading customer details...</div></div>;

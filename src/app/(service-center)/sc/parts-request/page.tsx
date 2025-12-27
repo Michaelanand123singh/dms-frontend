@@ -23,6 +23,7 @@ import {
   filterByServiceCenter,
   getServiceCenterContext,
 } from "@/shared/lib/serviceCenter";
+import { serviceEngineerJobCards } from "@/__mocks__/data/job-cards.mock";
 
 export default function PartsRequest() {
   const { userRole, userInfo, isLoading: isRoleLoading } = useRole();
