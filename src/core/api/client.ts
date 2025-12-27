@@ -27,11 +27,11 @@ class ApiClient {
 
     constructor(baseURL: string = API_BASE_URL) {
         if (!baseURL) {
-            console.warn("ApiClient: baseURL is undefined. Using default http://localhost:3001/api");
-            this.baseURL = "http://localhost:3001/api";
-        } else {
-            this.baseURL = baseURL;
+            throw new Error(
+                'API_BASE_URL is not configured. Please set NEXT_PUBLIC_API_URL in your .env file'
+            );
         }
+        this.baseURL = baseURL;
     }
 
     /**
