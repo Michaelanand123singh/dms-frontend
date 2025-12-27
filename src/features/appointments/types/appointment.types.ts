@@ -2,6 +2,20 @@
  * Appointment Type Definitions
  */
 
+// Backend AppointmentStatus enum values (must match Prisma schema)
+export type AppointmentStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "CANCELLED"
+  | "COMPLETED"
+  | "IN_PROGRESS"
+  | "ARRIVED"
+  | "QUOTATION_CREATED"
+  | "SENT_TO_MANAGER";
+
+// Backend AppointmentLocation enum values
+export type AppointmentLocation = "STATION" | "DOORSTEP";
+
 export interface Appointment {
   id: number | string;
   customerId: string;
@@ -13,7 +27,7 @@ export interface Appointment {
   date?: string;
   time?: string;
   duration?: string;
-  status?: "Confirmed" | "Pending" | "Cancelled";
+  status?: AppointmentStatus;
   customerExternalId?: string;
   vehicleExternalId?: string;
   serviceCenterId?: string | number;
@@ -37,16 +51,39 @@ export interface CreateAppointmentDto {
   appointmentDate: string;
   appointmentTime: string;
   customerComplaint?: string;
-  location?: "STATION" | "DOORSTEP" | "PICKUP";
+  location?: AppointmentLocation;
   estimatedCost?: number;
   documentationFiles?: DocumentationFilesDto;
   uploadedBy?: string;
+  // Operational details
+  estimatedDeliveryDate?: string;
+  assignedServiceAdvisor?: string;
+  assignedTechnician?: string;
+  pickupDropRequired?: boolean;
+  pickupAddress?: string;
+  pickupState?: string;
+  pickupCity?: string;
+  pickupPincode?: string;
+  dropAddress?: string;
+  dropState?: string;
+  dropCity?: string;
+  dropPincode?: string;
+  preferredCommunicationMode?: string;
+  previousServiceHistory?: string;
+  estimatedServiceTime?: string;
+  odometerReading?: string;
+  duration?: string;
   [key: string]: any; // Allow other fields that might be passed temporarily
 }
 
 export interface UpdateAppointmentDto extends Partial<CreateAppointmentDto> {
-  status?: string;
+  status?: AppointmentStatus;
   assignedTechnician?: string;
+  // Check-in fields - set by Job Card workflow
+  customerArrived?: boolean;
+  arrivalMode?: string;
+  checkInNotes?: string;
+  checkInSlipNumber?: string;
   checkInDate?: string;
   checkInTime?: string;
 }

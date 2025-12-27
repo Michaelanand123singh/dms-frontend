@@ -83,6 +83,7 @@ export interface AppointmentForm {
   estimatedDeliveryDate?: string;
   assignedServiceAdvisor?: string;
   assignedTechnician?: string;
+  location?: "STATION" | "DOORSTEP"; // Service location type
   pickupDropRequired?: boolean;
   pickupAddress?: string;
   pickupState?: string;
@@ -117,20 +118,6 @@ export interface AppointmentForm {
   insuranceEndDate?: string;
   insuranceCompanyName?: string;
   vehicleColor?: string;
-
-  // Job Card Conversion Fields
-  batterySerialNumber?: string;
-  mcuSerialNumber?: string;
-  vcuSerialNumber?: string;
-  otherPartSerialNumber?: string;
-  technicianObservation?: string;
-
-  // Service Intake/Check-in Fields
-  arrivalMode?: "vehicle_present" | "vehicle_absent" | "check_in_only";
-  checkInNotes?: string;
-  checkInSlipNumber?: string;
-  checkInDate?: string;
-  checkInTime?: string;
 }
 
 export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
@@ -156,6 +143,7 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   estimatedDeliveryDate: undefined,
   assignedServiceAdvisor: undefined,
   assignedTechnician: undefined,
+  location: "STATION", // Default to station service
   pickupDropRequired: undefined,
   pickupAddress: undefined,
   pickupState: undefined,
@@ -188,18 +176,6 @@ export const INITIAL_APPOINTMENT_FORM: AppointmentForm = {
   insuranceEndDate: undefined,
   insuranceCompanyName: undefined,
   vehicleColor: undefined,
-  // Job Card Conversion Fields
-  batterySerialNumber: undefined,
-  mcuSerialNumber: undefined,
-  vcuSerialNumber: undefined,
-  otherPartSerialNumber: undefined,
-  technicianObservation: undefined,
-  // Service Intake/Check-in Fields
-  arrivalMode: undefined,
-  checkInNotes: undefined,
-  checkInSlipNumber: undefined,
-  checkInDate: undefined,
-  checkInTime: undefined,
 };
 
 export const DEFAULT_MAX_APPOINTMENTS_PER_DAY = 20;
