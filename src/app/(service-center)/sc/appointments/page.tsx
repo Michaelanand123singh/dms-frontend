@@ -265,7 +265,7 @@ function AppointmentsContent() {
               className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition shadow-md inline-flex items-center gap-2"
             >
               <Calendar size={20} />
-              Create New Appointment
+              New Appointment
             </button>
           )}
         </div>
