@@ -19,13 +19,15 @@ import {
   FileSpreadsheet,
   X
 } from "lucide-react";
-import type { Part, PartFormData } from "@/shared/types/inventory.types";
+import type { Part, PartFormData } from "@/features/inventory/types/inventory.types";
 import * as XLSX from "xlsx";
 import { PartsMasterForm } from "./PartsMasterForm";
 import { getInitialFormData, type PartsMasterFormData } from "./form.schema";
 import { mapPartToFormData, mapFormDataToPartFormData } from "./form.utils";
+import { useRole } from "@/shared/hooks";
 
 export default function PartsMasterPage() {
+  const { userInfo } = useRole();
   const [parts, setParts] = useState<Part[]>([]);
   const [filteredParts, setFilteredParts] = useState<Part[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +44,9 @@ export default function PartsMasterPage() {
   } | null>(null);
   const [formData, setFormData] = useState<PartsMasterFormData>(getInitialFormData());
 
+  // Get service center ID from user info (serviceCenter is the ID string)
+  const serviceCenterId = userInfo?.serviceCenter || "";
+
   useEffect(() => {
     fetchParts();
   }, []);
@@ -55,7 +60,7 @@ export default function PartsMasterPage() {
         (p) =>
           p.partName.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.partNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.partId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.partId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
@@ -86,6 +91,11 @@ export default function PartsMasterPage() {
     try {
       // Map form data to PartFormData (only includes fields with data)
       const partData = mapFormDataToPartFormData(formData);
+
+       // Inject Service Center ID for new parts if missing (required by backend)
+      if (!partData.serviceCenterId && serviceCenterId) {
+        partData.serviceCenterId = serviceCenterId;
+      }
 
       // At minimum, require partName for identification
       if (!partData.partName?.trim()) {
@@ -154,6 +164,12 @@ export default function PartsMasterPage() {
   const handleExcelUpload = async () => {
     if (!uploadFile) return;
 
+    // Validate service center ID
+    if (!serviceCenterId) {
+      alert("Unable to determine your service center. Please refresh the page and try again.");
+      return;
+    }
+
     try {
       setUploadProgress({ success: 0, failed: 0, errors: [] });
 
@@ -162,7 +178,7 @@ export default function PartsMasterPage() {
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData: any[] = XLSX.utils.sheet_to_json(firstSheet);
 
-      // Map Excel columns to PartFormData (new parameters from image)
+      // Map Excel columns to PartFormData (matching user's exact headers)
       const partsData: PartFormData[] = jsonData.map((row: any) => {
         // Try to match common column names (case-insensitive)
         const getValue = (keys: string[]) => {
@@ -177,48 +193,79 @@ export default function PartsMasterPage() {
           return "";
         };
 
-        // Calculate price from totalPrice or use purchasePrice
-        const totalPrice = parseFloat(getValue(["TOTAL PRICE", "Total Price", "total_price", "TotalPrice"]) || "0");
-        const purchasePrice = parseFloat(getValue(["PURCHASE PRICE", "Purchase Price", "purchase_price", "PurchasePrice"]) || "0");
-        const price = totalPrice > 0 ? totalPrice : (purchasePrice > 0 ? purchasePrice : 0);
+        // Parse numeric values with proper handling of percentages
+        const parseNumber = (val: any): number => {
+          if (typeof val === 'number') return val;
+          if (typeof val === 'string') {
+            // Remove percentage sign and parse
+            const cleaned = val.replace(/[%₹,\s]/g, '').trim();
+            return parseFloat(cleaned) || 0;
+          }
+          return 0;
+        };
+
+        // Parse boolean (YES/NO/true/false)
+        const parseBoolean = (val: any): boolean => {
+          if (typeof val === 'boolean') return val;
+          if (typeof val === 'string') {
+            return val.toLowerCase() === 'yes' || val.toLowerCase() === 'true';
+          }
+          return false;
+        };
+
+        // Get sale price - try multiple column names
+        const salePricePreGst = parseNumber(getValue(["Sale Price Pre GST", "Sale Price Pre Gst", "sale_price_pre_gst", "Price Pre GST", "pricePreGst"]));
+        const purchasePrice = parseNumber(getValue(["PURCHASE PRICE", "Purchase Price", "purchase_price", "PurchasePrice"]));
+        const totalPrice = parseNumber(getValue(["TOTAL PRICE", "Total Price", "total_price", "TotalPrice"]));
 
         return {
-          partId: String(getValue(["Part ID", "PartID", "part_id", "PartId"]) || ""),
+          // Basic Part Information
+          oemPartNumber: String(getValue(["OEM PART NUMBER", "OEM Part Number", "oem_part_number", "OemPartNumber"]) || ""),
           partName: String(getValue(["Part Name", "PartName", "part_name", "Name"]) || ""),
           partNumber: String(getValue(["Part Number", "PartNumber", "part_number", "Number"]) || ""),
+          originType: String(getValue(["ORIGIN TYPE", "Origin Type", "origin_type", "OriginType"]) || "NEW").replace(/\s*\/\s*/g, '/'),
           category: String(getValue(["Category", "category", "Category Name"]) || ""),
-          price: price,
           description: String(getValue(["Description", "description", "Desc"]) || ""),
-          minStockLevel: parseInt(getValue(["Min Stock", "MinStock", "min_stock", "Min Stock Level", "min_stock_level"]) || "0") || 0,
+
+          // Stock Information
+          stockQuantity: 0, // Initial stock is 0 for new parts
+          minStockLevel: parseInt(getValue(["Min Stock", "MinStock", "min_stock", "Min Stock Level"]) || "0") || 0,
+          maxStockLevel: 100, // Default max
           unit: String(getValue(["Unit", "unit", "UOM"]) || "piece"),
-          // New fields from image
-          oemPartNumber: String(getValue(["OEM PART NUMBER", "OEM Part Number", "oem_part_number", "OemPartNumber"]) || ""),
-          originType: String(getValue(["ORIGIN TYPE", "Origin Type", "origin_type", "OriginType"]) || "NEW"),
-          purchasePrice: String(getValue(["PURCHASE PRICE", "Purchase Price", "purchase_price", "PurchasePrice"]) || ""),
-          // Basic Part Info
+
+          // Part Details
           brandName: String(getValue(["Brand Name", "BrandName", "brand_name", "Brand"]) || ""),
           variant: String(getValue(["Variant", "variation"]) || ""),
           partType: String(getValue(["Part Type", "PartType", "part_type"]) || ""),
-          color: String(getValue(["Color", "colour"]) || ""),
-          // GST and Pricing
-          gstAmount: String(getValue(["GST Amount", "GstAmount", "gst_amount"]) || ""),
-          gstRateInput: String(getValue(["GST Rate Input", "GstRateInput", "gst_rate_input"]) || ""),
-          pricePreGst: String(getValue(["Price Pre GST", "PricePreGst", "price_pre_gst"]) || ""),
-          gstRateOutput: String(getValue(["GST Rate Output", "GstRateOutput", "gst_rate_output"]) || ""),
-          // Labour Information
-          estimatedLabour: String(getValue(["Estimated Labour", "EstimatedLabour", "estimated_labour"]) || ""),
-          estimatedLabourWorkTime: String(getValue(["Estimated Labour Work Time", "EstimatedLabourWorkTime", "estimated_labour_work_time", "Work Time"]) || ""),
-          labourRate: String(getValue(["Labour Rate", "LabourRate", "labour_rate"]) || ""),
-          labourGstRate: String(getValue(["Labour GST Rate", "LabourGstRate", "labour_gst_rate"]) || ""),
-          labourPrice: String(getValue(["LABOUR PRICE", "Labour Price", "labour_price", "LabourPrice"]) || ""),
-          // Calculated Totals
-          gstInput: String(getValue(["GST INPUT", "GST Input", "gst_input", "GstInput"]) || ""),
-          totalPrice: String(getValue(["TOTAL PRICE", "Total Price", "total_price", "TotalPrice"]) || ""),
-          totalGst: String(getValue(["TOTAL GST", "Total GST", "total_gst", "TotalGst"]) || ""),
-          // High Value Part
-          highValuePart: getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "true" ||
-            getValue(["High Value Part", "HighValuePart", "high_value_part"])?.toLowerCase() === "yes" ||
-            false,
+          color: String(getValue(["Color", "colour", "Colour"]) || ""),
+
+          // Pricing - Purchase
+          costPrice: purchasePrice,
+          pricePreGst: parseNumber(getValue(["Pre GST Amount To Us", "Pre GST Amount", "pricePreGst", "Price Pre Gst To Us"]) || purchasePrice),
+          gstRateInput: parseNumber(getValue(["GST Rate Input", "GstRateInput", "gst_rate_input"])),
+          gstInput: parseNumber(getValue(["GST INPUT", "GST Input", "gst_input", "GstInput"])),
+
+          // Pricing - Sale
+          unitPrice: salePricePreGst > 0 ? salePricePreGst : totalPrice,
+          price: salePricePreGst > 0 ? salePricePreGst : totalPrice,
+          gstRate: parseNumber(getValue(["GST Rate Output", "GstRateOutput", "gst_rate_output"])) || 18,
+          gstRateOutput: parseNumber(getValue(["GST Rate Output", "GstRateOutput", "gst_rate_output"])),
+          totalPrice: totalPrice,
+          totalGst: parseNumber(getValue(["TOTAL GST", "Total GST", "total_gst", "TotalGst"])),
+
+          // Labour Information - using new field names
+          labourName: String(getValue(["Associated Labour Name", "Labour Name", "labourName", "Estimated Labour"]) || ""),
+          labourCode: String(getValue(["Associated Labour Code", "Labour Code", "labourCode"]) || ""),
+          labourWorkTime: String(getValue(["Work Time", "WorkTime", "work_time", "Estimated Labour Work Time"]) || ""),
+          labourRate: parseNumber(getValue(["Labour Rate", "LabourRate", "labour_rate"])),
+          labourGstRate: parseNumber(getValue(["Labour GST Rate", "LabourGstRate", "labour_gst_rate"])),
+          labourPrice: parseNumber(getValue(["LABOUR PRICE", "Labour Price", "labour_price", "LabourPrice"])),
+
+          // Flags
+          highValuePart: parseBoolean(getValue(["High Value Part", "HighValuePart", "high_value_part"])),
+
+          // Service Center (required by backend)
+          serviceCenterId: serviceCenterId,
         } as PartFormData;
       });
 
@@ -255,31 +302,32 @@ export default function PartsMasterPage() {
   const downloadTemplate = () => {
     const templateData = [
       {
-        "OEM PART NUMBER": "W_000000000272_00",
+        "OEM PART NUMBER": "2W_000000000272_003",
         "Part Name": "COCKPIT TOP SHELL ANTHRACITE",
-        "Part Number": "003",
+        "Part Number": "_003",
         "ORIGIN TYPE": "OLD/NEW",
-        "Category": "BODY PANE",
+        "Category": "BODY PANEL",
         "PURCHASE PRICE": 950,
-        "Description": "HEADLIGH",
+        "Description": "HMI AND HEADLIGHT COVER",
         "Min Stock": 2,
         "Unit": "1",
-        "Brand Name": "LA ELECTRI",
+        "Brand Name": "OLA ELECTRIC",
         "Variant": "S1 PRO, S1",
         "Part Type": "PANEL",
-        "Color": "ANTHRACIT",
-        "GST Amount": "",
-        "GST Rate Input": "18",
-        "Price Pre GST": "1652",
-        "GST Rate Output": "18",
-        "Estimated Labour": "COCKPIT FIT000000000",
-        "Estimated Labour Work Time": "0.3M",
-        "Labour Rate": "180",
-        "Labour GST Rate": "18",
-        "LABOUR PRICE": "",
-        "GST INPUT": "",
-        "TOTAL PRICE": "",
-        "TOTAL GST": "",
+        "Color": "ANTHRACITE",
+        "Pre GST Amount To Us": 1400,
+        "GST Rate Input": "18%",
+        "Sale Price Pre GST": 1652,
+        "GST Rate Output": "18%",
+        "Associated Labour Name": "TOP COCKIT FITTING",
+        "Associated Labour Code": "LB_000000000121",
+        "Work Time": "0.3M",
+        "Labour Rate": 180,
+        "Labour GST Rate": "18%",
+        "LABOUR PRICE": 212.4,
+        "GST INPUT": 32.4,
+        "TOTAL PRICE": 1864.4,
+        "TOTAL GST": 284.4,
         "High Value Part": "NO",
       },
     ];
@@ -532,7 +580,7 @@ export default function PartsMasterPage() {
                             <Badge variant="info">{part.category}</Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">₹{part.price.toLocaleString()}</div>
+                            <div className="text-sm text-gray-900">₹{(part.price ?? 0).toLocaleString()}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className={`text-sm font-medium ${isOutOfStock ? "text-red-600" : isLowStock ? "text-orange-600" : "text-gray-900"}`}>

@@ -78,12 +78,5 @@ export interface CreateAppointmentDto {
 
 export interface UpdateAppointmentDto extends Partial<CreateAppointmentDto> {
   status?: AppointmentStatus;
-  assignedTechnician?: string;
-  // Check-in fields - set by Job Card workflow
-  customerArrived?: boolean;
-  arrivalMode?: string;
-  checkInNotes?: string;
-  checkInSlipNumber?: string;
-  checkInDate?: string;
-  checkInTime?: string;
 }
+

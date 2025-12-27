@@ -9,7 +9,7 @@ import { saveFileMetadata } from "@/services/files/fileMetadata.service";
 import { FileCategory, RelatedEntityType } from "@/services/files/types";
 import { localStorage as safeStorage } from "@/shared/lib/localStorage";
 import { apiClient } from "@/core/api/client";
-import type { Part } from "@/shared/types/inventory.types";
+import type { Part } from "@/features/inventory/types/inventory.types";
 
 interface WarrantyDocumentationData {
     videoEvidence: string[];
@@ -113,6 +113,7 @@ export const Part2ItemsSection: React.FC<Part2ItemsSectionProps> = ({
             partName: part.partName,
             partCode: part.partNumber || part.partCode || "",
             amount: part.unitPrice || part.price || 0,
+            labourCode: part.labourCode || prev.labourCode || "",
         }));
         setShowResults(false);
     };
@@ -316,11 +317,18 @@ export const Part2ItemsSection: React.FC<Part2ItemsSectionProps> = ({
                                                     <span>Code: {part.partNumber || part.partId}</span>
                                                     <span>Stock: {part.stockQuantity}</span>
                                                 </div>
-                                                {part.price && (
-                                                    <div className="text-xs text-indigo-600 mt-0.5">
-                                                        ₹{part.price.toLocaleString("en-IN")}
-                                                    </div>
-                                                )}
+                                                <div className="flex justify-between text-xs mt-0.5">
+                                                    {(part.unitPrice || part.price) && (
+                                                        <span className="text-indigo-600">
+                                                            ₹{(part.unitPrice || part.price || 0).toLocaleString("en-IN")}
+                                                        </span>
+                                                    )}
+                                                    {part.labourCode && (
+                                                        <span className="text-green-600">
+                                                            Labour: {part.labourCode}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </li>
                                         ))}
                                     </ul>
@@ -592,27 +600,29 @@ export const Part2ItemsSection: React.FC<Part2ItemsSectionProps> = ({
             </div>
 
             {/* Warranty Documentation Modal */}
-            {showWarrantyModal && selectedItemIndex !== null && (
-                <WarrantyDocumentationModal
-                    open={showWarrantyModal}
-                    onClose={() => {
-                        setShowWarrantyModal(false);
-                        setSelectedItemIndex(null);
-                    }}
-                    itemDescription={form.part2Items[selectedItemIndex]?.partName || ""}
-                    initialData={warrantyDocuments[selectedItemIndex]}
-                    onSave={(data) => {
-                        setWarrantyDocuments(prev => ({
-                            ...prev,
-                            [selectedItemIndex]: data
-                        }));
-                    }}
-                    mode={warrantyModalMode}
-                    jobCardId={propJobCardId || form.vehicleId || "temp"}
-                    itemIndex={selectedItemIndex}
-                    userId={userId}
-                />
-            )}
-        </div>
+            {
+                showWarrantyModal && selectedItemIndex !== null && (
+                    <WarrantyDocumentationModal
+                        open={showWarrantyModal}
+                        onClose={() => {
+                            setShowWarrantyModal(false);
+                            setSelectedItemIndex(null);
+                        }}
+                        itemDescription={form.part2Items[selectedItemIndex]?.partName || ""}
+                        initialData={warrantyDocuments[selectedItemIndex]}
+                        onSave={(data) => {
+                            setWarrantyDocuments(prev => ({
+                                ...prev,
+                                [selectedItemIndex]: data
+                            }));
+                        }}
+                        mode={warrantyModalMode}
+                        jobCardId={propJobCardId || form.vehicleId || "temp"}
+                        itemIndex={selectedItemIndex}
+                        userId={userId}
+                    />
+                )
+            }
+        </div >
     );
 };

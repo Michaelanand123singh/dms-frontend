@@ -1,46 +1,67 @@
 import { inventoryService } from "./inventory.service";
-import type { Part, PartFormData } from "@/shared/types/inventory.types";
-import type { InventoryItem } from "@/shared/types/inventory.types";
+import type { Part, PartFormData } from "../types/inventory.types";
+import type { InventoryItem } from "../types/inventory.types";
 
 class PartsMasterService {
 
   private mapInventoryItemToPart(item: InventoryItem): Part {
-    // Best effort mapping from InventoryItem (Frontend View) to Part (Frontend Entity)
-    // Note: Backend InventoryItem lacks many fields present in Part entity.
+    // Map from InventoryItem (list view) to Part (entity)
+    // Most fields now match between the two interfaces
+    const priceStr = typeof item.unitPrice === 'string'
+      ? item.unitPrice.replace(/[^0-9.]/g, '')
+      : String(item.unitPrice || 0);
+    const costStr = typeof item.costPrice === 'string'
+      ? item.costPrice.replace(/[^0-9.]/g, '')
+      : String(item.costPrice || 0);
+
     return {
       id: String(item.id),
-      partId: String(item.id), // Use DB ID or partCode
+      partId: item.partCode || String(item.id),
       partName: item.partName,
-      partNumber: item.partCode,
+      partNumber: item.partNumber || item.partCode || "",
       category: item.category,
-      price: parseFloat(item.unitPrice.replace(/[^0-9.]/g, '')) || 0, // Remove currency symbol
-      stockQuantity: item.currentQty,
-      minStockLevel: item.minStock,
-      unit: "piece", // Default
+
+      // Pricing
+      price: parseFloat(priceStr) || 0,
+      unitPrice: parseFloat(priceStr) || 0,
+      costPrice: parseFloat(costStr) || 0,
+      pricePreGst: item.pricePreGst || 0,
+      gstRate: item.gstRate || 18,
+      gstRateInput: item.gstRateInput || 0,
+      gstRateOutput: item.gstRateOutput || 0,
+      gstInput: item.gstInput || 0,
+      totalPrice: item.totalPrice || 0,
+      totalGst: item.totalGst || 0,
+
+      // Stock
+      stockQuantity: item.currentQty || item.stockQuantity || 0,
+      minStockLevel: item.minStock || item.minStockLevel || 0,
+      maxStockLevel: item.maxStockLevel || 100,
+
+      // Part Details
+      unit: item.unit || "piece",
+      oemPartNumber: item.oemPartNumber || item.hsnCode || "",
+      originType: item.originType || "NEW",
+      description: item.description || "",
+      brandName: item.brandName || "",
+      variant: item.variant || "",
+      partType: item.partType || "",
+      color: item.color || "",
+      location: item.location || "",
+
+      // Labour
+      labourName: item.labourName || "",
+      labourCode: item.labourCode || "",
+      labourWorkTime: item.labourWorkTime || "",
+      labourRate: item.labourRate || 0,
+      labourGstRate: item.labourGstRate || 18,
+      labourPrice: item.labourPrice || 0,
+
+      // Flags
+      highValuePart: item.highValuePart || false,
+
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      // Defaulting missing fields
-      originType: "OEM",
-      purchasePrice: parseFloat(item.costPrice.replace(/[^0-9.]/g, '')) || 0,
-      description: "",
-      brandName: "",
-      variant: "",
-      partType: "",
-      color: "",
-      gstAmount: 0,
-      gstRateInput: 18,
-      pricePreGst: 0,
-      gstRateOutput: 18,
-      estimatedLabour: 0,
-      estimatedLabourWorkTime: "",
-      labourRate: 0,
-      labourGstRate: 18,
-      labourPrice: 0,
-      gstInput: 0,
-      totalPrice: 0,
-      totalGst: 0,
-      highValuePart: false,
-      location: item.location
     };
   }
 
@@ -50,51 +71,83 @@ class PartsMasterService {
   }
 
   async getById(id: string): Promise<Part | null> {
-    // InventoryController does not support getById. We must shim it using getAll.
-    // In efficient, but necessary given current backend.
     const parts = await this.getAll();
     return parts.find((p) => p.id === id || p.partId === id || p.partNumber === id) || null;
   }
 
   async create(data: PartFormData): Promise<Part> {
-    // Map PartFormData to CreateInventoryPartPayload
-    // Note: Data loss will occur for unsupported fields
+    // Map PartFormData to CreateInventoryPartPayload with full schema
     const createdItem = await inventoryService.create({
-      serviceCenterId: data.centerId || "", // This might fail if centerId is missing.
+      serviceCenterId: data.serviceCenterId || "",
+
+      // Basic Part Information
+      oemPartNumber: data.oemPartNumber || "",
       partName: data.partName,
       partNumber: data.partNumber || `PN-${Date.now()}`,
+      originType: data.originType || "NEW",
       category: data.category || "General",
-      unitPrice: data.price || 0,
-      costPrice: data.purchasePrice ? parseFloat(data.purchasePrice) : 0,
-      gstRate: data.gstRateOutput || 18,
-      stockQuantity: 0, // Initial stock is 0
+      description: data.description || "",
+
+      // Stock Information
+      stockQuantity: data.stockQuantity || 0,
       minStockLevel: data.minStockLevel || 0,
-      maxStockLevel: 100, // Default
-      location: ""
+      maxStockLevel: data.maxStockLevel || 100,
+      unit: data.unit || "piece",
+      location: data.location || "",
+
+      // Part Details
+      brandName: data.brandName || "",
+      variant: data.variant || "",
+      partType: data.partType || "",
+      color: data.color || "",
+
+      // Pricing - Purchase
+      costPrice: data.costPrice || 0,
+      pricePreGst: data.pricePreGst || 0,
+      gstRateInput: data.gstRateInput || 0,
+      gstInput: data.gstInput || 0,
+
+      // Pricing - Sale
+      unitPrice: data.unitPrice || data.price || 0,
+      gstRate: data.gstRate || 18,
+      gstRateOutput: data.gstRateOutput || 0,
+      totalPrice: data.totalPrice || 0,
+      totalGst: data.totalGst || 0,
+
+      // Labour Information
+      labourName: data.labourName || "",
+      labourCode: data.labourCode || "",
+      labourWorkTime: data.labourWorkTime || "",
+      labourRate: data.labourRate || 0,
+      labourGstRate: data.labourGstRate || 0,
+      labourPrice: data.labourPrice || 0,
+
+      // Flags
+      highValuePart: data.highValuePart || false,
     });
     return this.mapInventoryItemToPart(createdItem);
   }
 
   async update(id: string, data: Partial<PartFormData>): Promise<Part> {
-    console.warn("Update Part Metadata not supported by backend API. Only Stock Adjustment is supported.");
-    const part = await this.getById(id);
-    if (!part) throw new Error("Part not found");
-    return part;
-    // Return existing part as we cannot update metadata
+    // Map Partial<PartFormData> to payload
+    const payload: any = { ...data };
+
+    // Handle specific mappings
+    if (data.price !== undefined) payload.unitPrice = data.price;
+
+    // Backend expects unitPrice, not price
+    if (payload.price) delete payload.price;
+
+    const updatedItem = await inventoryService.update(id, payload);
+    return this.mapInventoryItemToPart(updatedItem);
   }
 
   async delete(id: string): Promise<void> {
-    console.warn("Delete Part not supported by backend API.");
-    // No-op
+    await inventoryService.delete(id);
   }
 
   async updateStock(id: string, quantity: number, operation: "add" | "subtract" | "set"): Promise<Part> {
-    // Map operation to backend enum: ADD, SUBTRACT, SET
     const adjustmentType = operation === "add" ? "ADD" : operation === "subtract" ? "SUBTRACT" : "SET";
-
-    // InventoryService.adjustStock uses ID. 
-    // Be careful about ID mismatch (UUID vs PartNumber). 
-    // inventoryService.adjustStock takes 'id' which is likely the UUID.
 
     const updateditem = await inventoryService.adjustStock(id, {
       adjustmentType,
@@ -123,12 +176,9 @@ class PartsMasterService {
   }
 
   async searchParts(query: string): Promise<Part[]> {
-    // Backend supports search via getAll params?
-    // inventoryService.getAll({ search: query })
     const items = await inventoryService.getAll({ search: query });
     return items.map(this.mapInventoryItemToPart);
   }
 }
 
 export const partsMasterService = new PartsMasterService();
-

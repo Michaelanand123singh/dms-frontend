@@ -506,15 +506,14 @@ export const useAppointmentLogic = () => {
         if (!selectedAppointment) return;
 
         try {
-            // Step 1: Update appointment status
-            const updatePayload: any = {
-                status: "IN_PROGRESS", // Update status to backend Enum value
-                customerArrived: true, // Mark customer as arrived
+            // Step 1: Update appointment status to IN_PROGRESS
+            const updatePayload = {
+                status: "IN_PROGRESS",
             };
 
             await appointmentsService.update(selectedAppointment.id.toString(), updatePayload);
 
-            // Step 2: Create Job Card in Database
+            // Step 2: Create Temporary Job Card in Database
             let createdJobCardId: string | null = null;
 
             try {
@@ -526,8 +525,23 @@ export const useAppointmentLogic = () => {
                     throw new Error("Missing required customer, vehicle, or service center information");
                 }
 
-                // Create job card with IDs and operational details from appointment
-                // Customer and Vehicle info comes from foreign keys (customerId, vehicleId)
+                // Get customer details - prefer freshly loaded data, fallback to appointment
+                const customer = selectedAppointmentCustomer;
+                const vehicle = selectedAppointmentVehicle;
+
+                if (!customer || !vehicle) {
+                    throw new Error("Customer or Vehicle details not loaded. Please try again.");
+                }
+
+                // Build customer address string
+                const customerAddress = [
+                    customer.address,
+                    customer.cityState,
+                    customer.pincode
+                ].filter(Boolean).join(", ");
+
+                // Create TEMPORARY job card with full customer, vehicle, and service details
+                // This job card will become FINAL after quotation is approved
                 const jobCardPayload = {
                     appointmentId: selectedAppointment.id.toString(),
                     customerId,
@@ -536,43 +550,78 @@ export const useAppointmentLogic = () => {
                     serviceType: selectedAppointment.serviceType,
                     priority: "NORMAL",
                     location: selectedAppointment.location || "STATION",
-                    // Pass only operational details from appointment to Job Card
-                    // Customer/Vehicle info is fetched via relations (no duplication)
+                    isTemporary: true, // TEMP job card until quotation approved
+
+                    // Part 1 Data: Complete snapshot of customer, vehicle, and service details
                     part1Data: {
-                        // Operational Details from Appointment
-                        estimatedDeliveryDate: selectedAppointment.estimatedDeliveryDate,
-                        assignedServiceAdvisor: selectedAppointment.assignedServiceAdvisor,
-                        assignedTechnician: selectedAppointment.assignedTechnician,
-                        // Pickup/Drop Info
-                        pickupDropRequired: selectedAppointment.pickupDropRequired,
-                        pickupAddress: selectedAppointment.pickupAddress,
-                        pickupState: selectedAppointment.pickupState,
-                        pickupCity: selectedAppointment.pickupCity,
-                        pickupPincode: selectedAppointment.pickupPincode,
-                        dropAddress: selectedAppointment.dropAddress,
-                        dropState: selectedAppointment.dropState,
-                        dropCity: selectedAppointment.dropCity,
-                        dropPincode: selectedAppointment.dropPincode,
-                        // Communication preference
-                        preferredCommunicationMode: selectedAppointment.preferredCommunicationMode,
-                        // Customer complaint/feedback
-                        customerFeedback: selectedAppointment.customerComplaint || "",
-                        // Other service details
-                        previousServiceHistory: selectedAppointment.previousServiceHistory,
-                        estimatedServiceTime: selectedAppointment.estimatedServiceTime,
-                        odometerReading: selectedAppointment.odometerReading,
+                        // === CUSTOMER DETAILS (Required) ===
+                        fullName: customer.name,
+                        mobilePrimary: customer.phone,
+                        customerType: customer.customerType || "B2C",
+                        customerAddress: customerAddress || "",
+
+                        // === VEHICLE DETAILS (Required) ===
+                        vehicleBrand: vehicle.vehicleMake,
+                        vehicleModel: vehicle.vehicleModel,
+                        registrationNumber: vehicle.registration,
+                        vinChassisNumber: vehicle.vin,
+                        variantBatteryCapacity: vehicle.variant || "",
+                        warrantyStatus: vehicle.warrantyStatus || "",
+
+                        // === INSURANCE DETAILS ===
+                        insuranceStartDate: vehicle.insuranceStartDate
+                            ? new Date(vehicle.insuranceStartDate).toISOString().split('T')[0]
+                            : "",
+                        insuranceEndDate: vehicle.insuranceEndDate
+                            ? new Date(vehicle.insuranceEndDate).toISOString().split('T')[0]
+                            : "",
+                        insuranceCompanyName: vehicle.insuranceCompanyName || "",
+
+                        // === SERVICE DETAILS (Required: customerFeedback) ===
+                        customerFeedback: selectedAppointment.customerComplaint || form.customerComplaint || "",
+                        odometerReading: selectedAppointment.odometerReading || form.odometerReading || "",
+                        previousServiceHistory: selectedAppointment.previousServiceHistory || "",
+                        estimatedServiceTime: selectedAppointment.estimatedServiceTime || "",
+                        estimatedDeliveryDate: selectedAppointment.estimatedDeliveryDate || "",
+
+                        // === STAFF ASSIGNMENT ===
+                        assignedServiceAdvisor: selectedAppointment.assignedServiceAdvisor || form.assignedServiceAdvisor || "",
+                        assignedTechnician: selectedAppointment.assignedTechnician || form.assignedTechnician || "",
+
+                        // === PICKUP/DROP DETAILS ===
+                        pickupDropRequired: selectedAppointment.pickupDropRequired || false,
+                        pickupAddress: selectedAppointment.pickupAddress || "",
+                        pickupState: selectedAppointment.pickupState || "",
+                        pickupCity: selectedAppointment.pickupCity || "",
+                        pickupPincode: selectedAppointment.pickupPincode || "",
+                        dropAddress: selectedAppointment.dropAddress || "",
+                        dropState: selectedAppointment.dropState || "",
+                        dropCity: selectedAppointment.dropCity || "",
+                        dropPincode: selectedAppointment.dropPincode || "",
+
+                        // === COMMUNICATION ===
+                        preferredCommunicationMode: selectedAppointment.preferredCommunicationMode || "",
+
+                        // === SERIAL NUMBERS (to be filled later) ===
+                        batterySerialNumber: "",
+                        mcuSerialNumber: "",
+                        vcuSerialNumber: "",
+                        otherPartSerialNumber: "",
+                        technicianObservation: "",
                     },
                 };
+
+                console.log("📋 Creating Temp Job Card with payload:", jobCardPayload);
 
                 // Create job card via API
                 const createdJobCard = await jobCardService.create(jobCardPayload as any);
 
                 if (createdJobCard) {
-                    console.log("✅ Job Card Created Successfully:", createdJobCard);
+                    console.log("✅ Temp Job Card Created Successfully:", createdJobCard);
                     console.log("Job Card ID:", createdJobCard.id);
                     console.log("Job Card Number:", createdJobCard.jobCardNumber);
                     createdJobCardId = createdJobCard.id;
-                    showToast(`Job card ${createdJobCard.jobCardNumber} created successfully! Redirecting...`, "success");
+                    showToast(`Temp Job Card ${createdJobCard.jobCardNumber} created! Redirecting...`, "success");
                 } else {
                     showToast("Customer arrival recorded. Appointment status updated.", "success");
                 }
