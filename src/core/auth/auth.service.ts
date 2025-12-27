@@ -23,9 +23,30 @@ class AuthService {
      * Login with email and password
      */
     async login(credentials: LoginCredentials): Promise<LoginResponse> {
-        const response = await apiClient.post<any>('/auth/login', credentials);
+        try {
+            console.log('[Auth Service] Attempting login with:', credentials.email);
 
-        if (response.data && response.data.access_token) {
+            const response = await apiClient.post<any>('/auth/login', credentials);
+
+            console.log('[Auth Service] Raw API response:', response);
+            console.log('[Auth Service] Response data:', response.data);
+
+            // Check if response has the expected structure
+            if (!response.data) {
+                console.error('[Auth Service] No data in response:', response);
+                throw new Error('Invalid response structure: missing data field');
+            }
+
+            if (!response.data.access_token) {
+                console.error('[Auth Service] No access_token in response.data:', response.data);
+                throw new Error('Invalid response: missing access_token');
+            }
+
+            if (!response.data.user) {
+                console.error('[Auth Service] No user in response.data:', response.data);
+                throw new Error('Invalid response: missing user data');
+            }
+
             // Map Backend User Extended Details to Frontend UserInfo
             const backendUser = response.data.user;
             const user: UserInfo = {
@@ -39,8 +60,11 @@ class AuthService {
                     : '??'
             };
 
+            console.log('[Auth Service] Mapped user:', user);
+
             // Store the real token
             Cookies.set('auth_token', response.data.access_token, { expires: 7 });
+            console.log('[Auth Service] Token stored in cookie');
 
             const loginResponse: LoginResponse = {
                 access_token: response.data.access_token,
@@ -50,11 +74,19 @@ class AuthService {
             // Update auth store
             const { setAuth } = useAuthStore.getState();
             setAuth(user.role, user);
+            console.log('[Auth Service] Auth store updated');
 
             return loginResponse;
+        } catch (error: any) {
+            console.error('[Auth Service] Login failed:', error);
+            console.error('[Auth Service] Error details:', {
+                message: error.message,
+                code: error.code,
+                status: error.status,
+                response: error.response
+            });
+            throw error;
         }
-
-        throw new Error('Login failed: Invalid response from server');
     }
 
     /**
