@@ -227,7 +227,7 @@ export const useAppointmentLogic = () => {
             : appointments;
 
         // Hide appointments that are IN_PROGRESS (they should appear in job cards instead)
-        filtered = filtered.filter(apt => apt.status !== "IN_PROGRESS" && apt.status !== "IN PROGRESS");
+        filtered = filtered.filter(apt => apt.status !== "IN_PROGRESS");
 
         return filtered;
     }, [appointments, serviceCenterContext, shouldFilterAppointments]);
@@ -263,8 +263,57 @@ export const useAppointmentLogic = () => {
                 };
             };
 
-            const enrichedAppointment = {
-                ...appointment,
+            // Map ALL fields from backend response to AppointmentRecord format
+            const enrichedAppointment: AppointmentRecord = {
+                id: fullDetails.id,
+                customerName: fullDetails.customer?.name || appointment.customerName,
+                vehicle: fullDetails.vehicle?.registration
+                    ? `${fullDetails.vehicle.vehicleModel} (${fullDetails.vehicle.registration})`
+                    : appointment.vehicle,
+                phone: fullDetails.customer?.phone || appointment.phone,
+                serviceType: fullDetails.serviceType,
+                date: fullDetails.appointmentDate ? new Date(fullDetails.appointmentDate).toISOString().split('T')[0] : appointment.date,
+                time: fullDetails.appointmentTime || appointment.time,
+                duration: fullDetails.duration || "1 hour",
+                status: fullDetails.status,
+                customerExternalId: fullDetails.customerId,
+                vehicleExternalId: fullDetails.vehicleId,
+                serviceCenterId: fullDetails.serviceCenterId,
+                serviceCenterName: fullDetails.serviceCenter?.name,
+                // Service Details
+                customerComplaint: fullDetails.customerComplaint,
+                previousServiceHistory: fullDetails.previousServiceHistory,
+                estimatedServiceTime: fullDetails.estimatedServiceTime,
+                estimatedCost: fullDetails.estimatedCost?.toString(),
+                odometerReading: fullDetails.odometerReading,
+                estimatedDeliveryDate: fullDetails.estimatedDeliveryDate
+                    ? new Date(fullDetails.estimatedDeliveryDate).toISOString().split('T')[0]
+                    : undefined,
+                // Staff Assignment
+                assignedServiceAdvisor: fullDetails.assignedServiceAdvisor,
+                assignedTechnician: fullDetails.assignedTechnician,
+                // Location & Pickup/Drop
+                location: fullDetails.location,
+                pickupDropRequired: fullDetails.pickupDropRequired,
+                pickupAddress: fullDetails.pickupAddress,
+                pickupState: fullDetails.pickupState,
+                pickupCity: fullDetails.pickupCity,
+                pickupPincode: fullDetails.pickupPincode,
+                dropAddress: fullDetails.dropAddress,
+                dropState: fullDetails.dropState,
+                dropCity: fullDetails.dropCity,
+                dropPincode: fullDetails.dropPincode,
+                // Communication
+                preferredCommunicationMode: fullDetails.preferredCommunicationMode,
+                // Check-in Fields
+                arrivalMode: fullDetails.arrivalMode,
+                checkInNotes: fullDetails.checkInNotes,
+                checkInSlipNumber: fullDetails.checkInSlipNumber,
+                checkInDate: fullDetails.checkInDate
+                    ? new Date(fullDetails.checkInDate).toISOString().split('T')[0]
+                    : undefined,
+                checkInTime: fullDetails.checkInTime,
+                // Documentation files
                 customerIdProof: mapFilesToCategory(FileCategory.CUSTOMER_ID_PROOF),
                 vehicleRCCopy: mapFilesToCategory(FileCategory.VEHICLE_RC),
                 warrantyCardServiceBook: mapFilesToCategory(FileCategory.WARRANTY_CARD),
@@ -272,7 +321,7 @@ export const useAppointmentLogic = () => {
             };
 
             const formData = convertAppointmentToFormData(enrichedAppointment);
-            setSelectedAppointment(appointment);
+            setSelectedAppointment(enrichedAppointment);
 
             // Set Customer and Vehicle for form display
             if (fullDetails.customer) {
@@ -397,7 +446,7 @@ export const useAppointmentLogic = () => {
                 appointmentDate: new Date(form.date).toISOString(),
                 appointmentTime: form.time,
                 customerComplaint: form.customerComplaint,
-                location: "STATION" as const,
+                location: form.location || "STATION",
                 estimatedCost: form.estimatedCost ? parseFloat(form.estimatedCost) : undefined,
                 documentationFiles: {
                     customerIdProof: form.customerIdProof?.metadata,
@@ -407,7 +456,7 @@ export const useAppointmentLogic = () => {
                 },
                 uploadedBy: userInfo?.id,
 
-                // Add missing operational details
+                // Operational details
                 estimatedDeliveryDate: form.estimatedDeliveryDate,
                 assignedServiceAdvisor: form.assignedServiceAdvisor,
                 assignedTechnician: form.assignedTechnician,
@@ -477,8 +526,8 @@ export const useAppointmentLogic = () => {
                     throw new Error("Missing required customer, vehicle, or service center information");
                 }
 
-                // Create job card with just IDs - backend will fetch related data via relations
-                // This follows proper database normalization - no data duplication
+                // Create job card with IDs and operational details from appointment
+                // Customer and Vehicle info comes from foreign keys (customerId, vehicleId)
                 const jobCardPayload = {
                     appointmentId: selectedAppointment.id.toString(),
                     customerId,
@@ -486,6 +535,33 @@ export const useAppointmentLogic = () => {
                     serviceCenterId,
                     serviceType: selectedAppointment.serviceType,
                     priority: "NORMAL",
+                    location: selectedAppointment.location || "STATION",
+                    // Pass only operational details from appointment to Job Card
+                    // Customer/Vehicle info is fetched via relations (no duplication)
+                    part1Data: {
+                        // Operational Details from Appointment
+                        estimatedDeliveryDate: selectedAppointment.estimatedDeliveryDate,
+                        assignedServiceAdvisor: selectedAppointment.assignedServiceAdvisor,
+                        assignedTechnician: selectedAppointment.assignedTechnician,
+                        // Pickup/Drop Info
+                        pickupDropRequired: selectedAppointment.pickupDropRequired,
+                        pickupAddress: selectedAppointment.pickupAddress,
+                        pickupState: selectedAppointment.pickupState,
+                        pickupCity: selectedAppointment.pickupCity,
+                        pickupPincode: selectedAppointment.pickupPincode,
+                        dropAddress: selectedAppointment.dropAddress,
+                        dropState: selectedAppointment.dropState,
+                        dropCity: selectedAppointment.dropCity,
+                        dropPincode: selectedAppointment.dropPincode,
+                        // Communication preference
+                        preferredCommunicationMode: selectedAppointment.preferredCommunicationMode,
+                        // Customer complaint/feedback
+                        customerFeedback: selectedAppointment.customerComplaint || "",
+                        // Other service details
+                        previousServiceHistory: selectedAppointment.previousServiceHistory,
+                        estimatedServiceTime: selectedAppointment.estimatedServiceTime,
+                        odometerReading: selectedAppointment.odometerReading,
+                    },
                 };
 
                 // Create job card via API

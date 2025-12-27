@@ -1,6 +1,17 @@
 // Import DocumentationFiles type before using it
 import type { DocumentationFiles } from '@/shared/types/documentation.types';
 
+// Backend AppointmentStatus enum values (must match Prisma schema)
+export type AppointmentStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "CANCELLED"
+  | "COMPLETED"
+  | "IN_PROGRESS"
+  | "ARRIVED"
+  | "QUOTATION_CREATED"
+  | "SENT_TO_MANAGER";
+
 export interface AppointmentRecord {
   id: string | number;
   customerName: string;
@@ -10,7 +21,7 @@ export interface AppointmentRecord {
   date: string;
   time: string;
   duration: string;
-  status: string;
+  status: AppointmentStatus;
   customerExternalId?: string;
   vehicleExternalId?: string;
   serviceCenterId?: number | string;
@@ -31,6 +42,7 @@ export interface AppointmentRecord {
   estimatedDeliveryDate?: string;
   assignedServiceAdvisor?: string;
   assignedTechnician?: string;
+  location?: "STATION" | "DOORSTEP";
   pickupDropRequired?: boolean;
   pickupAddress?: string;
   pickupState?: string;
@@ -155,5 +167,3 @@ export interface ServiceIntakeRequest {
 
 export type ToastType = "success" | "error";
 export type CustomerArrivalStatus = "arrived" | "not_arrived" | null;
-export type AppointmentStatus = "Confirmed" | "Pending" | "Cancelled";
-

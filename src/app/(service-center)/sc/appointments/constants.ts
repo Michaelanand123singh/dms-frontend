@@ -11,12 +11,15 @@ export const SERVICE_CENTER_CODE_MAP: Record<string, string> = {
 };
 
 export const STATUS_CONFIG: Record<string, { bg: string; text: string }> = {
-  Confirmed: { bg: "bg-green-100", text: "text-green-800" },
-  Pending: { bg: "bg-yellow-100", text: "text-yellow-800" },
-  Cancelled: { bg: "bg-red-100", text: "text-red-800" },
-  "In Progress": { bg: "bg-blue-100", text: "text-blue-800" },
-  "Sent to Manager": { bg: "bg-purple-100", text: "text-purple-800" },
-  "Quotation Created": { bg: "bg-indigo-100", text: "text-indigo-800" },
+  // Backend AppointmentStatus enum values (UPPERCASE with underscores)
+  PENDING: { bg: "bg-yellow-100", text: "text-yellow-800" },
+  CONFIRMED: { bg: "bg-green-100", text: "text-green-800" },
+  CANCELLED: { bg: "bg-red-100", text: "text-red-800" },
+  COMPLETED: { bg: "bg-emerald-100", text: "text-emerald-800" },
+  IN_PROGRESS: { bg: "bg-blue-100", text: "text-blue-800" },
+  ARRIVED: { bg: "bg-cyan-100", text: "text-cyan-800" },
+  QUOTATION_CREATED: { bg: "bg-indigo-100", text: "text-indigo-800" },
+  SENT_TO_MANAGER: { bg: "bg-purple-100", text: "text-purple-800" },
 };
 
 export const TOAST_DURATION = 3000;

@@ -28,6 +28,7 @@ export const convertAppointmentToFormData = (appointment: AppointmentRecord): Pa
     estimatedDeliveryDate: appointment.estimatedDeliveryDate,
     assignedServiceAdvisor: appointment.assignedServiceAdvisor,
     assignedTechnician: appointment.assignedTechnician,
+    location: appointment.location,
     pickupDropRequired: appointment.pickupDropRequired,
     pickupAddress: appointment.pickupAddress,
     pickupState: appointment.pickupState,
@@ -60,18 +61,6 @@ export const convertAppointmentToFormData = (appointment: AppointmentRecord): Pa
     insuranceEndDate: appointment.insuranceEndDate,
     insuranceCompanyName: appointment.insuranceCompanyName,
     vehicleColor: appointment.vehicleColor,
-    // Job Card Conversion Fields
-    batterySerialNumber: appointment.batterySerialNumber,
-    mcuSerialNumber: appointment.mcuSerialNumber,
-    vcuSerialNumber: appointment.vcuSerialNumber,
-    otherPartSerialNumber: appointment.otherPartSerialNumber,
-    technicianObservation: appointment.technicianObservation,
-    // Service Intake/Check-in Fields
-    arrivalMode: appointment.arrivalMode,
-    checkInNotes: appointment.checkInNotes,
-    checkInSlipNumber: appointment.checkInSlipNumber,
-    checkInDate: appointment.checkInDate,
-    checkInTime: appointment.checkInTime,
     // Documentation files (if stored as URLs)
     customerIdProof: appointment.customerIdProof,
     vehicleRCCopy: appointment.vehicleRCCopy,
